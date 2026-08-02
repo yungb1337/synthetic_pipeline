@@ -1,0 +1,20 @@
+# Parser Module (Extraction -> DOM) — pinned deps
+# Python >= 3.11
+
+# PDF text/layout backend
+pymupdf>=1.24
+
+# image reading (OCR input, TIFF, PNG, JPEG)
+pillow>=10
+
+# XLSX / spreadsheet
+openpyxl>=3.1
+
+# DOM models
+pydantic>=2.7
+
+# tests
+pytest>=8
+
+# --- on-prem OCR (optional runtime; lazily imported so the parser works without it) ---
+rapidocr-onnxruntime>=1.2

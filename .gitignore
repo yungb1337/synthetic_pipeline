@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[co]
+.venv/
+*.egg-info/
+
+# Local model weights — large binaries (gitignore; use Git LFS if you want them tracked)
+models/
+.huggingface/
+.cache/
+
+# Parser runtime output
+_parser_out/
+_cli_out/
+_samples/
+_scale_corpus/
+_scale_out/
+_demo_corpus/
+_demo_out/
+_workspace/
+work/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

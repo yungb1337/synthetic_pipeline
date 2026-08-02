@@ -1,0 +1,782 @@
+Synthetic Data Generation: A Comparative Study
+
+Asha Mannarapotta Venugopal            Tung Son Tran                                                   Markus Endres
+
+          University of Passau         University of Passau                                            University of Passau
+            Passau, Germany              Passau, Germany                                                 Passau, Germany
+
+ asha.mannarapottavenugopal@uni-  tungson.tran@uni-passau.de                                     markus.endres@uni-passau.de
+                 passau.de
+
+ABSTRACT                                                                                            Using real data for different purposes like algorithm testing,
+                                                                                                 Machine Learning training or various Data Science applications
+Generating synthetic data similar to realistic data is a crucial task                            in business and industries suffer from different problems: original
+in data augmentation and data production. Due to the preservation                                data is often highly secure, takes a lot of time to be accessible,
+of authentic data distribution, synthetic data provide concealment                               and it cannot be used for testing hypothetical scenarios. Therefore,
+of sensitive information and therefore enable Big Data acquisition                               generating synthetic data is quite important for researchers and
+for model training without facing privacy challenges. Nevertheless,                              business developers to overcome real data usage restrictions. It
+the obstacles arise starting with acquiring real-world open-source                               allows to simulate not yet encountered conditions and it can be
+data to effectively synthesizing new samples as genuine as possible.                             generated to meet specific needs or conditions that are not available
+In this paper, a comparative study is conducted by considering the                               in existing (real) data. Another familiar constraint is the lack of
+efficacy of different generative models like Generative Adversarial                              specific characteristics in a dataset required for certain applications
+Network (GAN), Variational Autoencoder (VAE), Synthetic Minority                                 or domains, which typically cannot be obtained effortlessly and
+Oversampling Technique (SMOTE), Data Synthesizer (DS), Synthetic                                 economically.
+Data Vault with Gaussian Copula (SDV-G), Conditional Generative
+Adversarial Networks (SDV-GAN), and SynthPop Non-Parametric                                         In practice, often scanty authentic data serve as template from
+(SP-NP) approach to synthesize data with regard to various datasets.                             which synthetic data can be produced algorithmically, e.g. when
+We used the pairwise correlation and Synthetic Data (SD) metrics                                 privacy requirements limit data usage and variability. Typical ap-
+as utility measures respectively between real data and generated                                 plications where synthetic data is a "must-have" are autonomous
+data for evaluation. Accordingly, this paper investigates the effects                            driving, financial services, healthcare, model training, and consumer
+of various data generation models, and the processing time of every                              behaviour evaluation in marketing and social media analysis.
+model is included as one of the evaluation metrics.
+                                                                                                    Research communities and organizations involved in Machine
+CCS CONCEPTS                                                                                     Learning development need adequate datasets consisting of various
+                                                                                                 characteristics for experimental purposes. Large, accessible and
+· General and reference  Surveys and overviews.                                                  privacy compromising-free datasets therefore are much desired.
+                                                                                                 Nevertheless in many cases, real data is often not sufficient to com-
+KEYWORDS                                                                                         prise such a dataset that meets the demand required to carry out
+                                                                                                 experiments and approaches due to numerous concerns as afore-
+Synthetic Data, Neural Networks, Generative Models                                               mentioned. Missing values or corrupted records due to errors in
+                                                                                                 measurement or data encryption and storage, data is too expensive
+ACM Reference Format:                                                                            to acquire due to technological constraints or consent requirements,
+Asha Mannarapotta Venugopal, Tung Son Tran, and Markus Endres. 2022.                             are among the many popular contributing reasons. Synthetic data
+Synthetic Data Generation: A Comparative Study. In International Data-                           henceforth becomes a promising alternative to alleviate these lim-
+base Engineered Applications Symposium (IDEAS'22), August 22-24, 2022,                           itations and opens up opportunities in a wide range of domains
+Budapest, Hungary. ACM, New York, NY, USA, 9 pages. https://doi.org/10.                          like privacy protection, image generation, healthcare, data mining,
+1145/3548785.3548793                                                                             pattern recognition, etc.
+
+1 INTRODUCTION                                                                                      In this paper, we present a comparative study in order to iden-
+                                                                                                 tify the most efficient data generation method according to certain
+Synthetic data refers to artificial information rather than those that                           use cases. Seven models were inspected, namely Generative Adver-
+are recorded from real-world events via direct measurement [7].                                  sarial Network (GAN), Variational Autoencoder (VAE), Synthetic
+Artificial data is used when real data is not available, cannot be                               Minority Oversampling Technique (SMOTE), Data Synthesizer (DS),
+used due to privacy concerns and avoids business data vulnerable                                 Synthetic Data Vault with Gaussian Copula (SDV-G), Conditional
+to data breaches.                                                                                Generative Adversarial Networks (SDV-GAN), and SynthPop Non-
+                                                                                                 Parametric (SP-NP). For each use case, identical configurations
+Permission to make digital or hard copies of all or part of this work for personal or            such as working environment, hardware, training dataset (Adult
+classroom use is granted without fee provided that copies are not made or distributed            Census Data, Airbnb Data, and Airlines Data) from open sources
+for profit or commercial advantage and that copies bear this notice and the full citation        and programs are applied to every model to ensure fairness in per-
+on the first page. Copyrights for components of this work owned by others than ACM               formance evaluation, which considers processing time, generation
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,          speed and generated data quality. To the best of our knowledge,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a      many of these models have been widely applied in contemplate
+fee. Request permissions from permissions@acm.org.
+IDEAS'22, August 22-24, 2022, Budapest, Hungary
+© 2022 Association for Computing Machinery.
+ACM ISBN 978-1-4503-9709-4/22/08. . . $15.00
+https://doi.org/10.1145/3548785.3548793
+
+                                                                                             94
+IDEAS'22, August 22-24, 2022, Budapest, Hungary                                             Asha Mannarapotta Venugopal, Tung Son Tran, and Markus Endres
+
+works, but there have not been a research that examines their ef-            data) is achieved to be similar as that of the output schema (gen-
+ficacy in comparison and thus, this becomes the objective of our             erated data). Finally, the evaluation is conducted on the generated
+contribution.                                                                data to assess quality as well as to compare models performance
+                                                                             according to certain evaluation metrics which will be further de-
+   This paper is structured as follows: Section 2 describes our used         scribed subsequently.
+data generation models, the architecture pipeline, and the used
+datasets. Details on the implementation strategies and challenges            2.2 Synthetic Data Generation Models
+can be found in Section 3. All experiments and results are presented
+in Section 4. In Section 5 we discuss related work, and Section 6            Seven frameworks considered in this study, namely Synthetic Mi-
+contains a summarization.                                                    nority Oversampling Technique (SMOTE), Generative Adversar-
+                                                                             ial Network (GAN), SynthPop Non-Parametric (SP-NP), Synthetic
+2 BACKGROUND                                                                 Data Vault with Gaussian Copula (SDV-G), Variational Autoen-
+                                                                             coder (VAE), Data Synthesizer (DS) and Conditional Generative
+In this section we provide an outline of our synthetic data genera-          Adversarial Networks (SDV-GAN) are outlined in Table 1. A brief
+tion pipeline. We give a brief overview on our architecture, the data        summary of each model is disclosed in Section 3, while their detailed
+preprocessing step, the used models and datasets. We also present            descriptions are referred to the bibliography.
+details of our evaluation techniques.
+                                                                                                  Table 1: List of used models
+2.1 Pipeline Architecture
+                                                                             Year Name      Full name                                  Ref.
+Our workflow is defined by four steps (Figure 1), starting with data
+collection and preprocessing where the preprocessed data becomes             2002 SMOTE     Synthetic Minority Oversampling Technique  [2]
+the input of the training phase, in which various features and char-
+acteristics such as data types, value ranges, pattern and distribution,      2014 GAN       Generative Adversarial Network             [6]
+etc. are extracted and captured. Data quality requirements include
+                                                                             2015 SP-NP     SynthPop Non-Parametric                    [13]
+                   Figure 1: Pipeline architecture
+                                                                             2016 SDV-G     Synthetic Data Vault with Gaussian Copula  [14]
+the consistency, accuracy, integrity, timeliness, interpretability, and
+believability of the dataset. The raw data, which is the original            2017 DS        Data Synthesizer                           [16]
+form of the real data supposed to be used as the training data, most
+often comprises incomplete, inconsistent data and lack of values or          2017 VAE       Variational Autoencoder                    [8]
+attributes depending on the different types of datasets. Therefore,
+we transformed the raw dataset into a clean and understandable               2019 SDV-GAN Conditional Generative Adversarial Networks [17]
+dataset that can be used for training with the generator models
+[11]. In order to achieve this, we performed Data Collection, Data           2.3 Datasets
+Cleaning, and Data Analysis and Extraction. Data Collection involves
+gathering and measuring the featured variables of the datasets en-           For our experiments we used datasets consisting of varying records.
+abling the target outcome for the next phases such implementation            First, the Adult Census Data1 (30,162 records with 11 attributes
+and evaluation. Data Cleaning is applied to check and fill in the            after data preprocessing) is the census data from 1994 based on
+missing values, remove noise data, detect or remove outliers, and            income (originally possess 48,842 records with 14 attributes) with
+correct inconsistent data. Data Analysis and Extraction takes place          multivariate dataset characteristics consisting of both categorical
+by reviewing the data and checking them for missing values, and              and numerical data. Second, Airbnb Data2 (213,451 records with
+removing noise data if any.                                                  11 attributes after data preprocessing) has details of new users
+                                                                             from Airbnb with demographics, web records and other statistics
+   Trained models subsequently can be readily used for inference             (initially with same number of records and 16 attributes) holding
+tasks, where synthetic data can be generated based on user con-              different type of attributes that consists of categorical, numerical
+figurations queried to the models. Such configurations can specify           and timeseries data. And third, Airlines Dataset3 (1,046,595 records
+desired sample quantity to be produced, value range as well as distri-       after data preprocessing) has flight travel details of adult passengers
+bution. The data distribution present in the input schema (original          (1,048,575 records with 30 attributes before data preprocessing) with
+                                                                             several attributes consisting of categorical and numerical data. We
+                                                                             have choosen these datasets because of different type of attributes
+                                                                             holding varying data distribution and enabling the betterment of im-
+                                                                             plementation process in finding the advantages and disadvantages
+                                                                             of each model while handling the datasets.
+
+                                                                             2.4 Evaluation Techniques
+
+                                                                             This section describes the two evaluation techniques used to evalu-
+                                                                             ate the datasets on the compared models on the basis of it efficacy
+                                                                             and utility. The used techniques are Pairwise Correlation and SD
+                                                                             Metrics.
+
+                                                                             2.4.1 Pairwise Correlation and Proximity Value. Pairwise correla-
+                                                                             tion is the correlation distance observed between two variables.
+                                                                             Correlation distance is a famous method of estimating the distance
+
+                                                                             1UCI Machine Learning Repository (2019): https://archive.ics.uci.edu/ml/datasets/
+
+                                                                             census+income
+                                                                             2 Airbnb:
+                                                                                            https://www.kaggle.com/competitions/airbnb- recruiting- new- user-
+
+                                                                             bookings/overview
+                                                                             3AirlinesCodrnaAdult: https://www.openml.org/d/1240
+
+                                                                         95
+Synthetic Data Generation: A Comparative Study                                                                         IDEAS'22, August 22-24, 2022, Budapest, Hungary
+
+between two random variables with limited variances. When the                 vector and that of a selected nearest neighbor with a random value
+distance of two items is zero, at that point they are the equivalent,         between 0 and 1, then add the result to the input feature vector. This
+and vice versa [1]. The method evaluates the correlation of real              results in the decision boundary of the minority classes becoming
+data and synthetic data. The concept behind this technique is to              more general.
+determine if the relationship between the variables in the real data
+are preserved in the generated synthetic data, which is done as                  Implementation. We adopted the SMOTE technique with Label
+follows:                                                                      Encoding and Logistic Regression. Label Encoding is used in con-
+                                                                              verting the labels (data in each row or column or cell) into numeric
+(1) Firstly by observing the n variables of real data and storing             format making it easier for the Machine Learning models to pro-
+    it in a matrix df_real.corr.                                              cess the dataset whereas Logistic Regression helps in predicting the
+                                                                              variables which are categorically dependent. In order to generate
+(2) Then the n variables of synthetic data are observed and                   duplicate/fake values, SMOTE requires to have one or two columns.
+    stored in a matrix df_synth.corr.                                         This allows the data to be manipulated and to produce new random
+                                                                              values. SMOTE is initialized for oversampling so that the data can
+By exploring the output values from data generation, we check                 be transformed. This is done with a random state of 2 and also by
+                                                                              setting a sampling_strategy ratio to assign the number of samples
+whether the pairwise correlation structure of the real data is firmly         to be generated because the data was earlier split into two forms,
+                                                                              one with one or two columns and reference and the other set that
+reflected by the correlation structure of the synthetic data and              includes all the features of all the columns.
+
+then determine the pairwise correlation distance for both real data              Challenges. SMOTE faces certain challenges while generating
+                                                                              synthetic data. The main challenges include overlapping of classes,
+and synthetic data and calculate the difference between them. To              creating additional noise and it is also hard to implement it for very
+                                                                              high dimensional data. We overcome this by analyzing the samples
+accomplish this, the correlation difference diff is calculated as             and their respective labels from the results of Label Encoding. The
+                                                                              hyperparameters were standard to all the 3 datasets where we
+follows:                                           (1)                        have the random_state as 2 and k_neighbours as 1. By tuning the
+                                                                              hyperparameters in random_state and k_neighbours, the similarity
+          diff = df_real.corr - df_synth.corr                                 or differences in resulting values were very minute. SMOTE in
+                                                                              general requires sufficient amount of samples to compare during the
+   For a generated dataset of good quality, diff should be close to '0',      oversampling phase, we must ensure there are sufficient samples
+which is the proximity value. The proximity values of bad quality             (specifically where we have more than 2 labels) in the columns
+are far from '0'. Proximity is the measure of similarity and dissimi-         (particular column attributes) of the dataset. This was done during
+larity between the data points. The proximity value referred in this          the data preprocessing where we analyze the data and check if all
+case mean the value obtained after the observation of correlation             the attributes hold sufficient number of samples possessing more
+distance between real data and synthetic data [5].                            than 2 labels.
+
+2.4.2 SD Metrics. SD metrics are developed under the SDV project              3.2 GAN
+4 [14] both to evaluate the relationship of synthetic data with real
+data and to test the quality of the former one. It is a dataset-agnostic      Generative Adversarial Network (GAN) [6] is a Neural Network
+tool that supports various data modalities such as single column,             (NN)-based approach consisting of two components: a generative
+column pairs, single table, multi table and timeseries. It also in-           model G that learns the distribution from training data, then pro-
+cludes a variety of metrics such as statistical, detection, efficacy,         duces samples from it, and a discriminative model D that tries to
+privacy, Bayesian Network and Gaussian Mixture. These metrics                 distinguish the generated samples as real or fake. The objective of
+are a combination of several metrics such as CSTest (Chi-Squared),            the training process is to maximize the error of the discriminator D
+KSTest (Inverted Kolmogorov-Smirnov D statistic), KSTestExtended,             on classifying samples produced by the generator G, thus inherently
+LogisticDetection (Logistic Regression Detection), SVCDetection               maximizing the synthesized samples similarity to authentic sam-
+(Support Vector Classification Detection), BNLikelihood (Bayesian             ples. Both models are trained independently, in which the generator
+Network Likelihood), BNLogLikelihood (Bayesian Network Log                    gain more efficiency at producing similar (better) synthetic data,
+Likelihood), LogisticParentChildDetection (Logistic Regression De-            while the discriminator becomes increasingly skilled at identifying
+tection), and SVCParentChildDetection (Support Vector Classifica-             these data.
+tion Detection). Here, values close to '0' mean that the data is not
+of good quality, and values close to '1' mean the data is of good                Implementation. The implementation of GAN mainly uses Label
+quality. SD Metrics is available as a library in Python.                      Encoding (similar like Synthetic Minority Oversampling Technique
+                                                                              (SMOTE)) and Clustering. Clustering helps in dividing the data
+3 IMPLEMENTATION DETAILS AND                                                  points into groups where the data points of the same group are
+    CHALLENGES                                                                similar to those in the other group. The batch size is set to 100 so that
+                                                                              the whole set of data is handled in batches of 100 on each iteration.
+In this section we present more details on the used models and also           Next, two variables are initialized, one for the discriminator and the
+discuss implementation issues and challenges we had so solve in               other for the generator with the value 1. It is mainly the number
+order to compare all models.                                                  of discriminator network updates per adversarial training step and
+
+3.1 SMOTE
+
+SMOTE [2] is an over-sampling technique that generates data for
+minority classes by inputting a sample from each of such classes.
+Then it creates synthetic samples based on its corresponding k
+Nearest Neighbors (kNN) in the feature space. The new samples are
+generated by multiplying the difference between the input feature
+
+4SD Metrics: https://github.com/sdv-dev/SDMetrics
+
+                                                                          96
+IDEAS'22, August 22-24, 2022, Budapest, Hungary                                                 Asha Mannarapotta Venugopal, Tung Son Tran, and Markus Endres
+
+number of generator network updates per adversarial training step,          while the latter allows the completion of data based on some given
+respectively. These act as the key hyperparameter arguments which           information.
+are standard for all the datasets. Then the column labels and column
+data are initialized with the columns of the trained data for the              Implementation. The framework of SDV is advantageous for
+class and if not for the column labels. The training data with no           direct implementation for all types of dataset. Input and generated
+label is initialized with the training data of the data columns.            synthetic data are in the form of dataframes. It is also to be noted
+                                                                            that Label Encoding can be used for all the SDV models. SDV-G is
+   Challenges. In general, it is difficult to train GANs as they have       implemented directly by only assigning the Gaussian Copula model
+several problems such as non-convergence and mode collapse. Non-            for the generator.
+convergence is when the parameters are unstable and do not con-
+verge. Mode collapse is when the generator collapses and generates             Challenges. In general, Gaussian Copula works only for linear
+limited variety of samples. There occurs an unbalance between               correlation problems and not when there is tail dependence. Tail
+generator and discriminator that causes overfitting and when it             dependence is a concept of clustering of large events which are
+comes to hyperparameter selection, they become highly sensitive.            extremely important for risk management problems. So, for this
+To overcome this, it is important to balance between generator and          task SDV-G servers to beneficial, but for clustering problems it is
+discriminator to avoid overfitting in the training.                         in question.
+
+3.3 SP-NP                                                                   3.5 SDV-GAN
+
+SynthPop Non-Parametric (SP-NP) [13] is a Python package of the             Conditional Generative Adversarial Networks (SDV-GAN) [17] is
+original R package SYNTHPOP which uses the functions and struc-             an adapted framework of SDV-G using Conditional GAN (CTGAN),
+ture of the mice multiple imputation package and extends it for the         a data generator to generate synthetic tabular (categorical) data
+purpose of synthetic data generation. The basic functionality of            based on GAN, which can handle varied feature types for both
+SYNTHPOP is to generate synthetic forms of microdata containing             discrete and continuous data that claim to outperform the existing
+sensitive information. It has two modes, namely parametric and non-         GAN models, Variational Autoencoder (VAE) and Bayesian Net-
+parametric. Parametric is a mixture of logistic regression with linear      works when applied on benchmarking datasets. This also includes
+regression, which uses binary, numeric, ordered and unordered fac-          some new techniques such as mode-specific normalization to aug-
+tor of data types designated in a vector (default parametric method)        ment the training process, change in architecture and to resolve the
+and can be customized if needed. Non-parametric uses Classifica-            data imbalance by implementing conditional generator and training
+tion and Regression Trees (CART) (default non-parametric method)            by sampling. We call this model as SDV-GAN since CTGAN is also
+that is based on classification and regression trees, which handles         a part of the SDV-G framework.
+all types of variables having predictors and can be applied for all
+data types. In this paper, we use only the non-parametric version.             Implementation. Since the framework of SDV can be directly
+                                                                            implemented for all types of datasets where the input data is in
+   Implementation. The implementation of SP-NP involves Label               the form of a dataframe and the generated synthetic data is also
+Encoding, similar to SMOTE where the input data is encoded and              in the form of a dataframe, the setup is similar to the implementa-
+given as input to the generator function. In general, SYNTHPOP              tion of SDV-G. So, SDV-GAN is also implemented directly by only
+requires dtypes (data types) as one of its main hyperparameters             assigning the CTGAN model for the generator.
+apart from the feature contents. So it is necessary to specify the
+data types of every column attribute in this dtypes respectively for           Challenges. SDVs also have problems with producing complete
+each dataset. The results obtained from the generator is decoded to         results when the samples are too less for an attribute type. Larger
+the original input data structure which serves to be our synthetic          datasets with sufficient amount of categorical data can overcome
+data.                                                                       this issues and also smaller datasets, when trained multiple times,
+                                                                            overcome this in certain cases.
+   Challenges. SYNTHPOP had to be customized for every single
+dataset based on their attribute type. It also does not work well           3.6 VAE
+with float and categorical data formats. This is the reason why we
+use Label Encoding to overcome this challenge.                              VAE [8] is a NN-based approach capable of capturing complicated
+                                                                            data distribution and produce synthetic data that are similar to the
+3.4 SDV-G                                                                   original data, which consists of two components: an encoder and a
+                                                                            decoder. The former captures dimensional dependencies by map-
+Synthetic Data Vault with Gaussian Copula (SDV-G) [14] is a frame-          ping the input data into the latent space, while the latter takes the
+work that generates synthetic data by utilizing a multivariate model        latent variable as input to generate samples. Mathematically, VAE
+derived from the intersection of various tables in a relational data-       is classified as a variational Bayesian method and thus is different
+base. The modeling of the whole database is performed by taking             in formulation to autoencoders despite the architecture similarity.
+input consisting of the data tables themselves and their correspond-
+ing metadata. The relationship between tables is computed recur-               Implementation. The implementation of VAE is as difficult as
+sively using Conditional Parameter Aggregation (CPA) to handle              GAN, escpecially for the purpose of generating categorical data.
+foreign key relations, while the relationship between columns of a          Here, we use Label Encoding just like SMOTE, GAN and SP-NP.
+table is computed using multivariate Gaussian Copula to calculate           Since VAEs already possess an encoder and decoder, the process of
+covariance. The framework is capable of performing model-based              generation takes more time compared to any other model. But it is
+and knowledge based synthesis, where the former allows user to              not possible to avoid the label encoding because the encoder and
+synthesize a complete database using solely the computed model,             decoder functions result in some null values when implemented
+                                                                            directly.
+
+                                                                        97
+Synthetic Data Generation: A Comparative Study                                      IDEAS'22, August 22-24, 2022, Budapest, Hungary
+
+   Challenges. The main challenge of VAE is the consumption of             is evaluated for each column of synthetic data against each column
+processing time. In future, we might be able to overcome this when         of real data. The models have good proximity, where '0' means
+implementing and running on a GPU environment.                             we have a closer proximity and any value far from '0' means the
+                                                                           proximity is low. Also we have a good SD Metric score, where
+3.7 DS                                                                     '1' means the generated synthetic data is of good quality whereas
+                                                                           '0' means the quality of data is low. The heatmaps represent the
+Data Synthesizer (DS) [16] is a framework consisting of three mod-         pairwise correlation distance between each column attribute of the
+ules: a Data Describer, a Data Generator and a Model Inspector. The        synthetic data and each column attribute of the real data.
+Data Describer inspects the input data types, correlations and at-
+tributes distribution to create a summary, from which synthetic               We performed different experiments on different datasets as
+samples are generated by the Data Generator. The Model Inspec-             described below:
+tor is responsible for visualizing the summary, allowing accuracy
+evaluation and parameters adjustment. It has three modes: the de-             (1) The first experiment begins with generating and evaluating
+fault correlated attribute mode, the independent attribute mode for                the Adult Census Data with 10K records for the 7 models
+the cases of expensive correlation computation cost or inadequate                  SMOTE, GAN, SP-NP, SDV-G, SDV-GAN, VAE and DS.
+samples, and the random mode for cases of exceedingly sensitive
+data.                                                                         (2) The second experiment is with full Adult Census Data where
+                                                                                   we have 30,162 records for which we perform experiments
+   Implementation. The framework of DS is implemented directly                     for the models SMOTE, GAN, SP-NP, SDV-G, SDV-GAN and
+using the random mode as we need our data to be handled sen-                       DS. We excluded VAE here because it took longer runtime
+sitively, but it has problems in generating timeseries data. We in-                of about 4 days and resulting in a value error occurred from
+cluded the timeseries generation by using the datetime Python                      the float point matrix of the generated dataset.
+library. The main implementation is carried out by inputting the
+dataset file as a whole and drawing its features into a JSON file             (3) The fourth experiment is for Airbnb Data (213,451 records)
+which acts a medium in generating the synthetic data having the                    which includes all necessary types of attributes such as cate-
+same features as the real data. This is one of the reasons why it                  gorical, numerical and timeseries. Here, we performed ex-
+is time efficient. The threshold value is the hyperparameter for                   periments for the models SMOTE, SP-NP, SDV-G and DS
+Data Describer which is standard for all the datasets and it is noted              and not for GAN, SDV-GAN and VAE, because the models
+that this threshold is always less than the domain size when the                   produce memory error due to huge number of records.
+attribute is categorical.
+                                                                              (4) Finally, the last experiment is conducted on Airlines Data
+   Challenges. Inability to generate timeseries is a major drawback                (1,046,595), which possess more than a million records on
+to the model. But if this can be fixed using some additional time-                 models SMOTE, SP-NP, SDV-G and DS. Similar to the Airbnb
+series generation methods, then this serves to be one very beneficial              Data, we do not perform experiments on GAN, SDV-GAN
+for synthetic data generation as the time consumption is very less.                and VAE.
+
+4 EXPERIMENTS AND RESULTS                                                  4.2.1 Results on Adult Data. The first experiment with 10K records
+                                                                           of Adult Census data is conducted and shows that the models
+In this section, we present our comparative study and discuss the          SMOTE, GAN, SP-NP, SDV-G, SDV-GAN, VAE and DS are suc-
+experiments conducted elaborately by describing and presenting             cessfully implemented. From the represented results in Table 2, it is
+the results obtained throughout the experimental phase 5.                  feasible to understand the performance nature and the comparison
+                                                                           of the proximity levels and SD Metrics.
+4.1 Experimental Setup
+                                                                           Table 2: Adult Census Data (10K records)
+The experiments are fourfold to the goals of this paper after suc-
+cessful completion of the implementation and evaluation. The ex-                    Adult Census Data (10K records)
+periments are mainly carried out on different datasets stored in
+CSV files, namely Adult Census Data (30,162 records), Airbnb Data                   Proximity Level SD Metrics Processing Time
+(213,451 records) and Airlines Data (1,046,595 records). For more
+details we refer to Section 2.3.                                           GAN      0.0127  0.8564                   26.2 minutes
+                                                                           VAE
+   The environmental setup for the experiment consists of Python           SMOTE    0.1903  0.3704                   21.2 hours
+3.9, Jupyter Notebook with Anaconda3, PyCharm IDE, and required            DS
+libraries installed on a Ubuntu platform. The Ubuntu platform is           SDV-G    0.0055  0.7833                   2.6 minutes
+a server with Ubuntu 20.04, 754GB RAM, Intel(R) Xeon(R) Gold               SDV-GAN
+processor and CPU at 2.60GHz. The Data Preprocessing is done               SP-NP    0.0190  0.0967                   0.4 seconds
+using Jupyter Notebook, Synthetic Data Generation and Evaluations
+are carried out on PyCharm.                                                         0.0002  0.6434                   7.0 seconds
+
+4.2 Accumulated Results                                                             0.0065  0.6830                   3.8 minutes
+
+The results obtained from the experiments are depicted in Tables                    0.0007  0.8595                   2.6 minutes
+2 - 5 as well as in the form of heatmaps (Figures 2 - 4 in the
+Appendix). Finding the proximity and SD Metrics (cp. Section 2.4)             Table 3 shows the results conducted on the Adult Census Data
+                                                                           with 30,162 records, whereas the heatmaps (Appendix, Figure 2)
+5Source Code: https://github.com/ashamvenu/SyntheticData.git               represent the pairwise correlation distance of synthetic data and
+                                                                           real data. The models SDV-G and SP-NP have better scores with
+                                                                           respect to the proximity level, while SMOTE, GAN, SP-NP and SDV-
+                                                                           GAN have better scores with respect to SD Metrics and in terms of
+                                                                           processing time, DS and SDV-G outperform the other models, but
+                                                                           SMOTE and SP-NP have resulted in a reasonable processing time.
+
+                                                                       98
+IDEAS'22, August 22-24, 2022, Budapest, Hungary                                               Asha Mannarapotta Venugopal, Tung Son Tran, and Markus Endres
+
+Table 3: Adult Census Data Results                                        5 RELATED WORK
+
+         Adult Census Data                                                Synthetic data generation has been a significant research topic for
+                                                                          the past two decades. However, most of the research work is based
+         Proximity Level SD Metrics              Processing Time          on artificial image generation and the focus on text data has been
+                                                          1.9 hours       rising only in the recent years. There are many papers dealing with
+GAN      0.0402  0.8621                                                   synthetic data generation and we are not able to mention all of
+SMOTE                                                  8.9 minutes        them. In this section, beside the models proposed in Section 2 and
+DS       0.0372  0.7296                                1.3 seconds        3, we mention the most relevant work related to our study.
+SDV-G                                                 17.9 seconds
+SDV-GAN  0.0219  0.0977                              25.7 minutes            In a comparative work conducted by Dandekar et al. [4] on Lin-
+SP-NP                                                  9.0 minutes        ear Regression, Decision Tree, Random Forest and Neural Networks,
+         0.0029  0.6426                                                   the results show that NNs are more effective w.r.t. utility and privacy
+                                                                          on the basis of running time. However, the evaluation also shows
+         0.0100  0.7134                                                   that the normalized Kullback-Leibler divergence scores are more
+                                                                          or less the same for all the four models. Considering the importance
+         0.0054  0.8644                                                   of implementing flexible models for synthetic data generation by
+                                                                          calculating nuances of multivariate structures, Manrique-Vallier
+4.2.2 Results on Airbnb Data. We carried out the experiment on            and Hu [12] proposed a Bayesian non-parametric method to pre-
+the Airbnb Data. The models of GAN, VAE and SDV-GAN failed to             serve complex multivariate data relationships between different
+run, producing a termination of the program due to huge amount            variables subject to structured zeros by a tool called Truncated
+of data samples ultimately causing a memory error. Hence, this            non-Parametric Latent Class Model (TNPLCM) using Full Condi-
+experiment was performed only on SMOTE, SP-NP, SDV-G and DS.              tional Specification (FCS) approach, CART method and Random
+The results (Table 4) obtained from Airbnb data show that SMOTE           Forests. This results in producing high quality of analytical data
+and SP-NP result in better proximity compared to DS and SDV-G.            which exposes low risk. For this reason, we have used SP-NP in our
+In terms of processing time, DS scores far better than the other          research, which uses CART method for its non-parametric version.
+three models. The heatmaps found in the Appendix, Figure 3, show
+the correlation distance between the real data and synthetic data            Peng and Telle [15] published a complete tool for synthetic data
+for each column and feature in the Airbnb Data. Table 4 depicts the       generation, employing three algorithms namely Random Data Gen-
+results in terms of proximity level and processing time of Airbnb         eration, Decision Tree and Multilinear Regression for different use
+Data. SD Metrics is not evaluated for Airbnb Data as the SD Metrics       cases depending on their respective data mining pattern. While
+is not capable for large datasets and result in memory error as           being satisfactory on the aspect of software functionality, adequate
+SD Metrics framework is designed to evaluate the dataframes of            evaluation of output quality and processing time was not provided.
+synthetic data and real data as a whole.
+                                                                             Beside textual data, synthetic time series generation is also in
+                     Table 4: Airbnb Data Results                         demand, particularly in domains where sensor data analysis is
+                                                                          involved such as healthcare applications. Dahmen and Cook [3]
+         Airbnb Data                                                      introduced a Machine Learning approach based on hidden Markov
+                                                                          models and models. The generated data have been evaluated us-
+         Proximity Level Processing Time                                  ing time series distance measures against the authentic, manually
+                                                                          annotated smart-home data and exhibited to be highly realistic as
+SMOTE    0.0036                                  1.5 hours                well as capable of improving the accuracy of the model it was used
+DS                                                                        to train on. However, the results show only the accuracy of which
+SDV-G    0.0093                                  33.6 seconds             we find the scores to be not satisfactory considering the quality of
+SP-NP                                                                     the generated data in comparison with the real data.
+         0.0102                                  2.6 minutes
+                                                                             Lecanzo and Arias [10] introduced three different generation
+         0.0008                                  1.6 hours                methods with traditional datasets based on item-based generative
+                                                                          models, where two of the models Itemset Generating Model (IGM)
+4.2.3 Results on Airline Data. Similarly to Airbnb Data, the ex-          and Interesting Itemset Miner (IIM) are over itemsets and the third
+periments are carried out only on SMOTE, SP-NP, SDV-G and DS              one Latent Dirichlet Allocation (LDA) is using textual corpora. Eval-
+models. The results (cp. Table 5) show that SMOTE and SP-NP               uation is carried out based on characteristics (pattern similarity),
+result in better proximity compared to DS and SDV-G. Also here,           preservation of itemsets, privacy and runtime. This determines the
+the processing time of DS is far better than the other three models.      strength and weakness of each model in which IGM has the lowest
+Again, the heatmaps are shown in Figure 4 and present the corre-          learning phase runtime, while IIM scores best in data generation.
+lation distance between the real data and synthetic data for each         Though the results depicts the runtime in seconds, the amount of
+column in the Airlines dataset. Table 5 depicts the results in terms      data used is unclear to consider the evaluation.
+of proximity level and processing time of Airlines Data. Similar to
+Airbnb Data, we did not evaluate SD Metrics due to memory errors.            Leduc and Grislain [9] proposed an architecture called Compos-
+                                                                          able Generative Model (CGM) which is an auto-regressive model
+         Table 5: Airlines Data Results                                   that inputs column embeddings through a transformer, evaluated
+                                                                          using Synthetic Data Gym (SDGym) benchmark and claiming CGM
+         Airlines Data
+
+         Proximity Level Processing Time
+
+SMOTE    0.0148                                  7.7 hours
+DS
+SDV-G    0.0287                                  90.3 seconds
+SP-NP
+         0.0282                                  11.9 minutes
+
+         0.0008                                  6.9 hours
+
+                                                                      99
+Synthetic Data Generation: A Comparative Study                                                            IDEAS'22, August 22-24, 2022, Budapest, Hungary
+
+to be the best state-of-the-art approach. The concept of using an                          [9] Johan Leduc and Nicolas Grislain. 2021. Composable Generative Models. CoRR
+encoder, decoder and loss function seems reliable but the evaluation                            abs/2102.09249 (2021). arXiv:2102.09249 https://arxiv.org/abs/2102.09249
+scores do not justify the claims with respect to synthetic data.
+                                                                                          [10] Christian Lezcano and Marta Arias. 2020. Synthetic Dataset Generation with
+6 CONCLUSION AND DISCUSSION                                                                     Itemset-Based Generative Models. CoRR abs/2007.06300 (2020). arXiv:2007.06300
+                                                                                                https://arxiv.org/abs/2007.06300
+In this paper we considered the challenge of generating synthetic
+data based on real data. The objective of our paper was to compare                        [11] Jasdeep Singh Malik, Prachi Goyal, and Mr. Akhilesh K Sharma. 2010. A Com-
+several state-of-the-art approaches to synthesize data in order to                              prehensive Approach Towards Data Preprocessing Techniques & Association
+find out the efficiency of the proposed models. We used different                               Rules.
+real world datasets as a basis for our data-driven tasks, namely
+Adult Census data, Airbnb data, and Airlines data to analyze and                          [12] Daniel Manrique-Vallier and Jingchen (Monika) Hu. 2018. Bayesian Non-
+depict the difference in performance as well as the behaviour of                                parametric Generation of Fully Synthetic Multivariate Categorical Data in the
+all seven models. We conducted several experiments of which the                                 Presence of Structural Zeros. Journal of the Royal Statistical Society: Series A
+initial experiments show that SMOTE, SP-NP, SDV-G and DS are                                    (Statistics in Society) 181 (02 2018). https://doi.org/10.1111/rssa.12352
+better among the 7 models chosen in terms of proximity, SD Metrics
+and processing time. GAN, SDV-GAN and VAE are not capable for                             [13] Beata Nowok. 2015. synthpop : An R package for generating synthetic versions
+large datasets, hence we run further experiments on SMOTE, SP-                                  of sensitive microdata for statistical disclosure control.
+NP, SDV-G and DS to analyze which among these 4 models give
+us more promising results. By the end of all the experiments, we                          [14] Neha Patki, Roy Wedge, and Kalyan Veeramachaneni. 2016. The Synthetic
+come to a conclusion that SMOTE and SP-NP are the most effective                                Data Vault. In 2016 IEEE International Conference on Data Science and Advanced
+methods in terms of proximity and SDV-G and DS are effective in                                 Analytics (DSAA). 399-410. https://doi.org/10.1109/DSAA.2016.49
+terms of processing time.
+                                                                                          [15] Taoxin Peng and Alexander Telle. 2018. A Tool for Generating Synthetic Data.
+   Our next step will be to consider models for text data generation,                           In Proceedings of the First International Conference on Data Science, E-Learning
+which is out of scope in this work due to being a more challenging                              and Information Systems. Association for Computing Machinery, New York, NY,
+task. Unlike the categorical data types, natural language generation                            USA, Article 22, 6 pages. https://doi.org/10.1145/3279996.3280018
+involves language modelling which is a complicated and demand-
+ing process that requires more sophisticated model architectures,                         [16] Haoyue Ping, Julia Stoyanovich, and Bill Howe. 2017. DataSynthesizer: Privacy-
+enormous amount of data, robust hardware to accommodate and                                     Preserving Synthetic Datasets. In Proceedings of the 29th International Conference
+longer training time. In addition, evaluating generated text quality                            on Scientific and Statistical Database Management. Article 42, 5 pages. https:
+is also an obstacle to be addressed, as identifying suitable metrics for                        //doi.org/10.1145/3085504.3091117
+automatic validation can be much less straightforward and counter
+intuitive, while human evaluation is certainly way too expensive                          [17] Lei Xu, Maria Skoularidou, Alfredo Cuesta-Infante, and Kalyan Veeramachaneni.
+to be included.                                                                                 2019. Modeling Tabular data using Conditional GAN. CoRR abs/1907.00503
+                                                                                                (2019). arXiv:1907.00503 http://arxiv.org/abs/1907.00503
+ACKNOWLEDGMENTS
+                                                                                          APPENDIX
+This research is part of the project "BigScience", which is funded
+by the Bavarian State Ministry for Economic Affairs, Regional De-                                         SMOTE                                                                       0.3
+velopment and Energy under the grant number DIK0259/01.                                                   age 0.00 0.00 -0.00 -0.27 0.06 -0.22 -0.08 0.15 -0.05 0.05 -0.08
+
+REFERENCES                                                                                                user_id 0.00 0.00 -0.07 0.09 -0.07 0.08 0.06 -0.04 -0.11 -0.03 0.04         0.2
+
+ [1] Atanu Bhattacharjee. 2014. Distance Correlation Coefficient: An Application          Synthetic Data  education -0.00 -0.07 0.00 -0.02 -0.08 -0.03 -0.08 0.01 -0.11 0.01 0.01
+      with Bayesian Approach in Clinical Data Analysis. Journal of Modern Applied                         catergory -0.27 0.09 -0.02 0.00 0.14 -0.43 -0.17 0.31 -0.04 0.11 -0.23 0.1
+      Statistical Methods 13, 1 (2014), 23.
+                                                                                                          martial_status 0.06 -0.07 -0.08 0.14 0.00 0.12 0.01 -0.09 -0.06 -0.03 0.04  0.0
+ [2] Kevin W. Bowyer, Nitesh V. Chawla, Lawrence O. Hall, and W. Philip Kegelmeyer.
+      2011. SMOTE: Synthetic Minority Over-sampling Technique. CoRR abs/1106.1813                         occupation -0.22 0.08 -0.03 -0.43 0.12 0.00 -0.12 0.21 -0.04 0.07 -0.16
+      (2011).                                                                                             relationship -0.08 0.06 -0.08 -0.17 0.01 -0.12 0.00 -0.01 -0.11 0.03 -0.08 0.1
+
+ [3] Jessamyn Dahmen and Diane Cook. 2019. SynSys: A Synthetic Data Generation                            gender 0.15 -0.04 0.01 0.31 -0.09 0.21 -0.01 0.00 0.08 -0.05 0.13           0.2
+      System for Healthcare Applications. Sensors 19, 5 (2019). https://doi.org/10.3390/
+      s19051181                                                                                                  hours -0.05 -0.11 -0.11 -0.04 -0.06 -0.04 -0.11 0.08 0.00 0.01 0.02
+                                                                                                          country_from 0.05 -0.03 0.01 0.11 -0.03 0.07 0.03 -0.05 0.01 0.00 0.04 0.3
+ [4] Ashish Dandekar, Remmy A. M. Zen, and Stéphane Bressan. 2018. A Compara-
+      tive Study of Synthetic Dataset Generation Techniques. In Database and Expert                       salary -0.08 0.04 0.01 -0.23 0.04 -0.16 -0.08 0.13 0.02 0.04 0.00           0.4
+      Systems Applications. Springer International Publishing, 387-395.
+                                                                                                          age
+ [5] B.S Everitt and David C. Howell. 2005. Encyclopedia of Statistics in Behavioral                           user_id
+      Science. Vol. 3. Wiley, 1621-1628.                                                                            education
+                                                                                                                         catergory
+ [6] Ian Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing Xu, David Warde-Farley,                                             martial_status
+      Sherjil Ozair, Aaron Courville, and Yoshua Bengio. 2014. Generative Adversarial                                               occupation
+      Nets. Advances in neural information processing systems 27 (2014).                                                                 relationship
+                                                                                                                                               gender
+ [7] McGraw Hill and S.P. Parker. 2003. McGraw-Hill Dictionary of Scientific and                                                                    hours
+      Technical Terms. McGraw-Hill Education. https://books.google.de/books?id=                                                                          country_from
+      xOPzO5HVFfEC                                                                                                                                             salary
+                                                                                                          Real Data
+ [8] Diederik P Kingma and Max Welling. [n.d.]. Auto-Encoding Variational Bayes.
+      https://doi.org/10.48550/ARXIV.1312.6114                                                            GAN
+                                                                                                          age 0.00 -0.10 0.28 0.11 0.07 -0.03 0.08 -0.03 0.13 0.19 0.08
+                                                                                                                                                                                      0.25
+
+                                                                                                          user_id -0.10 0.00 0.11 -0.08-0.00 0.02 0.00 -0.10 0.03 0.00 0.01 0.20
+                                                                                                          education 0.28 0.11 0.00 -0.02-0.08 0.16 -0.10 0.12 0.08 -0.07 0.01
+                                                                                                                                                                                      0.15
+                                                                                                          catergory 0.11 -0.08-0.02 0.00 0.13 0.22 -0.01-0.12 0.04 0.02 0.02
+                                                                                          Synthetic Data
+                                                                                                          martial_status 0.07 -0.00-0.08 0.13 0.00 0.04 -0.09-0.01-0.01-0.14 0.07     0.10
+
+                                                                                                          occupation -0.03 0.02 0.16 0.22 0.04 0.00 0.04 -0.03 0.01 -0.06 0.02        0.05
+
+                                                                                                          relationship 0.08 0.00 -0.10-0.01-0.09 0.04 0.00 -0.16 0.01 -0.11-0.07 0.00
+                                                                                                              gender -0.03-0.10 0.12 -0.12-0.01-0.03-0.16 0.00 0.13 0.02 0.12
+
+                                                                                                          hours 0.13 0.03 0.08 0.04 -0.01 0.01 0.01 0.13 0.00 0.04 -0.01              0.05
+
+                                                                                                          country_from 0.19 0.00 -0.07 0.02 -0.14-0.06-0.11 0.02 0.04 0.00 -0.12      0.10
+
+                                                                                                          salary 0.08 0.01 0.01 0.02 0.07 0.02 -0.07 0.12 -0.01-0.12 0.00             0.15
+
+                                                                                                          age
+                                                                                                              user_id
+                                                                                                                   education
+                                                                                                                        catergory
+                                                                                                                             martial_status
+                                                                                                                                  occupation
+                                                                                                                                       relationship
+                                                                                                                                            gender
+                                                                                                                                                 hours
+                                                                                                                                                     country_from
+                                                                                                                                                          salary
+                                                                                                          Real Data
+
+100
+IDEAS'22, August 22-24, 2022, Budapest, Hungary                                                                       Asha Mannarapotta Venugopal, Tung Son Tran, and Markus Endres
+
+                        Sp-Np                                                                                         DS
+                                                                                                                      age 0.00 -0.07 0.01 0.08 -0.28-0.01-0.24 0.08 0.10 -0.00 0.25
+                       age 0.00 0.01 -0.01 0.01 -0.01 0.00 -0.01 0.02 0.01 -0.00 0.01    0.020                                                                                                   0.2
+                    user_id 0.01 0.00 0.00 -0.01-0.01 0.00 -0.00 0.00 0.01 -0.01 0.01    0.015                        user_id -0.07 0.00 -0.03-0.04 0.04 0.00 0.02 0.03 -0.03-0.07-0.01 education 0.01 -0.03 0.00 0.00 -0.04-0.04-0.01-0.03 0.07 0.08 0.08 0.1
+                 education -0.01 0.00 0.00 -0.00 0.01 0.01 0.01 0.01 -0.00 0.01 0.01     0.010
+                 catergory 0.01 -0.01-0.00 0.00 -0.01-0.01-0.02 0.02 0.02 0.01 0.01Synthetic Data0.005Synthetic Data  catergory 0.08 -0.04 0.00 0.00 -0.02 0.01 -0.07 0.07 0.05 -0.00 0.01       0.0
+             martial_status -0.01-0.01 0.01 -0.01 0.00 -0.01 0.01 -0.02-0.01 0.01 -0.01  0.000
+                occupation 0.00 0.00 0.01 -0.01-0.01 0.00 -0.00 0.00 -0.00 0.00 0.00                                  martial_status -0.28 0.04 -0.04-0.02 0.00 0.03 0.17 -0.12-0.18-0.04-0.19   0.1
+               relationship -0.01-0.00 0.01 -0.02 0.01 -0.00 0.00 -0.01-0.00 0.02 -0.01   0.005
+                    gender 0.02 0.00 0.01 0.02 -0.02 0.00 -0.01 0.00 0.01 -0.02 0.01      0.010                       occupation -0.01 0.00 -0.04 0.01 0.03 0.00 -0.05 0.06 0.01 -0.00 0.07 0.2
+                     hours 0.01 0.01 -0.00 0.02 -0.01-0.00-0.00 0.01 0.00 0.01 0.02       0.015                       relationship -0.24 0.02 -0.01-0.07 0.17 -0.05 0.00 -0.58-0.25-0.02-0.26
+              country_from -0.00-0.01 0.01 0.01 0.01 0.00 0.02 -0.02 0.01 0.00 0.01
+                     salary 0.01 0.01 0.01 0.01 -0.01 0.00 -0.01 0.01 0.02 0.01 0.00                                  gender 0.08 0.03 -0.03 0.07 -0.12 0.06 -0.58 0.00 0.23 -0.00 0.23          0.3
+
+                                                                                                                      hours 0.10 -0.03 0.07 0.05 -0.18 0.01 -0.25 0.23 0.00 0.02 0.22            0.4
+
+                                                                                                                      country_from -0.00-0.07 0.08 -0.00-0.04-0.00-0.02-0.00 0.02 0.00 0.02 0.5
+                                                                                                                            salary 0.25 -0.01 0.08 0.01 -0.19 0.07 -0.26 0.23 0.22 0.02 0.00
+
+                age                                                                                                   age
+                    user_id                                                                                               user_id
+                         education                                                                                            education
+                              catergory                                                                                            catergory
+                                   martial_status                                                                                      martial_status
+                                        occupation                                                                                          occupation
+                                             relationship                                                                                       relationship
+                                                  gender                                                                                             gender
+                                                       hours                                                                                             hours
+                                                           country_from                                                                                      country_from
+                                                                salary                                                                                            salary
+                Real Data
+                                                                                                                      Real Data
+
+                              SDV-G                                                                                   Figure 2: Heatmaps of Adult Data
+
+                   age 0.00 -0.03 0.01 0.01 -0.28 0.01 -0.08 0.02 -0.09 0.00 0.12                                                    SMOTE
+                user_id -0.03 0.00 -0.02-0.02 0.03 -0.00-0.00 0.02 0.00 -0.04-0.00 0.1
+                                                                                                                              id 0.00 0.00 -0.01-0.01-0.01-0.00 0.01 0.00 0.00 0.01 0.00
+                education 0.01 -0.02 0.00 0.02 -0.04-0.04-0.02-0.02 0.07 0.06 0.10                                    timestamp 0.00 0.00 0.00 0.01 -0.01-0.01 0.00 -0.00-0.00 0.01 -0.01 0.25
+
+Synthetic Data      catergory 0.01 -0.02 0.02 0.00 -0.04 0.02 -0.05 0.06 0.02 0.00 -0.00 0.0                          gender -0.01 0.00 0.00 -0.03 0.04 -0.13 0.11 0.00 -0.03 0.03 -0.03 0.20
+                martial_status -0.28 0.03 -0.04-0.04 0.00 0.03 0.15 -0.11-0.20-0.04-0.19
+                                                                                                      Synthetic Data  category -0.01 0.01 -0.03 0.00 0.03 -0.09 0.08 -0.00-0.02 0.01 -0.03 0.15
+
+                occupation 0.01 -0.00-0.04 0.02 0.03 0.00 -0.07 0.06 0.04 0.01 0.08 0.1                                 language -0.01-0.01 0.04 0.03 0.00 0.09 -0.07 0.00 -0.01 0.00 0.03 0.10
+                relationship -0.08-0.00-0.02-0.05 0.15 -0.07 0.00 -0.33-0.10-0.01-0.15                                aff_channel -0.00-0.01-0.13-0.09 0.09 0.00 0.29 -0.00-0.04 0.05 -0.11
+
+                gender 0.02 0.02 -0.02 0.06 -0.11 0.06 -0.33 0.00 0.11 -0.00 0.16                                     aff_provider 0.01 0.00 0.11 0.08 -0.07 0.29 0.00 -0.00 0.02 -0.03 0.08     0.05
+                 hours -0.09 0.00 0.07 0.02 -0.20 0.04 -0.10 0.11 0.00 0.01 0.11 0.2
+                                                                                                                      signup_app 0.00 -0.00 0.00 -0.00 0.00 -0.00-0.00 0.00 0.03 -0.00-0.00 0.00
+
+                country_from 0.00 -0.04 0.06 0.00 -0.04 0.01 -0.01-0.00 0.01 0.00 0.02                                first_dev_type 0.00 -0.00-0.03-0.02-0.01-0.04 0.02 0.03 0.00 0.02 -0.01 0.05
+                                                                                                                       first_browser 0.01 0.01 0.03 0.01 0.00 0.05 -0.03-0.00 0.02 0.00 0.01
+                salary 0.12 -0.00 0.10 -0.00-0.19 0.08 -0.15 0.16 0.11 0.02 0.00         0.3
+                                                                                                                                                                                                 0.10
+                                                                                                                      country_dest 0.00 -0.01-0.03-0.03 0.03 -0.11 0.08 -0.00-0.01 0.01 0.00
+                age
+                    user_id                                                                                           id
+                         education                                                                                        timestamp
+                              catergory
+                                   martial_status                                                                              gender
+                                        occupation                                                                                  category
+                                             relationship                                                                                language
+                                                  gender                                                                                      aff_channel
+                                                       hours                                                                                       aff_provider
+                                                           country_from                                                                                 signup_app
+                                                                salary                                                                                       first_dev_type
+                Real Data                                                                                                                                        first_browser
+                                                                                                                                                                      country_dest
+                                                                                                                                                 Real Data
+                SDV-GAN                                                                  0.15
+                age 0.00 0.10 0.02 -0.03-0.14-0.05-0.12 0.09 0.01 0.01 0.01                                                            Sp-Np
+                                                                                                                                                                                                 0.006
+                  user_id 0.10 0.00 -0.00 0.07 -0.04 0.05 -0.04 0.03 0.02 0.02 0.15 0.10                                         id 0.00 -0.00-0.00-0.00-0.00-0.00 0.00 -0.00-0.00-0.00-0.00     0.004
+                education 0.02 -0.00 0.00 -0.01 0.04 -0.02 0.06 -0.12-0.04-0.01-0.02                                     timestamp -0.00 0.00 -0.00-0.00-0.00 0.00 0.00 0.00 0.00 0.00 -0.00     0.002
+                                                                                                                                                                                                 0.000
+Synthetic Data      catergory -0.03 0.07 -0.01 0.00 0.00 0.03 -0.02 0.05 0.02 -0.04 0.05 0.05         Synthetic Data        gender -0.00-0.00 0.00 -0.00-0.00 0.00 0.00 -0.00-0.00 0.00 0.01
+                martial_status -0.14-0.04 0.04 0.00 0.00 0.05 0.11 -0.07-0.04-0.01-0.05                                   category -0.00-0.00-0.00 0.00 -0.00 0.00 0.00 -0.00-0.01 0.00 0.01      0.002
+                                                                                                                          language -0.00-0.00-0.00-0.00 0.00 -0.00 0.00 -0.00 0.00 -0.00 0.00     0.004
+                occupation -0.05 0.05 -0.02 0.03 0.05 0.00 -0.03 0.06 -0.03-0.05-0.02 0.00                              aff_channel -0.00 0.00 0.00 0.00 -0.00 0.00 0.01 0.00 -0.00 0.00 0.00     0.006
+                relationship -0.12-0.04 0.06 -0.02 0.11 -0.03 0.00 -0.08-0.04-0.03-0.01                                aff_provider 0.00 0.00 0.00 0.00 0.00 0.01 0.00 -0.00-0.01 0.00 0.00
+                                                                                                                        signup_app -0.00 0.00 -0.00-0.00-0.00 0.00 -0.00 0.00 0.01 0.00 0.00
+                gender 0.09 0.03 -0.12 0.05 -0.07 0.06 -0.08 0.00 -0.02 0.02 -0.01       0.05                         first_dev_type -0.00 0.00 -0.00-0.01 0.00 -0.00-0.01 0.01 0.00 -0.00 0.00
+                                                                                                                       first_browser -0.00 0.00 0.00 0.00 -0.00 0.00 0.00 0.00 -0.00 0.00 0.00
+                hours 0.01 0.02 -0.04 0.02 -0.04-0.03-0.04-0.02 0.00 -0.02 0.03                                        country_dest -0.00-0.00 0.01 0.01 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+
+                country_from 0.01 0.02 -0.01-0.04-0.01-0.05-0.03 0.02 -0.02 0.00 0.02    0.10
+
+                salary 0.01 0.15 -0.02 0.05 -0.05-0.02-0.01-0.01 0.03 0.02 0.00
+
+                age                                                                                                   id
+                    user_id                                                                                               timestamp
+                         education
+                              catergory                                                                                        gender
+                                   martial_status                                                                                   category
+                                        occupation                                                                                       language
+                                             relationship                                                                                     aff_channel
+                                                  gender                                                                                           aff_provider
+                                                       hours                                                                                            signup_app
+                                                           country_from                                                                                      first_dev_type
+                                                                salary                                                                                           first_browser
+                                                                                                                                                                      country_dest
+                Real Data                                                                                             Real Data
+
+                                                                                                 101
+Synthetic Data Generation: A Comparative Study                                                                                                                                                                     IDEAS'22, August 22-24, 2022, Budapest, Hungary
+
+                SDV-G                                                                                                                                                                                     Airline              Sp-Np                                                   0.008
+                id 0.00 -0.00-0.00 0.00 -0.00 0.01 0.01 0.00 -0.00 0.00 0.01                                                                                                                               Flight                                                                      0.006
+                                                                                              0.3                                                                                                    AirportFrom   0.00 0.00-0.000.00-0.00-0.00-0.00-0.00-0.000.00 0.00-0.000.00       0.004
+                                                                                                                                                                                                       AirportTo   0.00 0.00 0.00 0.00 0.00 0.00-0.00-0.00-0.000.00 0.00-0.000.00      0.002
+                timestamp -0.00 0.00 0.00 -0.00-0.00 0.00 0.00 -0.01 0.01 -0.00-0.01                                                                                                                       Time    -0.000.00 0.00 0.00 0.00-0.00-0.00-0.00-0.000.00 0.00-0.000.00      0.000
+                                                                                                                                                                                                         Length    0.00 0.00 0.00 0.00-0.00-0.000.00 0.00 0.00-0.00-0.000.00-0.00
+                gender -0.00 0.00 0.00 0.33 0.01 -0.05 0.03 0.03 -0.04-0.00 0.05              0.2                                                                                                      catergory   -0.000.00 0.00-0.000.00-0.000.00 0.00 0.00-0.00-0.000.00-0.00        0.002
+                                                                                                                                                                                                       education   -0.000.00-0.00-0.00-0.000.00 0.00 0.00 0.00-0.00-0.000.00-0.00       0.004
+Synthetic Data  category 0.00 -0.00 0.33 0.00 0.03 -0.09 0.07 -0.02-0.05-0.03-0.00                                                                                                 Synthetic Data  marital_status  -0.00-0.00-0.000.00 0.00 0.00 0.00 0.00-0.000.00 0.00-0.000.00       0.006
+                language -0.00-0.00 0.01 0.03 0.00 -0.01 0.01 -0.01 0.03 -0.03 0.00 0.1                                                                                                               occupation   -0.00-0.00-0.000.00 0.00 0.00 0.00 0.00-0.00-0.00-0.000.00-0.00
+                                                                                                                                                                                                     relationship  -0.00-0.00-0.000.00 0.00 0.00-0.00-0.000.00 0.00 0.01-0.01-0.01
+                aff_channel 0.01 0.00 -0.05-0.09-0.01 0.00 0.02 0.01 -0.05 0.09 0.00 0.0                                                                                                                 gender    0.00 0.00 0.00-0.00-0.00-0.000.00-0.000.00 0.00-0.000.01-0.00
+                aff_provider 0.01 0.00 0.03 0.07 0.01 0.02 0.00 -0.07 0.01 -0.01-0.01                                                                                                              country_from    0.00 0.00 0.00-0.00-0.00-0.000.00-0.000.01-0.000.00 0.01-0.00
+                                                                                                                                                                                                                   -0.00-0.00-0.000.00 0.00 0.00-0.000.00-0.010.01 0.01 0.00-0.00
+                signup_app 0.00 -0.01 0.03 -0.02-0.01 0.01 -0.07 0.00 0.26 -0.03 0.01         0.1                                                                                                                  0.00 0.00 0.00-0.00-0.00-0.000.00-0.00-0.01-0.00-0.00-0.000.00
+
+                first_dev_type -0.00 0.01 -0.04-0.05 0.03 -0.05 0.01 0.26 0.00 -0.29 0.00
+
+                first_browser 0.00 -0.00-0.00-0.03-0.03 0.09 -0.01-0.03-0.29 0.00 -0.00       0.2
+
+                country_dest 0.01 -0.01 0.05 -0.00 0.00 0.00 -0.01 0.01 0.00 -0.00 0.00                                                                                                                            Airline
+                                                                                                                                                                                                                       Flight
+                id                                                                                                                                                                                                          AirportFrom
+                    timestamp                                                                                                                                                                                                   AirportTo
+                                                                                                                                                                                                                                     Time
+                         gender                                                                                                                                                                                                          Length
+                              category                                                                                                                                                                                                        catergory
+                                   language                                                                                                                                                                                                       education
+                                        aff_channel                                                                                                                                                                                                    marital_status
+                                             aff_provider                                                                                                                                                                                                  occupation
+                                                  signup_app                                                                                                                                                                                                    relationship
+                                                       first_dev_type                                                                                                                                                                                                gender
+                                                           first_browser                                                                                                                                                                                                 country_from
+                                                                country_dest                                                                                                                                       Real Data
+                Real Data
+
+                                  DS                                                                                                                                                                               SDV-G                                                               0.6
+                                                                                                                                                                                                   Airline 0.00 0.31 0.36-0.10-0.35-0.400.10-0.020.08-0.09-0.040.06 0.03
+                id 0.00 -0.00-0.00 0.00 -0.00 0.00 0.01 0.00 0.00 0.00 0.00 timestamp -0.00 0.00 -0.00 0.00 -0.00 0.00 0.00 -0.00 0.01 -0.01-0.00 0.4
+                                                                                                                                                                                                   Flight 0.31 0.00 0.18-0.24-0.05-0.050.08-0.010.06-0.07-0.040.05 0.03                0.4
+
+                gender -0.00-0.00 0.00 0.47 0.01 -0.04 0.04 0.02 -0.05-0.00 0.10              0.3                                                                                                  AirportFrom 0.36 0.18 0.00-0.26-0.25-0.240.11-0.020.08-0.09-0.040.07 0.04
+
+Synthetic Data  category 0.00 0.00 0.47 0.00 0.04 -0.07 0.09 -0.02-0.05-0.03-0.01 0.2                                                                                              Synthetic Data  AirportTo -0.10-0.24-0.260.00 0.31 0.30-0.070.02-0.060.07 0.02-0.05-0.02 Time -0.35-0.05-0.250.31 0.00 0.07-0.110.01-0.090.10 0.05-0.07-0.04 0.2
+                language -0.00-0.00 0.01 0.04 0.00 -0.01 0.02 0.00 0.03 -0.03-0.00
+                                                                                                                                                                                                     Length -0.40-0.05-0.240.30 0.07 0.00-0.110.01-0.090.10 0.06-0.08-0.04 0.0
+                aff_channel 0.00 0.00 -0.04-0.07-0.01 0.00 0.38 0.01 -0.05 0.08 -0.01         0.1                                                                                                  catergory 0.10 0.08 0.11-0.07-0.11-0.110.00-0.190.62-0.75-0.310.54 0.28
+
+                aff_provider 0.01 0.00 0.04 0.09 0.02 0.38 0.00 -0.08 0.01 -0.01-0.02 0.0                                                                                                          education -0.02-0.01-0.020.02 0.01 0.01-0.190.00-0.150.15 0.16-0.180.02             0.2
+
+                signup_app 0.00 -0.00 0.02 -0.02 0.00 0.01 -0.08 0.00 0.31 -0.04-0.00         0.1                                                                                                  marital_status 0.08 0.06 0.08-0.06-0.09-0.090.62-0.150.00-0.55-0.090.33 0.21
+
+                first_dev_type 0.00 0.01 -0.05-0.05 0.03 -0.05 0.01 0.31 0.00 -0.29-0.02                                                                                                           occupation -0.09-0.07-0.090.07 0.10 0.10-0.750.15-0.550.00 0.22-0.44-0.28           0.4
+
+                first_browser 0.00 -0.01-0.00-0.03-0.03 0.08 -0.01-0.04-0.29 0.00 -0.00       0.2                                                                                                  relationship -0.04-0.04-0.040.02 0.05 0.06-0.310.16-0.090.22 0.00-0.65-0.30
+
+                country_dest 0.00 -0.00 0.10 -0.01-0.00-0.01-0.02-0.00-0.02-0.00 0.00                                                                                                              gender 0.06 0.05 0.07-0.05-0.07-0.080.54-0.180.33-0.44-0.650.00 0.31                0.6
+
+                                                                                                                                                                                                   country_from 0.03 0.03 0.04-0.02-0.04-0.040.28 0.02 0.21-0.28-0.300.31 0.00
+
+                id                                                                                                                                                                                                 Airline
+                    timestamp                                                                                                                                                                                          Flight
+                                                                                                                                                                                                                            AirportFrom
+                        gender                                                                                                                                                                                                  AirportTo
+                             category                                                                                                                                                                                                Time
+                                 language                                                                                                                                                                                                Length
+                                      aff_channel                                                                                                                                                                                             catergory
+                                          aff_provider                                                                                                                                                                                            education
+                                               signup_app                                                                                                                                                                                              marital_status
+                                                   first_dev_type                                                                                                                                                                                          occupation
+                                                       first_browser                                                                                                                                                                                            relationship
+                                                            country_dest                                                                                                                                                                                             gender
+                Real Data                                                                                                                                                                                                                                                country_from
+                                                                                                                                                                                                                   Real Data
+
+                Figure 3: Heatmaps of Airbnb Data                                                                                                                                                                  DS
+
+                               SMOTE                                                                                                                                                               Airline 0.00 0.47 0.56-0.27-0.57-0.680.12-0.030.09-0.10-0.030.07 0.03               0.6
+
+                Airline 0.00-0.06-0.060.07 0.07 0.05-0.270.10-0.150.22 0.04-0.14-0.03 0.3                                                                                                          Flight 0.47 0.00 0.44-0.31-0.51-0.660.10-0.030.08-0.09-0.020.06 0.03
+
+                Flight -0.060.00-0.070.06 0.07 0.04-0.240.09-0.140.19 0.04-0.13-0.03                                                                                                               AirportFrom 0.56 0.44 0.00-0.36-0.62-0.660.12-0.030.10-0.11-0.030.07 0.04 AirportTo -0.27-0.31-0.360.00 0.41 0.47-0.080.02-0.060.07 0.02-0.05-0.02 0.4
+
+                AirportFrom -0.06-0.070.00 0.07 0.06 0.06-0.290.11-0.170.23 0.04-0.15-0.03 0.2                                                                                     Synthetic Data  Time -0.57-0.51-0.620.41 0.00 0.74-0.140.04-0.110.12 0.03-0.08-0.04                 0.2
+                  AirportTo 0.07 0.06 0.07 0.00-0.06-0.060.20-0.070.12-0.16-0.030.10 0.02
+                                                                                                                                                                                                   Length -0.68-0.66-0.660.47 0.74 0.00-0.150.04-0.120.13 0.04-0.09-0.04
+                Time 0.07 0.07 0.06-0.060.00-0.050.31-0.110.18-0.25-0.050.16 0.03                                                                                                                                                                                                      0.0
+Synthetic Data                                                                                0.1                                                                                                  catergory 0.12 0.10 0.12-0.08-0.14-0.150.00-0.230.66-0.80-0.270.56 0.29
+
+                Length 0.05 0.04 0.06-0.06-0.050.00 0.33-0.120.19-0.26-0.050.17 0.04                                                                                                               education -0.03-0.03-0.030.02 0.04 0.04-0.230.00-0.180.19 0.13-0.190.01 marital_status 0.09 0.08 0.10-0.06-0.11-0.120.66-0.180.00-0.59-0.050.34 0.22 0.2
+
+                catergory -0.27-0.24-0.290.20 0.31 0.33 0.00 0.11 0.04 0.03-0.090.02 0.12 0.0                                                                                                      occupation -0.10-0.09-0.110.07 0.12 0.13-0.800.19-0.590.00 0.19-0.45-0.29                                                                         0.4
+                education 0.10 0.09 0.11-0.07-0.11-0.120.11 0.00 0.09 0.00 0.01 0.05 0.06
+
+                marital_status -0.15-0.14-0.170.12 0.18 0.19 0.04 0.09 0.00-0.07-0.000.05 0.07 occupation 0.22 0.19 0.23-0.16-0.25-0.260.03 0.00-0.070.00 0.15-0.11-0.20 0.1                       relationship -0.03-0.02-0.030.02 0.03 0.04-0.270.13-0.050.19 0.00-0.64-0.29                                                                       0.6
+
+                                                                                                                                                                                                   gender 0.07 0.06 0.07-0.05-0.08-0.090.56-0.190.34-0.45-0.640.00 0.31
+
+                relationship 0.04 0.04 0.04-0.03-0.05-0.05-0.090.01-0.000.15 0.00 0.01-0.20                                                            0.2                                         country_from 0.03 0.03 0.04-0.02-0.04-0.040.29 0.01 0.22-0.29-0.290.31 0.00
+
+                gender -0.14-0.13-0.150.10 0.16 0.17 0.02 0.05 0.05-0.110.01 0.00 0.14                                                                                                                             Airline
+                                                                                                                                                                                                                       Flight
+                country_from -0.03-0.03-0.030.02 0.03 0.04 0.12 0.06 0.07-0.20-0.200.14 0.00                                                                                                                               AirportFrom
+                                                                                                                                                                                                                               AirportTo
+                Airline                                                                                                                                                                                                            Time
+                    Flight                                                                                                                                                                                                             Length
+                         AirportFrom                                                                                                                                                                                                       catergory
+                             AirportTo                                                                                                                                                                                                         education
+                                  Time                                                                                                                                                                                                              marital_status
+                                      Length                                                                                                                                                                                                            occupation
+                                           catergory                                                                                                                                                                                                        relationship
+                                               education                                                                                                                                                                                                        gender
+                                                    marital_status                                                                                                                                                                                                  country_from
+                                                        occupation                                                                                                                                                         Real Data
+                                                             relationship                                                                                                                          Figure 4: Heatmaps of Airlines Data
+                                                                  gender
+                                                                      country_from
+                Real Data
+
+                                                                                                                                                                              102
+

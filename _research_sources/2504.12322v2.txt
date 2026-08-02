@@ -1,0 +1,1154 @@
+                                                                                                                    A Strategic Coordination Framework of Small LLMs Matches
+                                                                                                                                        Large LLMs in Data Synthesis
+
+                                                                                                                                Xin Gao1, Qizhi Pei2, Zinan Tang1, Yu Li1, Honglin Lin1,
+                                                                                                                                            Jiang Wu1, Lijun Wu1, Conghui He1*
+
+                                                                                                                                  1Shanghai AI Laboratory, 2Renmin University of China
+                                                                                                                                      {gaoxin,wulijun,heconghui}@pjlab.org.cn
+
+                                                                                                                                          Abstract                                 Seed Dataset                     Qwen-2.5-72B-Instruct-Distilled
+                                                                                                                                                                                   Qwen-2.5-32B-Instruct-Distilled  Qwen-2.5-7B-GRA
+                                                                                                                         While data synthesis and distillation are promis-
+arXiv:2504.12322v2 [cs.CL] 21 Apr 2025                                                                                   ing strategies to enhance small language mod-         65
+                                                                                                     Avg Performance     els, current approaches heavily rely on Large         60 60.36 62.17 61.12
+                                                                                                                         Language Models (LLMs), which suffer from
+                                                                                                                         high computational costs, environmental inef-         55 55.36 53.03  52.33 52.94                54.93
+                                                                                                                         ficiency, and potential biases inherited from         50 49.32                             50.61 51.21
+                                                                                                                         monolithic architectures. In contrast, smaller
+                                                                                                                         LLMs are more accessible and sustainable, but         45 45.71
+                                                                                                                         their individual capabilities often fall short in
+                                                                                                                         generating high-quality, diverse, and reliable        40
+                                                                                                                         data. Inspired by collaborative human pro-
+                                                                                                                         cesses (e.g., peer review), we propose a mul-         35 Alpaca       WizardLM             Condor
+                                                                                                                         tiple small LLMs involved framework, GRA,
+                                                                                                                         that aggregates specialized roles across small        Figure 1: Average performance across GRA, vanilla
+                                                                                                                         LLMs to iterative refinement and quality con-         seed dataset and lagrge LLMs distilled data with Qwen-
+                                                                                                                         trol typically achieved by a single large LLM.        2.5-7B base model.
+                                                                                                                         In this collaborative framework, multiple small
+                                                                                                                         LLMs assume distinct roles--Generator, Re-            Yang et al., 2024a; OpenAI et al., 2023; Liu et al.,
+                                                                                                                         viewer, and Adjudicator--to simulate a peer-          2024), achieving state-of-the-art (SOTA) perfor-
+                                                                                                                         review-inspired data synthesis pipeline. The          mance across diverse domains such as natural lan-
+                                                                                                                         Generator proposes initial data samples, the          guage understanding (Naveed et al., 2023), rea-
+                                                                                                                         Reviewer critiques their quality and diversity,       soning (Guo et al., 2025; OpenAI, 2024), math
+                                                                                                                         and the Adjudicator resolves conflicts to final-      problem solving (Ahn et al., 2024), and code gen-
+                                                                                                                         ize the output. By decomposing the synthesis          eration (Jiang et al., 2024). Despite their remark-
+                                                                                                                         process into specialized sub-tasks, collabora-        able capabilities, these monolithic models demand
+                                                                                                                         tive small LLMs can achieve data-level parity         immense computational resources and energy, pos-
+                                                                                                                         with large LLM-based distillation. Through            ing significant barriers to deployment in resource-
+                                                                                                                         experiments across multiple benchmarks, we            constrained scenarios like edge devices or latency-
+                                                                                                                         demonstrate that GRA-produced data matches            sensitive applications (Zheng et al., 2024b). This
+                                                                                                                         or exceeds the quality of single large LLM            paradox has spurred growing interest in developing
+                                                                                                                         outputs, e.g., Qwen-2.5-72B-Instruct. Our re-         smaller-scale LLMs that balance efficiency and ef-
+                                                                                                                         sults challenge the necessity of monolithic large     fectiveness, positioning compact yet capable mod-
+                                                                                                                         models for high-quality data synthesis, advocat-      els as a critical research frontier in sustainable
+                                                                                                                         ing instead for strategic coordination of smaller     AI (Chen and Varoquaux, 2024).
+                                                                                                                         agents. Our datasets, models, and code are
+                                                                                                                         publicly available at https://github.com/                To enhance small LLMs performance, knowl-
+                                                                                                                         GX-XinGao/GRA.                                        edge distillation (Hinton, 2015)--transferring capa-
+                                                                                                                                                                               bilities from large models via data synthesis--has
+                                                                                                                    1 Introduction                                             emerged as a dominant paradigm (Xu et al., 2024b).
+                                                                                                                                                                               However, conventional distillation inherently de-
+                                                                                                                    The advent of Large Language Models (LLMs)                 pends on the availability of powerful LLMs (Wang
+                                                                                                                    with hundreds of billions of parameters has revolu-        et al., 2024), which introduces practical limitations:
+                                                                                                                    tionized artificial intelligence (Dubey et al., 2024a;     deploying large LLMs for data generation incurs
+
+                                                                                                                        * Corresponding author.
+
+                                                                                                                                                                            1
+prohibitive costs, especially in privacy-sensitive        2023). Synthetic data is a promising direction to
+or security-critical scenarios requiring local execu-     improve data. A dominant paradigm for synthetic
+tion (Hagos et al., 2024; Yao et al., 2024). While        data leverages knowledge distillation from LLMs.
+small LLMs offer computational accessibility, their       WizardLM (Xu et al., 2024a) iteratively enhances
+individual capacities are inherently constrained,         seed data based on predefined evolutionary rules
+struggling to match the quality, diversity, and re-       and instructions. MAGPIE (Xu et al., 2025) uti-
+liability of data synthesized by their larger coun-       lizes pre-defined query templates to directly prompt
+terparts. This raises a pivotal question: Can we          the LLM to synthesize data while not relying on
+design a resource-efficient framework that enables        seed data. MuggleMath (Li et al., 2024a) employs
+small models to collectively rival the distillation       LLMs to rewrite and enhance seed datasets by gen-
+capabilities of monolithic LLMs?                          erating new variations of problem statements and
+                                                          corresponding answers.
+   To address this challenge, we propose GRA, a
+collaborative framework inspired by human peer-              In addition to single-LLM-based approaches,
+review mechanisms. Diverging from traditional             several works also employ multiple agents for data
+single-model distillation, GRA orchestrates multi-        generation (Mitra et al., 2024; Majumdar et al.,
+ple specialized small LLMs into three synergistic         2024). AgentInstruct (Mitra et al., 2024) lever-
+roles: (1) Generator, which proposes candidate            ages GPT-4 (OpenAI et al., 2023) to facilitate data
+data samples; (2) Reviewer, which evaluates qual-         generation and curation through the use of multi-
+ity and diversity through iterative critiques; and        ple agents. Similarly, Genetic Instruct (Majumdar
+(3) Adjudicator, which resolves conflicts to final-       et al., 2024) defines three distinct roles--Instructor-
+ize outputs. Notably, the synthetic data generated        LLM, Coder-LLM, and Judge-LLM--to generate
+by a single Generator will be evaluated by multi-         code data. Unlike previous multi-agent frameworks
+ple Reviewers, and the Adjudicator is to resolve          that rely on a single LLM like GPT-4 for repeated
+significant disagreements among the Reviewers by          deployment across different stages, GRA pioneers
+reassessing the data. By decomposing the synthesis        a collaborative paradigm that coordinates diverse
+pipeline into discrete sub-tasks and enabling role-       types of small LLMs through specialized role allo-
+specific optimization, GRA mimics the refinement          cation to collectively rival the synthetic data quality
+processes typically concentrated within a single          of singular large LLMs.
+large LLM. This collaborative architecture not only
+circumvents the resource-intensity of large models        2.2 Data Curation
+but also amplifies small models' collective intel-
+ligence through task specialization and iterative         The efficacy of synthetic data critically hinges
+quality control--effectively operationalizing the         on post-synthesis curation (Long et al., 2024).
+"wisdom of crowds" principle in model ensembles.          Early curation methodologies predominantly re-
+                                                          lied on surface-level heuristics, such as repetition
+   We validate GRA through extensive experi-              counts (Salkar et al., 2022) and lexical diversity
+ments on multiple domains, including general ques-        metrics (Li et al., 2016; Zhu et al., 2018; Shu et al.,
+tion answering, reasoning, mathematical and cod-          2019), which inadequately captured semantic co-
+ing tasks. Remarkably, our framework achieves             herence and task-specific utility. Recent works shift
+data quality comparable to or exceeding outputs           toward LLM-driven curation frameworks. Initial
+from SOTA monolithic LLMs like Qwen-2.5-                  efforts employed perplexity (PPL) and instruction
+72B-Instruct, while requiring orders-of-magnitude         following difficulty score(IFD) (Li et al., 2024b)
+fewer computational resources. These results em-          to filter low-quality samples. The emergence of
+pirically demonstrate that strategically coordinated      "LLM-as-judge" paradigms further revolutionized
+small LLMs can collectively surpass the distillation      this domain, leveraging well-tuned LLMs for qual-
+performance of individual large LLMs.                     ity assessment (Gu et al., 2024). In contrast, while
+                                                          sharing the "LLM-as-judge" basis, our GRA frame-
+2 Related Work                                            work differs by using multiple specialized small
+                                                          LLMs for diverse evaluations. Unlike single-LLM
+2.1 Data Synthesis                                        approaches that risk bias, GRA employs a multi-
+                                                          agent system and a two-tier adjudication to ensure
+The rapid evolution of LLMs has increased the             balanced and comprehensive data assessment.
+demand for high-quality, diverse training data, cre-
+ating a bottleneck in AI development (Zhao et al.,
+
+                                                       2
+3 Methodology                                            by extracting and combining meaningful semantic
+                                                         patterns and attributes from the input data. Second,
+Preliminary We first provide essential back-             drawing inspiration from contextual summaries of
+ground and definitions for key components with the       seed examples, MG contextualizes the synthesized
+rationale behind our design choices. Specifically,       keywords into an executable instruction x. Last,
+we denote M as the pool of small LLMs employed           MG produces response y that appropriately ad-
+in the framework, and data pool at iteration t as        dresses the generated instruction x.
+D(t) = {(xi, yi, di, ki, si)}Ni=1, where each sample
+in D(t) consists of an instruction xi, a response        3.3 Data Reviewer
+yi, a domain label di, a 3-tuple of keywords ki,
+and a summary si. The domain label di indicates          To ensure equitable data evaluation and mitigate
+the task type of the sample, which is categorized        individual model biases, the Reviewer module per-
+into seven domains: Coding, Math, Question and           forms a rigorous multi-agent quality assessment
+Answering, Reasoning, Role Play, Language, and           through coordinated evaluation protocols. We ran-
+Creation, which are designed to aim for covering         domly select NR reviewers from M \ MG to form
+the most general domains. The 3-tuple keywords           the review committee R = {MRi}i=1 NR .
+ki are generated by LLMs to capture the core con-
+cepts of each data sample. In addition, we include a        The review process includes two stages: instruc-
+summary si to provide context and clarify keyword        tion evaluation and response evaluation. During
+relationships, enhancing the overall understanding       the instruction evaluation phase, each Reviewer
+of the data. More details such as domain definitions     independently verifies instruction x against three
+and construction of D(0)-seed dataset are shown in       binary criteria: "Reasonableness, Completeness,
+the Appendix A.                                          and Clarity". Immediate rejection occurs if any Re-
+                                                         viewer MRi flags any criterion failure. Approved
+3.1 Pipeline Overview                                    instructions then advance to the response evalua-
+                                                         tion stage, where each Reviewer conducts a granu-
+The overview of our GRA is shown in Figure 2.            lar analysis of the generated response y from six
+GRA integrates domain-specific generation with           dimensional metrics: "Correctness, Clarity, Com-
+collaborative curation by orchestrating three spe-       pleteness, Relevance, Coherence, and Ethicality".
+cialized roles. First, the Generator produces ini-       Then each Reviewer quantitatively assesses these
+tial samples using few-shot prompting tailored to        dimensions by assigning integer scores from 0 to
+the domain. Next, multiple Reviewers collabo-            10 and the averaged score serves as the final score.
+ratively assess the quality of these samples. Fi-        Additionally, each Reviewer provides detailed tex-
+nally, an Adjudicator resolves any conflicting eval-     tual feedback that delineates both the strengths and
+uations through consensus-driven arbitration. A          weaknesses of the generated response.
+post-processing module further refines the results
+by eliminating redundant outputs via embedding              In the end, the committee R aggregates as-
+deduplication and metadata enrichment. Moreover,         sessments through calculating the mean compos-
+to prevent model specialization bias, GRA dynami-        ite score µR and assessing consensus reliability
+cally assigns distinct LLMs from M to each role          through standard deviation R. After all, the com-
+through random selection and during generation.          mittee R makes the final decision: (a) Rejection: If
+                                                         µR <  . (b) Acceptance: If µR   with R  .
+3.2 Data Generator                                       (c). Adjudication: If µR   but R > , where
+                                                          and  are predefined thresholds.
+To enhance synthetic data diversity while maintain-
+ing domain consistency, we carefully design the          3.4 Data Adjudicator
+generation process to systematically integrate con-
+ceptual knowledge and contextual patterns. For           Adjudicator is designed for reassessing the disputed
+each instance, we randomly select one LLM MG             samples. For each disputed sample, we randomly
+M as the Generator. For a given domain, the gener-       select an Adjudicator MA from M \ (MG  R)
+ation workflow comprises three coordinated stages:       to perform consensus-driven arbitration. For each
+First, MG analyzes randomly selected keywords-           disputed sample, based on consolidating Review-
+summary pairs (ki, si) from the current domain           ers' feedback, MA conducts a comprehensive re-
+corpus, synthesizing a novel 3-tuple keywords k          assessment using the same evaluation criteria as
+                                                         the Reviewers and gets the final composite score
+                                                         sA. Only samples with sA   proceed to the
+
+                                                      3
+Data Generator                                                Data Reviewer                       Data Adjudicator           Post - Process
+
+          Data Pool                                                      Generated                                  Dispute         Candidate
+                                                                              Data                                    Data              Data
+
+             Data Sample                                                                                                     Descending
+                                                                                                                                Sortining
+Instruction               Instruction
+Response                                                                                                                            Embedding
+                          Response                 R1             R2                     R3                  Data                 Deduplication
+                                                                                                            Review
+                                                   Score : 8     Score : 8             Score : 8            Review                                                        Instruction
+                                                 Score : 8     Score : 8             Score : 8              Review                                                         Response
+                                                 Score         Score                 Score                                     AI
+
+                                                    Review        Review                Review                                       Formation
+                                                  Review        Review                Review                                         Alignment
+                                                Review        Review                Review                                   Summary
+
+Key Word1                    Key Word1                                                                      Adjudicate               Data Pool
+Key Word2                    Key Word2
+Key Word3                    Key Word3                                                            A         With
+ Summary                      Summary
+                                                                                                            Consensus
+Generate G                Generate
+Key Words                    Data                  Data       Collective               Data         Data       Data
+                                                              Assessment                          Score >   Score < 
+Key Word1                          Instruction  Score Avg >                         Score Avg >   Review
+Key Word2                          Response     Score Std <         Data            Score Std >              Review
+Key Word3
+ Summary                                          Review          Score Avg <         Review
+ Summary                                          Review            Score Std         Review
+                                                  Review                              Review
+                                                                   Review
+                                                                   Review
+                                                                   Review
+
+Figure 2: Overview of GRA's architecture, highlighting its four key modules: (a) The Generator creates domain-
+specific samples, (b) followed by collaborative evaluation by Reviewers, (c) The Adjudicator resolves conflicts, and
+(d) Post-Processing refines the results by removing redundancies.
+
+subsequent post-processing module.                                                  4 Experiment
+
+3.5 Post-Processing Module                                                          4.1 Settings
+
+The post-processing module ensures syntactic con-                                   GRA Data Generation. Our framework operates
+sistency and enhances diversity for final dataset                                   on three established instruction-tuning datasets: Al-
+integration. First, we generate embeddings for all                                  paca (Taori et al., 2023), WizardLM (Xu et al.,
+data using the all-MiniLM-L6-v2 encoder (Reimers                                    2024a), and the recent Condor (Cao et al., 2025),
+and Gurevych, 2019). Data are processed based on                                    which serve as seed datasets for data synthesis. As
+their review score µR in descending order. Each                                     for the small LLMs, we use five diverse and repre-
+sample, along with its embedding, undergoes se-                                     sentative LLMs within 7B-8B parameters: Llama-
+mantic redundancy verification against the target                                   3.1-8B-Instruct (Dubey et al., 2024b), Qwen2.5-
+data pool: if the maximum cosine similarity with                                    7B-Instruct (Yang et al., 2024b), InternLM3-8B-
+any item in the pool is below a specified sim-                                      Instruct (Cai et al., 2024), Mistral-7B-Instruct-
+ilarity threshold, the candidate is added to the                                    v0.3 (Jiang et al., 2023), and Tulu-3-8B (Lambert
+pool. Otherwise, it is rejected to prevent seman-                                   et al., 2024). The synthesis process runs for five
+tic duplication. The deduplicated data then under-                                  iterations, and each iteration produces approx 10K
+goes metadata enrichment through random LLM                                         high-quality samples per round (51K in total) us-
+MP  M to generate contextual summary s, sup-                                        ing vLLM (Kwon et al., 2023) toolkit. We set the
+plemented with the keywords from which it was                                       minimum score threshold  = 8 and the maximum
+derived, ensuring format consistency with the ex-                                   standard deviation  = 1.5 at review stage. For
+isting data. This two-stage filtration--embedding-                                  deduplication, the maximum cosine similarity is
+based semantic deduplication followed by LLM                                        set to 0.9. More detailed generation settings are
+summarization--ensures both conceptual diversity                                    shown in Appendix A.
+and structural compatibility for subsequent data
+synthesis workflows.                                                                Training. After data synthesis, we conduct full
+                                                                                    parameter Supervised Fine-Tuning (SFT) on two
+                                                                                    well-known base models for verification: Llama-
+                                                                                    3.1-8B-Base (Dubey et al., 2024b) and Qwen2.5-
+                                                                                    7B-Base (Yang et al., 2024b). The experiments uti-
+
+                                                                                4
+lize the Llama-Factory (Zheng et al., 2024a) toolkit.                          64       Condor  Alpaca       WizardLM
+We run five iterations, each accumulating synthetic
+data from Rnd1 to Rnd5, representing data from            Average Performance  62
+the first round up to all five rounds. In the main                             60
+experiment, we report the iteration with the best                              58
+average performance. Detailed training settings are                            56
+provided in Appendix B.                                                        54
+                                                                               52
+Evaluation. For evaluation, following (Xu et al.,                              50
+2024a; Cao et al., 2025), we select multiple bench-
+marks on various domains-mathematics, coding,                                      10K  20K     30K     40K  50K
+reasoning, and general-to demonstrate the effec-
+tiveness of our GRA framework, which include              Figure 3: Performance along data iterations with Qwen-
+GSM8K, MATH, HumanEval, MBPP, HellaSwag,                  2.5-7B-Base model.
+ARC-C, GPQA, IFEval, BBH and MMLU. We use
+the opencompass (Contributors, 2023b) toolkit for         recent models (Yang et al., 2024b), which likely
+a fair evaluation. More detailed evaluation settings      enhance its ability to leverage synthesized data.
+are shown in Appendix C.
+                                                          Diminishing Returns in Teacher Scaling. De-
+4.2 Main Results                                          spite doubling parameter counts (Qwen-2.5-32B-
+                                                          InstructQwen-2.5-72B-Instruct), teacher model
+The main results are presented in Table 1, where          scaling yields marginal quality gains. This suggests
+we compare GRA against vanilla seed datasets              a potential saturation point in knowledge transfer
+and also single large LLM (Qwen2.5-32B/72B-               efficiency for standard distillation methods, empha-
+Instruct) distillation. From the table, we can draw       sizing the need for more advanced distillation proto-
+following observations:                                   cols rather than naive distillation from larger mod-
+                                                          els. These insights collectively highlight GRA's
+Superiority Over Vanilla Seed Data. The GRA               practical value for efficient, high-quality data gen-
+method achieves significant improvements over             eration while delineating fundamental boundaries
+vanilla seed data, with average performance gains         in LLM knowledge transfer.
+of 6.18% (Llama-3.1-8B) and 11.81% (Qwen-2.5-
+7B) across all benchmarks. These results demon-           4.3 Ablation
+strate the effectiveness of GRA. We attribute this
+success to GRA's ability to enhance data diversity        Performance along Data Iteration. To investi-
+and quality through iterative data synthesis. Further     gate the impact of iterative data synthesis rounds
+analysis is provided in Section 5.4.                      on model performance, we conduct five sequential
+                                                          iterations of data generation using GRA, with ap-
+Competitive Against Large LLM Distillation.               prox 10K synthetic samples produced per iteration.
+GRA's collaborative small LLM framework demon-            We trained models incrementally on cumulative
+strates parity with or superiority to single large        datasets: 10K (1st iteration), 20K (1st-2nd), 30K
+LLM distillation. Notably, comparing to Qwen-             (1st-3rd), 40K (1st-4th), and 50K (1st-5th). Re-
+2.5-72B-Instruct distilled data, it narrows the per-      sults are illustrated in Figure 3. Experiments across
+formance gap to 0.59% for Llama-3.1-8B while              three distinct seed datasets consistently demon-
+surpassing by 8.83% for Qwen-2.5-7B on aver-              strate a positive correlation between iteration count
+age. This validates the viability of cost-effective       and model performance. Besides, we observe that
+multi-agent synthesis as a scalable alternative to        performance gains are rapid in early iterations, but
+resource-intensive large-model distillation.              gradually plateaued in later iterations, suggesting
+                                                          diminishing yet meaningful returns. This trend
+Base Model Dependency. Performance varies                 aligns with the hypothesis that initial cycles resolve
+substantially with base model capability: Qwen-           critical data scarcity, whereas subsequent rounds
+based implementations consistently outperform             exhaust exploitable synthetic data diversity.
+Llama counterparts by 9% under identical data
+conditions. We attribute this discrepancy to Qwen's       Effect of GRA Data Reviewer. We conduct ab-
+strong base model ability, as demonstrated by many        lation experiments to evaluate the effectiveness of
+                                                          GRA's multi-model review mechanism by compar-
+
+                                                       5
+Dataset                                 Math          Coding                              Reasoning     BBH         General  AVG
+                                 GSM8K MATH    Humaneval MBPP HellaSwag                   ARC-C GPQA           MMLU IFEval
+Alpaca                                                                                                  60.42                49.32
+Qwen-2.5-7B-GRA                                      Qwen-2.5-7B Base Model                             60.57                60.36
+Qwen-2.5-32B-Instruct-Distilled                                                                         42.04                55.36
+Qwen-2.5-72B-Instruct-Distilled  60.12  27.00  32.32                        61.20  72.51  65.76  23.74  38.75  45.19  44.95  53.03
+WizardLM                         70.28  33.82  76.83                        64.80  80.23  74.24  24.24  39.34  65.42  53.16  45.71
+Qwen-2.5-7B-GRA                  63.23  56.26  76.22                        65.40  72.02  56.61  20.71  63.99  49.05  53.71  62.17
+Qwen-2.5-32B-Instruct-Distilled  50.64  55.80  74.39                        64.40  74.70  56.95  23.74  37.63  37.37  53.33  52.33
+Qwen-2.5-72B-Instruct-Distilled  64.37  31.94  50.61                        64.20  65.89  40.68  21.72  37.02  31.18  47.12  52.93
+Condor                           58.98  47.84  76.83                        64.60  81.58  79.66  28.79  39.96  65.23  54.15  50.61
+Qwen-2.5-7B-GRA                  59.36  54.96  72.56                        66.20  54.22  54.58  21.21  61.49  46.99  53.96  61.12
+Qwen-2.5-32B-Instruct-Distilled  69.83  56.30  79.88                        65.20  57.85  56.61  16.67  37.53  35.02  53.96  54.93
+Qwen-2.5-72B-Instruct-Distilled  57.16  48.60  51.83                        64.60  55.74  66.10  24.75  32.18  47.48  49.86  51.21
+                                 64.75  42.82  76.22                        65.60  79.90  75.59  26.26         64.59  54.02
+Alpaca                           71.34  56.00  68.90                        66.40  63.93  61.02  18.69  61.86  54.56  52.95  45.88
+Llama-3.1-8B-GRA                 62.22  54.46  75.61                        65.40  61.99  52.88  14.14  64.50  39.61  52.41  52.13
+Qwen-2.5-32B-Instruct Distilled                                                                         65.07                51.71
+Qwen-2.5-72B-Instruct Distilled                 Llama-3.1-8B Base Model                                 64.77                52.68
+WizardLM                                                                                                62.98                46.59
+Llama-3.1-8B-GRA                 51.71  11.32  43.29 45.20                         53.25  75.25  21.21  63.28  52.65  43.06  50.92
+Qwen-2.5-32B-Instruct Distilled  65.58  17.20                                             71.53  29.80  65.03  48.58  56.80  51.10
+Qwen-2.5-72B-Instruct Distilled  64.44  23.32  52.44 48.60                         66.30  69.49  26.77  63.60  45.78  55.73  52.18
+Condor                           67.40  23.82                                             74.24  26.77  65.28  48.09  58.39  43.04
+Llama-3.1-8B-GRA                 63.84  16.78  48.17 49.20                         69.14  63.05  9.60   63.48  40.89  48.90  51.60
+Qwen-2.5-32B-Instruct Distilled  65.88  18.98                                             72.88  26.77  66.12  43.10  53.52  51.81
+Qwen-2.5-72B-Instruct Distilled  64.97  23.50  48.78 50.60                         63.95  65.08  23.74  63.71  43.31  54.51  51.56
+                                 66.64  24.12                                             69.15  26.77         46.98  56.28
+                                 61.49  22.12  45.73 47.00                         67.16  51.53  15.66         27.91  52.35
+                                 65.58  15.82                                             72.54  26.77         45.22  53.54
+                                 64.94  23.00  51.22 47.00                         66.54  65.08  24.24         44.37  52.64
+                                 69.14  23.30                                             68.14  21.72         45.02  53.94
+                                               51.83 48.00                         67.66
+
+                                               51.83 48.60                         63.76
+
+                                               38.41 48.40                         47.24
+
+                                               50.61 48.80                         69.22
+
+                                               54.88 49.80                         71.04
+
+                                               53.05 50.20                         67.40
+
+Table 1: Main Comparison between our proposed method, the vanilla seed datasets, and the data distilled from
+large-scale LLMs (Qwen-2.5-32B-Instruct and Qwen-2.5-72B-Instruct). Colored values represent the best results.
+
+                     53                 52.14                                      Effect of GRA Data Adjudicator. To validate
+                                                                                   the necessity of the Adjudicator module in GRA,
+Average Performance  51 51.18 51.00 51.31                                          we conducted ablation experiments without the Ad-
+                                                                                   judicator, where conflicting reviews were resolved
+                     49                                                            via majority voting. Using Llama-3.1-8B as the
+                                                                                   base model and Alpaca as the seed dataset, the
+                     47                                                            Adjudicator-enhanced version achieved a 0.73%
+                                                                                   improvement in synthetic data quality (measured
+                     45 w/o Review Llama Review GRA Review w/o Adjudicator         by human-aligned correctness scores), demonstrat-
+                                                                                   ing its effectiveness, as shown in Figure 4.
+Figure 4: comparison across different setting of reviewer
+and adjudicator, with alpaca as seed dataset and Llama-                            5 Analysis
+3.1-8B as base model.
+
+                                                                                   5.1 Effect of Small LLMs' Role
+
+ing against three baselines: no Reviewer, Llama3.1-                                We are interested in the specific role played in
+8B-Instruct Reviewer. As shown in Figure 4, GRA                                    the GRA framework, therefore we conduct experi-
+outperforms all baselines, confirming the necessity                                ments of three role assignment strategies for GRA
+of collaborative curation. Notably, single-model re-                               pipeline with Qwen-2.5-7B-Base as the training
+views show negligible gains over no review, imply-                                 model: (1) Single-Model: all roles assigned to
+ing either (a) limited quality-assessment capacity in                              a single LLM (Llama3.1-8B-Instruct); (2) Fixed-
+small LLMs or (b) data quality from GRA's gener-                                   assignment strategy: five distinct LLMs assigned
+ation phase being sufficiently robust for standalone                               to roles in fixed permutations; (3) Our GRA setting
+use. These results validate that GRA's multi-agent                                 with random roles. The results are as follows: when
+framework uniquely synthesizes complementary                                       we simply use one model to play all roles (Setting
+curation strengths, avoiding the pitfalls of isolated                              1), the average accuracy is 52.07, while Setting 2,
+or capacity-constrained reviewers. Comparisons                                     which assigns fixed roles to five dedicated mod-
+wiht large LLM reviwer are shown in Section 5.4.                                   els, results in a lower accuracy of 48.59. Lastly,
+
+                                                                            6
+    GRA Data Synthesis Cases                                                      100 GRA
+                                                                                  75 Vanilla
+     # Data:
+     ## Instruction:                                           t-SNE Dimension 2  50
+     Given a set of numbers from 1 to 100, find the sum
+     of all numbers that are divisible by both 3 and 5.                           25
+     Express the sum in LaTeX format.
+     ## Response:                                                                 0
+     The sum of all numbers from 1 to 100 that are
+     divisible by both 3 and 5 can be found by calculating                        25
+     the sum of the arithmetic series where the first term
+     is (3 × 5 = 15) and the last term is (100)... the sum                        50
+     of all numbers from 1 to 100 that are divisible by
+     both 3 and 5 is 90. In LaTeX format, this is written                         75
+     as: [sumi=1 100 (3 × 5)i = 90]
+                                                                                       100       75     50  25  0  25              50      75       100
+     # Data Review                                                                                          t-SNE Dimension 1
+     ##Reviewer 1
+     detail scores : [9,10,10,10,10,10]. review comment:       Figure 5: Data coverage comparison between vanilla
+     NO MISSTATEMENT, ALL INFO PRESENT.
+     ##Reviewer 2                                              seed dataset and GRA synthetic data.
+     detail scores : [9,9,10,10,10,10]. review comment:
+     Accurate and well-structured response, clear and                             100       GRA
+     correct explanation, irrelevant information avoided,
+     perfect coherence and suitable LaTeX expression                              75        Large LLMs
+     ##Review 3
+     detail scores : [6,4,5,4,5,3]. review comment:            t-SNE Dimension 2  50
+     Incorrect arithmetic series calculation and LaTeX
+     format error                                                                 25
+     ##Review Result
+     average score of 8 meets the threshold. score std of                         0
+     2.4758 exceeds the threshold.
+                                                                                  25
+     #Data Adjudicator
+     detail scores : [4,2,5,5,5,1,5]. average score of 4.5                        50
+     below threshold.
+     ##Adjudication Result                                                        75
+     Discard unqualified data.
+                                                                                       100       75     50  25  0  25          50      75      100
+      Case 1: A case analysis of inconsistent data.                                                         t-SNE Dimension 1
+
+our GRA based training achieves 59.52 accuracy.                Figure 6: Data coverage comparison between large
+Lastly, our GRA based training achieves 59.52 ac-
+curacy. From the above results, we can find that               LLMs distilled data and GRA synthetic data.
+the advantages of our randomized role assignment
+in our GRA is clear and significant, compared to               the majority's misjudgment to assign a low score
+both other settings. Besides, interestingly, fixed as-         (4.5/10), thereby filtering out the flawed data. This
+signments of different models performs worse than              highlights how the Adjudicator mitigates limita-
+single role model, which means that self-evolve                tions of simple voting or averaging by dynamically
+is better than fixed role assignment among differ-             reconciling disagreements and enforcing rigorous
+ent models, further demonstrating that multi-agent             quality standards.
+corporation is curial.
+                                                               5.3 Data Diversity
+5.2 Inconsistent Data Analysis                                 To assess the diversity of synthesized data, we com-
+                                                               pare three sources: GRA-generated data, data dis-
+We show a Case 1 to further illustrate the effective-          tilled from a single large LLM, and the vanilla seed
+ness of Adjudicator. For a wrong math problem,                 dataset. We visualize the instruction embeddings
+two of three reviewers incorrectly assigned high               with t-SNE (Van der Maaten and Hinton, 2008).
+scores, while one correctly flagged the error. Al-
+though the average score (8/10) initially met the              Diversity Analysis. As shown in Figure 5. GRA-
+retention threshold, the high score variance (2.48)            generated data exhibits a broader distribution than
+triggered adjudication. The Adjudicator synthe-                the vanilla seed dataset, particularly covering under-
+sized all reviews and evaluation criteria, overriding          represented regions in the seed data's embedding
+                                                               space. This suggests that GRA complementing the
+                                                               seed dataset by expanding its coverage. Besides,
+                                                               Figure 6 reveals that GRA surpasses the single
+                                                               large LLM in distribution diversity, implying that
+                                                               collaborative small LLMs can mitigate the inher-
+                                                               ent limits and biases of single model. Notably,
+                                                               while the seed dataset demonstrates comparable in-
+                                                               struction diversity, its inferior performance in main
+                                                               experiments-Table 1 highlights critical deficiencies
+                                                               in response quality rather than instruction coverage.
+
+                                                               Seed Data Enhancement via GRA. We further
+                                                               applied GRA's generator to rewrite responses in
+                                                               the vanilla seed dataset, followed by curation us-
+                                                               ing GRA's reviewer and adjudicator. As shown in
+                                                               Table 2, the refined dataset achieves performance
+
+                                                            7
+14000  GRA                                                                      1.2
+12000  Qwen-2.5-72B-Instruct
+                                                                                1.0
+10000
+Frequency                                                                       0.8
+                                                                       IFD8000
+                                                                                0.6
+6000
+                                                                                0.4
+4000
+                                                                                0.2
+2000
+                                                                                0.0
+0      7.5 8.0 8.5 9.0 9.5 10.0                                                         WizardLM Qwen-2.5-72B-Instruct GRA
+                                                                                                          Distilled
+                   Score Value
+Figure 7: Data quality score comparison between GRA                       Figure 8: The IFD score comparison between the data
+                                                                          generated by GRA, the vanilla seed dataset WizardLM,
+and single Large LLMs--Qwen-2.5-72B-Instruct.                             and single large LLM (Qwen-2.5-72B-Instruct) distilled
+                                                                          data.
+parity with GRA-generated data. Moreover, com-                            5.5 Data Difficulty
+bining GRA-synthesized data with enhanced seed
+data yields synergistic effects, outperforming ei-                        To evaluate the complexity and knowledge density
+ther dataset alone in certain settings. This under-                       of synthesized data, we compute the Instruction-
+scores GRA's dual utility: (a) generating novel                           Following Difficulty (IFD) score (Li et al., 2024b)
+high-quality data and (b) upgrading existing data                         for the three datasets. From the results depicted
+through systematic rewriting and quality control.                         in Figure 8, two key observations emerge: First,
+                                                                          GRA-generated data achieves a significantly higher
+Data / Seed Dataset Alpaca WizardLM  Condor                               IFD than the seed dataset (+14.58%), indicating
+                                                                          its enhanced difficulty and richer knowledge cov-
+       Llama-3.1-8B-Base              43.04                               erage. This aligns with empirical training results,
+                                      47.68                               where models trained on GRA data exhibit superior
+Vanilla Seed Data  45.88 46.59        51.16                               performance. Second, despite using smaller LLMs,
+                                      52.22                               GRA attains comparable difficulty to the Qwen-
+GRA-Refined Seed Data 50.39 52.81                                         72B-distilled data (75.82% v.s. 75.49%). This sug-
+                                      50.61                               gests that collaborative small LLMs in GRA mit-
+GRA Synthetic Data 52.14 50.74        45.5                                igate individual capability limitations, effectively
+                                      61.13                               emulating large LLMs in generating challenging
+GRA Integrated Data 51.93 52.35       62.1                                examples. These results validate GRA's ability to
+                                                                          synthesize high-quality, difficulty-controllable data
+       Qwen-2.5-7B-Base                                                   without relying on large LLMs, addressing both
+                                                                          scalability and performance trade-offs in data syn-
+Vanilla Seed Data  49.32 45.71                                            thesis pipelines.
+
+GRA-Refined Seed Data 59.97 58.34                                         6 Conclusion
+
+GRA Synthetic Data 59.52 62.17                                            In this paper, we introduce GRA (Generator-
+                                                                          Reviewer-Adjudicator), a novel framework that
+GRA Integrated Data 61.19 59.00                                           leverages the collaborative capabilities of multi-
+                                                                          ple small LLMs to achieve data synthesis quality
+Table 2: Comparison across Vanilla Seed Data, GRA-                        comparable to that of single monolithic LLMs. Our
+Refined Seed Data, GRA Synthetic Data and GRA Inte-                       approach addresses the significant computational
+grated Data.                                                              and environmental concerns associated with large
+                                                                          LLMs while mitigating the biases inherent in their
+5.4 Data Quality                                                          centralized architectures. The experimental results
+                                                                          across diverse benchmarks validate the efficacy of
+To evaluate the data quality, we utilize Qwen-2.5-                        GRA. GRA underscores the potential of role spe-
+72B-Instruct to assess the synthetic data and com-                        cialization in enhancing data synthesis quality, chal-
+pare its score with our Reviewers' score. From                            lenging the prevailing notion that larger models are
+Figure 7, we find that the GRA method exhibits                            inherently superior for such tasks, paving the way
+finer granularity and a more balanced scoring dis-                        for more sustainable and equitable data synthesis.
+tribution compared to the coarser-grained scores
+from the large LLM, indicating its ability to capture
+nuanced quality variations. Second, over 87.3% of
+GRA-curated data (scores > 8) align with high
+scores from the large LLM, while 12.7% receive
+lower scores ( 8) from the latter. Notably, the
+large LLM assigns even higher scores to a larger
+subset of data, further validating the reliability of
+GRA in generating high-quality data. These re-
+sults suggest that GRA enhances scoring resolu-
+tion without compromising assessment consistency
+with large LLMs.
+
+                                                       8
+Limitations                                                    Maosong Cao, Taolin Zhang, Mo Li, Chuyu Zhang,
+                                                                  Yunxin Liu, Haodong Duan, Songyang Zhang, and
+Despite the promising performance of the GRA                      Kai Chen. 2025. Condor: Enhance llm alignment
+framework, several aspects warrant further explo-                 with knowledge-driven data synthesis and refinement.
+ration. Current role allocation mechanism--based                  arXiv preprint arXiv:2501.12273.
+on randomized assignment--may yield suboptimal
+collaboration patterns. This stochastic approach               Lihu Chen and Gaël Varoquaux. 2024. What is the
+lacks explicit optimization for task-specific syner-              role of small models in the llm era: A survey. arXiv
+gies, suggesting the need for intelligent role con-               preprint arXiv:2409.06857.
+figuration strategies (e.g., performance-aware dy-
+namic allocation or metric-driven reinforcement                Mark Chen, Jerry Tworek, Heewoo Jun, Qiming
+learning) to systematically maximize agent com-                   Yuan, Henrique Ponde De Oliveira Pinto, Jared Ka-
+plementarity. Furthermore, while GRA is primarily                 plan, Harri Edwards, Yuri Burda, Nicholas Joseph,
+designed for textual reasoning tasks, extending its               Greg Brockman, et al. 2021. Evaluating large
+paradigm to multimodal scenarios presents a com-                  language models trained on code. arXiv preprint
+pelling direction.                                                arXiv:2107.03374.
+
+References                                                     Peter Clark, Isaac Cowhey, Oren Etzioni, Tushar Khot,
+                                                                  Ashish Sabharwal, Carissa Schoenick, and Oyvind
+Janice Ahn, Rishu Verma, Renze Lou, Di Liu, Rui                   Tafjord. 2018. Think you have solved question an-
+   Zhang, and Wenpeng Yin. 2024. Large language                   swering? try arc, the ai2 reasoning challenge. arXiv
+   models for mathematical reasoning: Progresses and              preprint arXiv:1803.05457.
+   challenges. In EACL (Student Research Workshop),
+   pages 225-237. Association for Computational Lin-           Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian,
+   guistics.                                                      Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias
+                                                                  Plappert, Jerry Tworek, Jacob Hilton, Reiichiro
+Jacob Austin, Augustus Odena, Maxwell Nye, Maarten                Nakano, et al. 2021. Training verifiers to solve math
+   Bosma, Henryk Michalewski, David Dohan, Ellen                  word problems. arXiv preprint arXiv:2110.14168.
+   Jiang, Carrie Cai, Michael Terry, Quoc Le, et al. 2021.
+   Program synthesis with large language models. arXiv         LMDeploy Contributors. 2023a. Lmdeploy: A toolkit
+   preprint arXiv:2108.07732.                                     for compressing, deploying, and serving llm. https:
+                                                                  //github.com/InternLM/lmdeploy.
+Zheng Cai, Maosong Cao, Haojiong Chen, Kai Chen,
+   Keyu Chen, Xin Chen, Xun Chen, Zehui Chen,                  OpenCompass Contributors. 2023b. Opencompass:
+   Zhi Chen, Pei Chu, Xiaoyi Dong, Haodong Duan,                  A universal evaluation platform for foundation
+   Qi Fan, Zhaoye Fei, Yang Gao, Jiaye Ge, Chenya                 models. https://github.com/open-compass/
+   Gu, Yuzhe Gu, Tao Gui, Aijia Guo, Qipeng Guo,                  opencompass.
+   Conghui He, Yingfan Hu, Ting Huang, Tao Jiang,
+   Penglong Jiao, Zhenjiang Jin, Zhikai Lei, Jiaxing Li,       Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey,
+   Jingwen Li, Linyang Li, Shuaibin Li, Wei Li, Yin-              Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman,
+   ing Li, Hongwei Liu, Jiangning Liu, Jiawei Hong,               Akhil Mathur, Alan Schelten, Amy Yang, Angela
+   Kaiwen Liu, Kuikun Liu, Xiaoran Liu, Chengqi Lv,               Fan, et al. 2024a. The llama 3 herd of models. arXiv
+   Haijun Lv, Kai Lv, Li Ma, Runyuan Ma, Zerun Ma,                preprint arXiv:2407.21783.
+   Wenchang Ning, Linke Ouyang, Jiantao Qiu, Yuan
+   Qu, Fukai Shang, Yunfan Shao, Demin Song, Zi-               Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey,
+   fan Song, Zhihao Sui, Peng Sun, Yu Sun, Huanze                 Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman,
+   Tang, Bin Wang, Guoteng Wang, Jiaqi Wang, Ji-                  Akhil Mathur, Alan Schelten, Amy Yang, Angela
+   ayu Wang, Rui Wang, Yudong Wang, Ziyi Wang,                    Fan, et al. 2024b. The llama 3 herd of models. arXiv
+   Xingjian Wei, Qizhen Weng, Fan Wu, Yingtong                    preprint arXiv:2407.21783.
+   Xiong, Chao Xu, Ruiliang Xu, Hang Yan, Yirong
+   Yan, Xiaogui Yang, Haochen Ye, Huaiyuan Ying, Jia           Jiawei Gu, Xuhui Jiang, Zhichao Shi, Hexiang Tan,
+   Yu, Jing Yu, Yuhang Zang, Chuyu Zhang, Li Zhang,               Xuehao Zhai, Chengjin Xu, Wei Li, Yinghan Shen,
+   Pan Zhang, Peng Zhang, Ruijie Zhang, Shuo Zhang,               Shengjie Ma, Honghao Liu, et al. 2024. A survey on
+   Songyang Zhang, Wenjian Zhang, Wenwei Zhang,                   llm-as-a-judge. arXiv preprint arXiv:2411.15594.
+   Xingcheng Zhang, Xinyue Zhang, Hui Zhao, Qian
+   Zhao, Xiaomeng Zhao, Fengzhe Zhou, Zaida Zhou,              Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song,
+   Jingming Zhuo, Yicheng Zou, Xipeng Qiu, Yu Qiao,               Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma,
+   and Dahua Lin. 2024. Internlm2 technical report.               Peiyi Wang, Xiao Bi, et al. 2025. Deepseek-r1: In-
+   Preprint, arXiv:2403.17297.                                    centivizing reasoning capability in llms via reinforce-
+                                                                  ment learning. arXiv preprint arXiv:2501.12948.
+
+                                                               Desta Haileselassie Hagos, Rick Battle, and Danda B
+                                                                  Rawat. 2024. Recent advances in generative ai and
+                                                                  large language models: Current status, challenges,
+                                                                  and perspectives. IEEE Transactions on Artificial
+                                                                  Intelligence.
+
+                                                            9
+Dan Hendrycks, Collin Burns, Steven Basart, Andy Zou,         Lin Long, Rui Wang, Ruixuan Xiao, Junbo Zhao, Xiao
+   Mantas Mazeika, Dawn Song, and Jacob Steinhardt.              Ding, Gang Chen, and Haobo Wang. 2024. On llms-
+   2020. Measuring massive multitask language under-             driven synthetic data generation, curation, and eval-
+   standing. arXiv preprint arXiv:2009.03300.                    uation: A survey. In ACL (Findings), pages 11065-
+                                                                 11082. Association for Computational Linguistics.
+Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul
+   Arora, Steven Basart, Eric Tang, Dawn Song, and            Somshubra Majumdar, Vahid Noroozi, Sean Narenthi-
+   Jacob Steinhardt. 2021. Measuring mathematical                ran, Aleksander Ficek, Jagadeesh Balam, and Boris
+   problem solving with the math dataset. In Proceed-            Ginsburg. 2024. Genetic instruct: Scaling up syn-
+   ings of the Neural Information Processing Systems             thetic generation of coding instructions for large lan-
+   Track on Datasets and Benchmarks, volume 1.                   guage models. arXiv preprint arXiv:2407.21077.
+
+Geoffrey Hinton. 2015. Distilling the knowledge in a          Arindam Mitra, Luciano Del Corro, Guoqing Zheng,
+   neural network. arXiv preprint arXiv:1503.02531.              Shweti Mahajan, Dany Rouhana, Andres Codas,
+                                                                 Yadong Lu, Wei-ge Chen, Olga Vrousgos, Corby
+Albert Q Jiang, Alexandre Sablayrolles, Arthur Men-              Rosset, et al. 2024. Agentinstruct: Toward gener-
+   sch, Chris Bamford, Devendra Singh Chaplot, Diego             ative teaching with agentic flows. arXiv preprint
+   de las Casas, Florian Bressand, Gianna Lengyel, Guil-         arXiv:2407.03502.
+   laume Lample, Lucile Saulnier, et al. 2023. Mistral
+   7b. arXiv preprint arXiv:2310.06825.                       Humza Naveed, Asad Ullah Khan, Shi Qiu, Muhammad
+                                                                 Saqib, Saeed Anwar, Muhammad Usman, Naveed
+Juyong Jiang, Fan Wang, Jiasi Shen, Sungju Kim,                  Akhtar, Nick Barnes, and Ajmal Mian. 2023. A
+   and Sunghun Kim. 2024. A survey on large lan-                 comprehensive overview of large language models.
+   guage models for code generation. arXiv preprint              arXiv preprint arXiv:2307.06435.
+   arXiv:2406.00515.
+                                                              OpenAI. 2024. Learning to reason with llms.
+Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying
+   Sheng, Lianmin Zheng, Cody Hao Yu, Joseph Gon-             Josh OpenAI, Achiam, Steven Adler, Sandhini Agarwal,
+   zalez, Hao Zhang, and Ion Stoica. 2023. Efficient             Lama Ahmad, Ilge Akkaya, Florencia Leoni Aleman,
+   memory management for large language model serv-              Diogo Almeida, Janko Altenschmidt, Sam Altman,
+   ing with pagedattention. In Proceedings of the 29th           Shyamal Anadkat, et al. 2023. Gpt-4 technical report.
+   Symposium on Operating Systems Principles, pages              arXiv preprint arXiv:2303.08774.
+   611-626.
+                                                              Nils Reimers and Iryna Gurevych. 2019. Sentence-bert:
+Nathan Lambert, Jacob Morrison, Valentina Pyatkin,               Sentence embeddings using siamese bert-networks.
+   Shengyi Huang, Hamish Ivison, Faeze Brahman,                  In Proceedings of the 2019 Conference on Empirical
+   Lester James V Miranda, Alisa Liu, Nouha Dziri,               Methods in Natural Language Processing. Associa-
+   Shane Lyu, et al. 2024. T\" ulu 3: Pushing frontiers          tion for Computational Linguistics.
+   in open language model post-training. arXiv preprint
+   arXiv:2411.15124.                                          David Rein, Betty Li Hou, Asa Cooper Stickland, Jack-
+                                                                 son Petty, Richard Yuanzhe Pang, Julien Dirani, Ju-
+Chengpeng Li, Zheng Yuan, Hongyi Yuan, Guanting                  lian Michael, and Samuel R Bowman. 2023. Gpqa: A
+   Dong, Keming Lu, Jiancan Wu, Chuanqi Tan, Xi-                 graduate-level google-proof q&a benchmark. arXiv
+   ang Wang, and Chang Zhou. 2024a. Mugglemath:                  preprint arXiv:2311.12022.
+   Assessing the impact of query and response augmen-
+   tation on math reasoning. In ACL (1), pages 10230-         Nikita Salkar, Thomas A. Trikalinos, Byron C. Wallace,
+   10258. Association for Computational Linguistics.             and Ani Nenkova. 2022. Self-repetition in abstractive
+                                                                 neural summarizers. In AACL/IJCNLP (2), pages
+Jiwei Li, Michel Galley, Chris Brockett, Jianfeng Gao,           341-350. Association for Computational Linguistics.
+   and Bill Dolan. 2016. A diversity-promoting ob-
+   jective function for neural conversation models. In        Raphael Shu, Hideki Nakayama, and Kyunghyun Cho.
+   HLT-NAACL, pages 110-119. The Association for                 2019. Generating diverse translations with sentence
+   Computational Linguistics.                                    codes. In ACL (1), pages 1823-1827. Association for
+                                                                 Computational Linguistics.
+Ming Li, Yong Zhang, Zhitao Li, Jiuhai Chen, Lichang
+   Chen, Ning Cheng, Jianzong Wang, Tianyi Zhou, and          Mirac Suzgun, Nathan Scales, Nathanael Schärli, Se-
+   Jing Xiao. 2024b. From quantity to quality: Boosting          bastian Gehrmann, Yi Tay, Hyung Won Chung,
+   LLM performance with self-guided data selection               Aakanksha Chowdhery, Quoc V Le, Ed H Chi, Denny
+   for instruction tuning. In NAACL-HLT, pages 7602-             Zhou, et al. 2022. Challenging big-bench tasks and
+   7635. Association for Computational Linguistics.              whether chain-of-thought can solve them. arXiv
+                                                                 preprint arXiv:2210.09261.
+Aixin Liu, Bei Feng, Bing Xue, Bingxuan Wang,
+   Bochao Wu, Chengda Lu, Chenggang Zhao, Chengqi             Rohan Taori, Ishaan Gulrajani, Tianyi Zhang, Yann
+   Deng, Chenyu Zhang, Chong Ruan, et al. 2024.                  Dubois, Xuechen Li, Carlos Guestrin, Percy Liang,
+   Deepseek-v3 technical report. arXiv preprint                  and Tatsunori B. Hashimoto. 2023. Stanford alpaca:
+   arXiv:2412.19437.                                             An instruction-following llama model. https://
+                                                                 github.com/tatsu-lab/stanford_alpaca.
+
+                                                          10
+Laurens Van der Maaten and Geoffrey Hinton. 2008.             Jeffrey Zhou, Tianjian Lu, Swaroop Mishra, Sid-
+   Visualizing data using t-sne. Journal of machine              dhartha Brahma, Sujoy Basu, Yi Luan, Denny Zhou,
+   learning research, 9(11).                                     and Le Hou. 2023. Instruction-following evalu-
+                                                                 ation for large language models. arXiv preprint
+Ke Wang, Jiahui Zhu, Minjie Ren, Zeming Liu, Shiwei              arXiv:2311.07911.
+   Li, Zongye Zhang, Chenkai Zhang, Xiaoyu Wu, Qiqi
+   Zhan, Qingjie Liu, et al. 2024. A survey on data syn-      Yaoming Zhu, Sidi Lu, Lei Zheng, Jiaxian Guo, Weinan
+   thesis and augmentation for large language models.            Zhang, Jun Wang, and Yong Yu. 2018. Texygen: A
+   arXiv preprint arXiv:2410.12896.                              benchmarking platform for text generation models.
+                                                                 In SIGIR, pages 1097-1100. ACM.
+Can Xu, Qingfeng Sun, Kai Zheng, Xiubo Geng,
+   Pu Zhao, Jiazhan Feng, Chongyang Tao, Qingwei              A Generation
+   Lin, and Daxin Jiang. 2024a. Wizardlm: Empow-
+   ering large pre-trained language models to follow          When generating data, we deployed models using
+   complex instructions. In ICLR. OpenReview.net.             VLLM and LMDeploy (Contributors, 2023a) on 8
+                                                              NVIDIA A100 GPUs. For setting the model gen-
+Xiaohan Xu, Ming Li, Chongyang Tao, Tao Shen,                 eration parameters, we used the default settings of
+   Reynold Cheng, Jinyang Li, Can Xu, Dacheng Tao,            the deployment tools, except for temperature=0.2,
+   and Tianyi Zhou. 2024b. A survey on knowledge              top_p=0.9, max_token=4096. The number of ex-
+   distillation of large language models. arXiv preprint      amples used in few-shot ranges from 2 to 4. We set
+   arXiv:2402.13116.                                          the minimum score threshold  = 8 and the max-
+                                                              imum standard deviation  = 1.5 at review stage.
+Zhangchen Xu, Fengqing Jiang, Luyao Niu, Yun-                 For deduplication, the maximum cosine similarity
+   tian Deng, Radha Poovendran, Yejin Choi, and               is set to 0.9. Here we provide detailed criteria for
+   Bill Yuchen Lin. 2025. Magpie: Alignment data              data domain classification:
+   synthesis from scratch by prompting aligned LLMs
+   with nothing. In The Thirteenth International Con-            · Coding: Involves understanding, generating,
+   ference on Learning Representations.                             debugging, and fixing code.
+
+An Yang, Baosong Yang, Beichen Zhang, Binyuan Hui,               · Math: Entails performing mathematical oper-
+   Bo Zheng, Bowen Yu, Chengyuan Li, Dayiheng Liu,                  ations, applying formulas, and solving prob-
+   Fei Huang, Haoran Wei, et al. 2024a. Qwen2. 5                    lems.
+   technical report. arXiv preprint arXiv:2412.15115.
+                                                                 · QA: Focuses on providing specialized and
+An Yang, Baosong Yang, Beichen Zhang, Binyuan Hui,                  accurate answers to questions within a specific
+   Bo Zheng, Bowen Yu, Chengyuan Li, Dayiheng Liu,                  domain or field.
+   Fei Huang, Haoran Wei, et al. 2024b. Qwen2. 5
+   technical report. arXiv preprint arXiv:2412.15115.            · Language: Involves accurately understanding
+                                                                    and analyzing text, performing tasks such as
+Yifan Yao, Jinhao Duan, Kaidi Xu, Yuanfang Cai, Zhibo               translation, summarization, and classification.
+   Sun, and Yue Zhang. 2024. A survey on large lan-
+   guage model (llm) security and privacy: The good,             · Role Play: Engages in simulated conversa-
+   the bad, and the ugly. High-Confidence Computing,                tions or behaviors by assuming different roles
+   page 100211.                                                     to explore various perspectives or scenarios.
+
+Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali                   · Reasoning: Involves complex causal reason-
+   Farhadi, and Yejin Choi. 2019. Hellaswag: Can a                  ing and logical judgment, solving multi-level
+   machine really finish your sentence? arXiv preprint              problems through inference and analysis.
+   arXiv:1905.07830.
+                                                                 · Creation: Emphasizes originality and creativ-
+Wayne Xin Zhao, Kun Zhou, Junyi Li, Tianyi Tang,                    ity, creating content according to requirements
+   Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen                  and adapting to different styles and themes.
+   Zhang, Junjie Zhang, Zican Dong, et al. 2023. A
+   survey of large language models. arXiv preprint            Before initiating the GRA data synthesis, we em-
+   arXiv:2303.18223.                                          ployed all available LLMs to extract keywords and
+                                                              summaries from the seed dataset using a random-
+Yaowei Zheng, Richong Zhang, Junhao Zhang, Yan-               ized rotation approach.
+   han Ye, Zheyan Luo, Zhangchi Feng, and Yongqiang
+   Ma. 2024a. Llamafactory: Unified efficient fine-
+   tuning of 100+ language models. arXiv preprint
+   arXiv:2403.13372.
+
+Yue Zheng, Yuhao Chen, Bin Qian, Xiufang Shi, Yuan-
+   chao Shu, and Jiming Chen. 2024b. A review on
+   edge large language models: Design, execution, and
+   applications. arXiv preprint arXiv:2410.11845.
+
+                                                          11
+B Training                                                     · The ARC-C dataset (Clark et al., 2018) is a
+                                                                  collection of science exam questions designed
+We employ LLaMA-Factory (Zheng et al., 2024a)                     to evaluate advanced reasoning capabilities. It
+for model fine-tuning. All models, including our                  includes 2,590 questions across various sci-
+reproduced baselines, are fine-tuned over 1 epochs                ence topics, requiring multi-step reasoning
+with a batch size of 256 using 8 NVIDIA A100                      and knowledge application to solve.
+GPUs. The peak learning rate is set to 5e-6, fea-
+turing a linear warm-up during the initial 3% of               · The GPQA datase (Rein et al., 2023)t is a
+training steps, followed by a cosine decay. The                   high-quality benchmark for evaluating general
+maximum sequence length is configured to 4096.                    knowledge and reasoning. It consists of di-
+                                                                  verse questions spanning multiple domains, in-
+C Evaluation                                                      cluding science, history, and culture, designed
+                                                                  to test the breadth and depth of a model's un-
+We compare GRA with baselines on the following                    derstanding.
+10 benchmarks:
+                                                               · The IFEval dataset (Zhou et al., 2023) focuses
+   · The GSM8K dataset (Cobbe et al., 2021)                       on evaluating instruction-following capabili-
+      contains 8,500 grade school-level math word                 ties in language models. It includes a variety
+      problems.focus on real-world scenarios, test-               of tasks that require models to follow complex
+      ing a model's ability to parse natural language,            instructions accurately, testing their ability to
+      extract relevant information, and perform ac-               understand and execute multi-step directives.
+      curate calculations.
+                                                               · The MMLU dataset (Hendrycks et al., 2020)
+   · The MATH dataset (Hendrycks et al., 2021)                    is a comprehensive benchmark covering 57
+      evaluates mathematical reasoning with prob-                 tasks across diverse domains, including hu-
+      lems spanning arithmetic, algebra, calculus,                manities, STEM, and social sciences. It evalu-
+      and geometry, and 5 levels of difficulty.                   ates a model's ability to perform well across a
+                                                                  wide range of subjects and tasks.
+   · The HumanEval dataset (Chen et al., 2021) is
+      designed to evaluate the functional correctness          · The BBH dataset (Suzgun et al., 2022) is a
+      of code generation models. It consists of 164               subset of the Big-Bench benchmark, consist-
+      hand-written programming problems, each re-                 ing of 23 challenging tasks that are partic-
+      quiring the generation of a Python function                 ularly difficult for language models. These
+      to solve a specific task. The dataset assesses              tasks require advanced reasoning, knowledge,
+      the ability of models to produce syntactically              and problem-solving skills, making them a
+      correct and logically accurate code.                        robust test of model capabilities.
+
+   · The MBPP dataset (Austin et al., 2021) con-                  In our testing, we employ the default metrics
+      tains around 1,000 Python programming tasks,                of OpenCompass (Contributors, 2023b) corre-
+      focusing on fundamental programming con-                    sponding to each benchmark.
+      cepts. It is split into training and test sets,
+      with tasks ranging from simple operations to          D Cases
+      more complex algorithmic challenges, mak-
+      ing it suitable for evaluating code generation        A comprehensive data synthesis case is detailed in
+      and understanding.                                    Case 2.
+
+   · The Hellaswag dataset (Zellers et al., 2019)           E Prompts
+      is a commonsense reasoning benchmark that
+      includes 70,000 multiple-choice questions de-         The prompts we used, including domain identifi-
+      rived from everyday scenarios. It tests a             cation, summary generation, key word extraction,
+      model's ability to predict the most plausible         key word generation, instruction generation, in-
+      continuation of a given context, emphasizing          struction evaluation,response generation, response
+      natural language understanding and reason-            evaluation and data adjudication are shown in
+      ing.                                                  Prompt 1, 2, 3, 4, 6, 7, 8, 9.
+
+                                                        12
+GRA Data Synthesis Cases
+
+# Sample Data:
+## Instruction1:
+You are Cleopatra, the last active ruler of the Ptolemaic Kingdom of Egypt. Reflect on your complex relationships with
+Julius Caesar and Mark Antony, and explain how these alliances influenced your rule and the fate of Egypt. Discuss the
+political and emotional aspects of these relationships, and what you would consider to be the most significant outcomes.
+## Response1:
+As Cleopatra, the last Pharaoh of ancient Egypt, my life was a tapestry woven with threads of power, passion, and
+ambition. My relationships with Julius Caesar and Mark Antony were not only pivotal to my personal story but also
+crucial to the fate of my kingdom...
+## Instruction2:
+Please use the identity of an old Guangzhou resident and use a humorous and exaggerated tone to talk about your views
+on the changes in Guangzhou cuisine. In your answer, please use at least three metaphors or personifications, and make
+sure that each sentence is no less than 20 words, and must be separated by colons or semicolons.
+## Response2:
+Oh, talking about the changes in Guangzhou's food, it's like a magic trick in the Xiguan Mansion, with surprises hidden
+behind every door; the Diandude on Shamian Island was like a happy fruit for the neighbors. Although there are some
+young competitors now, it is still going strong and exudes a unique charm...
+
+# Generate Key words:
+Fantasy Adventure Quest
+
+# Reference Summary:
+1. Cleopatra's alliances with Caesar and Antony shaped Egypt's fate.
+2. Humorous Guangzhou local describes food evolution
+
+# Generate Data:
+##Instruction:
+Embark on a quest through the mystical realm of Eldoria, where you must navigate through enchanted forests, solve
+ancient riddles, and face fearsome dragons to retrieve the legendary Crystal of Aether. In this role-play, you are an
+aspiring hero, a seeker of truth, and a guardian of balance. Your adventure begins in the quaint village of Everlight,
+where whispers of the Crystal's whereabouts have begun to stir. What will you do first on your journey?
+##Response:
+As an aspiring hero on this quest to find the legendary Crystal of Aether, I would first consult the village elders of
+Everlight. They are likely to have valuable insights or clues about the whereabouts of the Crystal and the nature of the
+quest. My approach would be to: 1. Seek out the village elders and listen to their stories and advice. 2. Offer to help
+with any local tasks or problems as a gesture of goodwill and to build relationships.3. Inquire about the ancient riddles
+and the lore surrounding the Crystal of Aether. 4. Ask if there are any artifacts or maps in the village that could assist on
+the journey. 5. Formulate a plan of action based on the information gathered, considering the potential routes through
+the enchanted forests and the locations of the fearsome dragons. This initial step is crucial for gathering intelligence and
+preparing for the challenges ahead.
+
+#Data Review:
+##Evaluation:
+The average score of 8.2 meets the criteria, but the standard deviation of 1.6 does not, therefore it is sent to the Data
+Adjudicator for evaluation.
+
+#Data Adjudicator:
+##Comment:
+1. Clear plan, relevant steps, and coherent structure. Minor redundancy noted.
+2. Response offers a thorough and strategic approach to consulting the village elders, ensuring a well-informed and
+well-prepared adventure.
+3. The response provides a clear and structured plan to gather information, build relationships, and prepare for the
+journey. However, some minor verbalizations are present in the points, but are well approached despite a bit of excess
+wording in some areas.
+##Score:
+The average score of 8.1 meets the criteria.
+
+#Generate Data Summary:
+Navigate enchanted forests, solve riddles, face dragons to retrieve Crystal of Aether.
+
+                               Case 2: A comprehensive data synthesis case of GRA.
+
+                                                         13
+Domain Identification
+
+## role
+- You are an expert in identifying the domain of SFT instructions.
+
+## goal
+- Determine the domain of the provided instructions using the specified classification criteria.
+
+## classification criteria
+- **Math**: Involves performing mathematical operations, applying formulas, and solving problems.
+- **Coding**: Encompasses understanding, generating, debugging, and fixing code.
+- **QA**: Provide specialized and accurate answers to questions within a specific domain or field..
+- **Language**: Accurately understand and analyze the given text, and then perform tasks including translation,
+summarization, classification, etc.
+- **Role Play**: Engage in simulated conversations or behaviors by assuming different roles to explore various
+perspectives or scenarios.
+- **Reasoning**: Carry out complex causal reasoning and logical judgment, and solve multi-level complex problems
+through reasonable inference and analysis.
+- **Creation**: Emphasize originality and creativity, create content according to requirements, and flexibly adapt to
+different styles and themes.
+
+## output format
+- Assign each data to one `domain` category mentioned above only.
+- The output `domain` must be in English rather than Chinese.
+- Use `<boa>` and `<eoa>` to encapsulate the domain, e.g., `<bod>"domain":"the domain"<eod>`.
+
+                                   Prompt 1: Prompt used in domain identification.
+
+Summary Generation
+
+## role
+- You are an expert in concise summarization.
+## goal
+- Analyze the provided `instruction`, summarize and generate a brief, accurate `summary`.
+## requirement
+- Limit the `summary` to no more than 30 words.
+- Ensure clarity and precision in capturing the essence of the instruction.
+- - Symbolic representations involving mathematical data must be in LaTeX format.
+## output_format
+- The output `summary` must be in English rather than Chinese.
+- Use `<bod>` and `<eod>` to encapsulate the `summary`, e.g., `<bod>"summary":"the summary"<eod>`.
+- Output only the generated `summary`, nothing else.
+
+                                   Prompt 2: Prompt used in summary generation.
+
+Key Word Extraction
+
+## role
+- You are an expert at distilling key information from SFT instructions.
+## goal
+- Extracts the `keywords` from the given instructions.
+## output_format
+- The number of `keywords` must not exceed three.
+- The output `keywords` must be in English rather than Chinese.
+- Directly and Only output the data `keywords`.
+- Use `<bok>` and `<eok>` to encapsulate the `keywords`, e.g.,`<bok>"keywords":["the keywords"]<eok>`.
+
+                                    Prompt 3: Prompt used in key word extraction.
+
+                                                         14
+Key Word Generation
+
+## role
+- You are a creative language model specializing in innovative `keyword` generation and `domain` synthesis.
+## goal
+- Generate a unique set of `keywords` and `domain` that aligned with the provided examples and introducing novel
+concepts within the same domain.
+## requirement
+- Maintain a single domain with no more than three keywords.
+- Must only create one new data abstract.
+- The keywords must be novel, different to the provided examples.
+## output_format
+- The output must be in English rather than Chinese.
+- Use `<boa>` and `<eoa>` to encapsulate the domain and keywords, e.g., `<boa>"domain":"the do-
+main","keywords":["the keywords"]<eoa>`.
+- Directly output and only output the data abstract, nothing else.
+
+                                   Prompt 4: Prompt used in key word generation.
+
+Instruction Generation
+
+## role
+- You are an expert in data generation.
+## goal
+- Generate a high-quality `domain` related prompt, which related to key words like keywords.
+## requirement
+- The generated prompt must be high-quality, accurately reflecting the domain and keywords.
+- The generated prompt must be semantically complete and contain the notation and terminology specifications of the
+corresponding field.
+- The generated prompt must specify the task the user wants the model to complete, answer a question, or perform an
+action.
+- Symbolic representations involving mathematical data must be in LaTeX format.
+## output_format
+- Please ensure that the prompt generated are not overly verbose while maintaining quality and compliance.
+- Output directly and only the prompt you generate, nothing else.
+- The `generated prompt` must be wrapped with <boi> and <eoi>, e.g., `<boi>this is the generated prompt<eoi>`.
+<begin of reference>
+summaries
+<end of reference>
+
+                                   Prompt 5: Prompt used in instruction generation.
+
+                                                         15
+Instruction Evaluation
+
+## role
+You are a rigorous reviewer who is responsible for evaluating the quality of the `instruction` in an instruction-response
+pair.
+## goal
+- For the given `instruction`, You need to evaluate it according to the several evaluation dimensions specified in the
+`rule`.
+## rule
+- **Reasonable**: `instruction` must be clear and executable to ensure that they can be effectively responded to and
+handled.
+- **Completeness**: `instruction` must provide all necessary information and context required to perform the task,
+ensuring there are no missing elements that could hinder understanding or execution.
+- **Clarity**: `instruction` must be clear in language, accurate in wording, concise in syntactic structure, avoid vague
+expressions, clearly convey expected results, and eliminate ambiguity.
+## constraint
+- **Reasonable**: if the instruction meets the criteria, score 1; otherwise, score 0.
+- **Completeness**: if the instruction meets the criteria, score 1; otherwise, score 0.
+- **Clarity**: if the instruction meets the criteria, score 1; otherwise, score 0.
+## output_format
+1. Use `<bos>` and `<eos>`to encapsulate the scores for each category as the list in python, e.g., `<bos>[1,1,0]<eos>`.
+2. Directly output and only output the scores, nothing else.
+
+                                   Prompt 6: Prompt used in instruction evaluation.
+
+Response Generation
+
+## role
+You are a professional language model assistant that aims to strictly generate high-quality `response` based on the
+`instruction`.
+## goal
+- You need to generate a correct, complete, and sufficient `response` based on the `instruction`, strictly following the the
+`instruction`.
+## output_format
+- Symbolic representations involving mathematical data must be in LaTeX format.
+- Please output directly and only output `response`, nothing else.
+
+                                    Prompt 7: Prompt used in response generation.
+
+                                                         16
+Response Evaluation
+
+## role
+- You are a rigorous reviewer who is responsible for evaluating the quality of the Response in an Instruction-Response
+pair.
+## goal
+- For the `given response`, You need to strictly score and evaluate each Response according to the several evaluation
+dimensions specified in the `rule`.
+## rule
+- Correctness: The response should accurately fulfill the instruction's requirements with correct information and logic.
+- Clarity: The response must be expressed in clear, understandable language, avoiding ambiguity.
+- Completeness: The response should include all necessary details and explanations to fully address the instruction.
+- Relevance: The response must stay focused on instruction and exclude irrelevant information.
+- Coherence: The response should be logically structured and flow smoothly from one point to the next.
+- Ethicality: The response must be safe, unbiased, and free from harmful or inappropriate content.
+## constraint
+- For each evaluation dimension in `rule`, give an score from 1 to 10, and form a `score_list`.
+- In addition to the scores, you also need to provide specific `review` for the scores.
+- The `review` must be brief, under 30 words and focusing on the key points.
+## output_format
+- Use `<bos>` and `<eos>` to encapsulate the `score_list`, e.g., `<bos>[8,4,6]<eos>`.
+- Use `<boc>` and `<eoc>` to encapsulate the `review`, e.g., `<boc>THE CONTENT OF review<eoc>`.
+- Please output directly and only the `score_list` and `review` in the specified output format, nothing else.
+- **Note: Be particularly critical in your evaluation to ensure only responses of the highest quality receive high scores.**
+
+                                    Prompt 8: Prompt used in response evaluation.
+
+Data Adjudication
+
+## role
+- You are a rigorous reviewer who is responsible for evaluating the quality of the Response in an Instruction-Response
+pair.
+## goal
+- For the `given response`, you need to strictly score and evaluate each Response according to the evaluation dimensions
+specified in the `rule`, while integrating insights from the `prior evaluation`.
+## rule
+- Correctness: The response should accurately fulfill the instruction's requirements with correct information and logic.
+- Clarity: The response must be expressed in clear, understandable language, avoiding ambiguity.
+- Completeness: The response should include all necessary details and explanations to fully address the instruction.
+- Relevance: The response must stay focused on instruction and exclude irrelevant information.
+- Coherence: The response should be logically structured and flow smoothly from one point to the next.
+- Ethicality: The response must be safe, unbiased, and free from harmful or inappropriate content.
+## constraint
+- Must analyze the requirements of `instruction`, the quality of `response`, and the `prior evaluation` in detail.
+- For each evaluation dimension in `rule`, give an score from 1 to 10, and form a `score_list`.
+- In addition to the scores, you also need to provide specific `review` for the scores.
+- The `review` must be brief, under 30 words and focusing on the key points.
+## output_format
+- Use `<bos>` and `<eos>` to encapsulate the `score_list`, e.g., `<bos>[8,4,6]<eos>`.
+- Use `<boc>` and `<eoc>` to encapsulate the `review`, e.g., `<boc>THE CONTENT OF review<eoc>.`
+- Please output directly and only the `score_list` and `review` in the specified output format, nothing else.
+- **Note: Be particularly critical in your evaluation to ensure only responses of the highest quality receive high scores.**
+## prior evaluation
+review
+<begin of Instruction-Response pair>
+## instruction
+instruction
+## response
+response
+<end of Instruction-Response pair>
+
+                                     Prompt 9: Prompt used in data adjudication.
+
+                                                         17
+                 Math   Coding                    Reasoning                 General
+          GSM8K MATH                              ARC-C GPQA           MMLU IFEval
+SIZE                    Humaneval MBPP HellaSwag                BBH                  AVG
+
+                                     LLama3.1 8B                64.46                47.21
+                                                                63.28                50.31
+                                     Condor                     63.13                49.57
+                                                                64.75                50.75
+10K GRA1  64.90  11.26  48.78 46.60  59.10        69.49  24.75  63.48  39.55  43.17  51.60
+20K GRA2  65.88  16.22                            70.51  28.79         44.89  48.40
+30K GRA3  67.10  15.38  51.83 47.40  65.83        69.15  25.25  63.80  45.60  48.03  47.58
+40K GRA4  65.88  14.64                            72.20  27.27  64.62  42.90  54.49  50.44
+50K GRA5  65.58  15.82  51.83 48.40  61.82        72.54  26.77  62.91  45.22  53.54  49.86
+                                                                64.78                51.53
+                        51.83 47.40  66.07                      64.50                52.14
+
+                        50.61 48.80  69.22                      63.35                48.56
+                                                                64.97                50.58
+                                     Alpaca                     63.13                50.74
+                                                                63.28                50.92
+10K GRA1  63.91  10.22  48.17 47.20  61.57        69.83  29.80  64.25  35.15  46.08  50.43
+20K GRA2  65.66  14.86                            71.19  27.78         45.05  50.16
+30K GRA3  65.13  11.02  53.66 47.00  64.41        70.17  26.77  41.18  45.35  53.41  49.72
+40K GRA4  66.41  15.16                            73.56  29.29  51.95  45.63  55.31  58.56
+50K GRA5  65.58  17.2   53.66 48.00  62.11        71.53  29.80  57.26  48.58  56.80  59.75
+                                                                51.11                59.30
+                        50.61 49.20  65.32                      61.49                61.13
+
+                        52.44 48.60  66.30                      45.00                52.23
+                                                                45.49                55.72
+                                     WizardLM                   60.57                60.36
+                                                                45.27                59.52
+10K GRA1  63.68  10.08  49.39 47.80  61.67        68.47  29.80  62.97  42.87  48.47  59.79
+20K GRA2  65.96  16.98                            72.54  26.77         44.07  51.44
+30K GRA3  68.16  14.50  50.61 47.20  65.25        69.15  28.28  48.30  44.93  52.28  54.13
+40K GRA4  65.88  18.98                            72.88  26.77  53.02  43.10  53.52  56.69
+50K GRA5  65.66  14.14  52.44 50.00  64.49        73.22  28.28  53.38  42.14  55.27  58.04
+                                                                59.29                60.41
+                        51.22 47.00  66.54                      63.99                62.17
+
+                        47.56 48.20  65.54
+
+                                     Qwen2.5 7B
+
+                                     Condor
+
+10K GRA1  49.36  20.10  72.56 64.40  62.69        62.37  19.70         54.70  50.13
+20K GRA2  60.88  42.10                            74.24  26.77         63.70  50.97
+30K GRA3  65.88  34.30  75.00 66.40  73.56        73.90  26.77         64.08  53.52
+40K GRA4  67.25  39.04                            73.22  26.26         63.12  52.86
+50K GRA5  64.75  42.82  78.05 66.00  77.74        75.59  26.26         64.59  54.02
+
+                        79.27 66.60  74.23
+
+                        76.22 65.60  79.90
+
+                                     Alpaca
+
+10K GRA1  52.08  20.42  71.34 65.60  70.68        70.17  19.19         57.43  50.37
+20K GRA2  63.68  33.50                            71.19  24.24         58.66  49.91
+30K GRA3  70.28  33.82  73.17 65.80  71.59        74.24  24.24         65.42  53.16
+40K GRA4  72.78  46.48                            71.19  24.24         61.86  55.53
+50K GRA5  51.71  44.62  76.83 64.80  80.23        77.63  20.71         65.06  54.58
+
+                        75.00 65.80  76.99
+
+                        74.39 64.60  81.62
+
+                                     WizardLM
+
+10K GRA1  53.98  23.20  73.17 65.20  73.66        70.51  22.73         59.42  51.08
+20K GRA2  59.74  31.02                            73.22  20.71         63.12  50.59
+30K GRA3  66.72  27.70  73.17 65.80  76.44        74.24  23.74         64.60  51.17
+40K GRA4  70.89  38.58                            77.63  19.19         65.10  53.55
+50K GRA5  58.98  47.84  75.61 64.80  78.47        79.66  28.79         65.23  54.15
+
+                        76.22 64.60  79.02
+
+                        76.83 64.60  81.58
+
+Table 3: Detail Results of effect of the data iteration . Bold underlined values represent the best results.
+
+                                     18
+
