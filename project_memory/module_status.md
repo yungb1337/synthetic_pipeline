@@ -31,7 +31,8 @@ metadata:
 - [x] **Checkpoint 001** → `checkpoints/checkpoint_001.md`
 - [x] **Module #2 Normalizer** implemented+tested → `app/normalizer/`, `docs/normalizer-module-spec.md` (18 tests green)
 - [x] **Batch/scale layer** → `app/processing/` + batched OCR + batching-capable embeddings seam → `docs/scale-batch-spec.md` (24 tests green; ~2ms/doc, incremental manifest verified)
-- [x] **Real local GPU embeddings** → `app/embedding/` `SentenceTransformerEmbedder` (`BAAI/bge-small-en-v1.5`, 384) on RTX 3050 (torch 2.13+cu126 + sentence-transformers 5.6); `factory.default_embedder` auto GPU/CPU, Dummy fallback → `requirements-gpu.txt`, `scripts/check_embedder.py` (27 tests green on CUDA)
+- [x] **Real local GPU embeddings** → `SentenceTransformerEmbedder` = **`BAAI/bge-m3` (1024-dim, multilingual)** on RTX 3050 (torch 2.13+cu126, sentence-transformers 5.6, fp16 to fit VRAM); model in `models/bge-m3` via `scripts/download_models.py`; `factory.default_embedder` auto GPU/CPU, Dummy fallback
+- [x] **Git initialized** (commit f5a72ec) — source/docs/memory/tests tracked; `.venv`, `models/`, caches ignored
 - [ ] Archive the academic-PDF read (re-dispatch) → ground Ontology/KG/Ontology decisions
 
 ## Next module

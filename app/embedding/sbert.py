@@ -64,11 +64,12 @@ class SentenceTransformerEmbedder:
     def _load(self) -> None:
         try:
             from sentence_transformers import SentenceTransformer  # type: ignore
-            kwargs = {"device": self.device}
-            if self.fp16:
-                import torch  # type: ignore
-                kwargs["torch_dtype"] = torch.float16  # fits 4GB VRAM
-            self._st = SentenceTransformer(self._model_ref, **kwargs)
+            self._st = SentenceTransformer(self._model_ref, device=self.device)
+            if self.fp16:                      # cast to half to fit 4GB VRAM
+                try:
+                    self._st = self._st.half()
+                except Exception:
+                    pass
             try:  # modern + legacy API
                 self.dim = int(self._st.get_embedding_dimension())
             except AttributeError:

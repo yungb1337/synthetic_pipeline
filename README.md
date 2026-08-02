@@ -55,10 +55,12 @@ python -m pytest
 PDF (text + layout + headings + tables + images), DOCX, XLSX, CSV/TSV, JSON, XML, HTML, Markdown, plain text, and images / scanned (on-prem OCR).
 
 ## Local models & GPU
-Two local, open-source model types are used; **no document ever leaves the machine**.
+Two local, open-source model types are used; **no document ever leaves the machine**. Model weights live in the repo under `models/` (git-ignored; large binaries).
 
 - **OCR — already local.** RapidOCR-onnxruntime bundles PaddleOCR detection+recognition models and runs on the on-prem `onnxruntime` (CPU by default). Batched for many pages; engine loads only when a doc needs OCR.
-- **Embeddings — real local model on your GPU.** `app/embedding/` uses `sentence-transformers` (`BAAI/bge-small-en-v1.5`, 384-dim) via PyTorch **CUDA** onto the RTX 3050, with automatic CPU fallback. `factory.default_embedder()` picks whichever is available; `DummyEmbedder` is only the deterministic fallback for tests/CI/machines without torch.
+- **Embeddings — `BAAI/bge-m3` (1024-dim, multilingual) on your GPU.** `app/embedding/` uses `sentence-transformers` via PyTorch **CUDA** onto the RTX 3050 (fp16 to fit 4GB), with automatic CPU fallback. `factory.default_embedder()` picks whichever is available; `DummyEmbedder` is only the deterministic fallback for tests/CI/machines without torch.
+  - Install/update the model into `models/`:
+    `PYTHONPATH=. python scripts/download_models.py`  (→ `models/bge-m3`)
   - Installed for this machine (verified): `torch-2.13.0+cu126`, `sentence-transformers-5.6.1` (see `requirements-gpu.txt`).
   - Verify: `PYTHONPATH=. python scripts/check_embedder.py`
 

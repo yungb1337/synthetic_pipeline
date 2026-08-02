@@ -9,8 +9,9 @@
 #     pip install --index-url https://download.pytorch.org/whl/cu126 torch
 #     pip install sentence-transformers
 
-# Runtime embedding: real local model (BAAI/bge-small-en-v1.5 by default),
-# GPU-aware via PyTorch CUDA.
+# Runtime embedding: real local model (BAAI/bge-m3, 1024-dim multilingual),
+# GPU-aware via PyTorch CUDA. After installing, fetch the weights once:
+#   PYTHONPATH=. python scripts/download_models.py   # -> models/bge-m3
 # torch==2.13.0+cu126        (installed from the cu126 index above)
 sentence-transformers>=5.6
 transformers>=5.14
