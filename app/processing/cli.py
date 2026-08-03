@@ -36,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
         cfg = replace(cfg, concurrency=args.concurrency)
     if args.no_ocr:
         cfg = replace(cfg, ocr_warm=False)
+    cfg = replace(cfg, manifest_path=args.manifest)
 
     store = FilesystemStore(args.out)
     pipeline = ParseNormalizePipeline(store)
