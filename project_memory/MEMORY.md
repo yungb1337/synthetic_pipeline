@@ -12,4 +12,8 @@ Persistent checkpoint + context files for this project.
 - **Checkpoint:** `checkpoints/checkpoint_001.md` (Module #1). Module #2 + batch + GPU embeddings done (27 tests green; GPU embedder runs on CUDA).
 - **Research sources:** `_research_sources/*.txt` (extracted text of SYN1–4 + papers).
 
+## The engineering organization
+- [Active Run Brief](active_objective.md) — the objective the autonomous org executes next.
+- **Org:** 8 agents in `.claude/agents/` · gates in `docs/org-gate-protocol.md` · drive with `/dev-team` (in-session) or the `audit` workflow (background) · similarity signal = `scripts/check_similarity.py`.
+
 Principle: append, never destroy; keep every decision's reasoning.
