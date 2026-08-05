@@ -54,6 +54,21 @@ def test_latest_chunks_numeric_sort(tmp_path):
     assert latest.chunker_version == "chunker-v1.2.3"
 
 
+def test_version_key_mixed_formats_comparable():
+    """Mixed numeric/non-numeric version keys must sort without TypeError
+    (regression for the 2026-08-05 bugfix: a v0.1.0 vs vv0.1.0 clash crashed
+    sorted() with '<' not supported between str and int)."""
+    from app.chunking.store import _version_key
+
+    versions = ["v0.1.0", "0.2.0", "v0.1.9", "0.2.0-alpha"]
+    ordered = sorted(versions, key=_version_key)
+    assert ordered[0].startswith("0.2.0") or ordered[0] == "0.2.0"
+    assert "v0.1.0" in ordered
+    # numeric sorts before non-numeric, and nothing raises
+    for a, b in zip(versions, versions):
+        _version_key(a) < _version_key(b)  # must not raise TypeError
+
+
 def test_deterministic_overwrite(tmp_path):
     store = FilesystemChunkStore(str(tmp_path / "store"))
     art = _artifact()

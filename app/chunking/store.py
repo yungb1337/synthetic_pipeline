@@ -49,12 +49,21 @@ def _sanitize_embedder_id(name: str) -> str:
 
 
 def _version_key(v: str) -> tuple:
-    """Numeric version sort key (``vX.Y.Z`` -> ``(X, Y, Z)``); string fallback."""
-    parts = v.split(".")
-    try:
-        return tuple(int(p) for p in parts)
-    except ValueError:
-        return tuple(parts)
+    """Numeric version sort key (``vX.Y.Z`` -> ``((0, X), (0, Y), (0, Z))``).
+
+    Robust to mixed numeric/non-numeric parts (e.g. ``v0.2.0-alpha``): each
+    part becomes ``(0, int)`` when all-digits else ``(1, str)``, so any two
+    version strings are always comparable (numeric sorts before non-numeric).
+    Previously an all-int tuple vs a str tuple raised ``TypeError`` in
+    ``sorted()`` (bugfix, 2026-08-05, surfaced by the module walkthrough).
+    """
+    out = []
+    for p in v.split("."):
+        if p.isdigit():
+            out.append((0, int(p)))
+        else:
+            out.append((1, p))
+    return tuple(out)
 
 
 class ChunkStore(ABC):

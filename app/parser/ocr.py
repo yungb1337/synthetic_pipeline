@@ -10,6 +10,7 @@ RapidOCR returns, per text line: [quad(4 pts), text, confidence].
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 
 # Minimize import cost + keep module importable without the heavy engine.
 _engine = None
@@ -41,13 +42,23 @@ def _quad_to_bbox(quad) -> tuple[float, float, float, float]:
 
 
 def ocr_image(image) -> list[tuple[str, tuple[float, float, float, float], float]]:
-    """Run OCR on a PIL image. Returns list of (text, bbox, confidence).
+    """Run OCR on an image. Returns list of (text, bbox, confidence).
 
-    `image` may be a PIL.Image.Image or a path to an image file.
+    `image` may be raw bytes, a file path, a numpy array, or a PIL image.
     Returns [] if the engine is not available.
+
+    NOTE (bugfix, 2026-08-05): RapidOCR.__call__ only accepts str |
+    numpy.ndarray | bytes | pathlib.Path — passing a PIL Image raises
+    LoadImageError, which used to be swallowed into an empty result. A PIL
+    image is now converted to a numpy array first.
     """
     if not engine_available():
         return []
+    if not isinstance(image, (str, bytes, Path)):
+        from PIL import Image as _PIL
+        if isinstance(image, _PIL.Image):
+            import numpy as _np
+            image = _np.asarray(image)
     try:
         result, _elapse = _engine(image)
     except Exception:

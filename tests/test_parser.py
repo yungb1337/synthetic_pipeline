@@ -158,3 +158,27 @@ def _make_pdf_with_image():
             pix.set_pixel(x, y, (x * 3 % 255, y * 3 % 255, 128))
     page.insert_image(fitz.Rect(72, 150, 172, 250), pixmap=pix)
     return doc.tobytes()
+
+
+# ---------------------------------------------------------------------------
+def test_ocr_pil_image_converted_to_ndarray(monkeypatch):
+    """RapidOCR rejects PIL Images (str|ndarray|bytes|Path only); a PIL image
+    passed to ocr_image must be converted to a numpy array, not swallowed into
+    an empty result (regression for the 2026-08-05 bugfix)."""
+    from app.parser import ocr
+
+    seen = {}
+
+    def fake_engine(image):
+        seen["type"] = type(image).__module__ + "." + type(image).__name__
+        return (None, 0.0)
+
+    monkeypatch.setattr(ocr, "engine_available", lambda: True)
+    monkeypatch.setattr(ocr, "_engine", fake_engine)
+
+    from PIL import Image
+
+    img = Image.new("RGB", (20, 20), "white")
+    result = ocr.ocr_image(img)
+    assert result == []
+    assert seen["type"] == "numpy.ndarray", f"engine received {seen['type']}, expected ndarray"
