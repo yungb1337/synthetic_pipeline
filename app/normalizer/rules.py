@@ -50,14 +50,13 @@ def dehyphenate(text: str) -> tuple[str, bool]:
 
 
 # ---- rule 4: collapse whitespace --------------------------------------------
-# Collapse all runs of whitespace (space/tab/newline) to a single space.
-_WS_RE = re.compile(r"[ \t]+[ \t]*\n[ \t]*|[ \t]{2,}", re.MULTILINE)
+# Collapse every run of whitespace (space/tab/newline) to a single space.
+# The newline branch consumes the whole run (leading space/tab, newlines,
+# trailing space/tab) so two adjacent matches can never each emit a space.
+_WS_RE = re.compile(r"(?:[ \t]*\n)+[ \t]*|[ \t]{2,}")
 
 def collapse_whitespace(text: str) -> tuple[str, bool]:
-    new = re.sub(r"[ \t]{2,}", " ", text).strip()
-    # ensure at least single spaces between alphanumerics after newlines
-    new = re.sub(r"[ \t]*\n[ \t]*", " ", new)
-    new = re.sub(r" {2,}", " ", new).strip()
+    new = _WS_RE.sub(" ", text).strip()
     return new, new != text
 
 

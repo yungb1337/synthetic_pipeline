@@ -79,9 +79,11 @@ def _embed_pass(report, store, cfg) -> None:
     embed = default_embedder()
     total_texts = total_vecs = 0
     for did in report.ids:
-        blob = store.get(f"dom/{did}.norm.json")
-        if not blob:
+        # normalized DOM lives at dom/<doc_id>/norm-{version}.docJSON (versioned)
+        matches = sorted((store.root / "dom" / did).glob("norm-v*.docJSON"))
+        if not matches:
             continue
+        blob = matches[-1].read_bytes()
         doc = Document.model_validate_json(blob.decode("utf-8"))
         blocks = [b for p in doc.pages for b in p.blocks]
         total_texts += len(blocks)

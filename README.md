@@ -64,6 +64,22 @@ Two local, open-source model types are used; **no document ever leaves the machi
   - Installed for this machine (verified): `torch-2.13.0+cu126`, `sentence-transformers-5.6.1` (see `requirements-gpu.txt`).
   - Verify: `PYTHONPATH=. python scripts/check_embedder.py`
 
+## Optional Docling backend (ADR-007) — layout + tables, gated
+Docling is **present but triggers only where layout analysis is required**, keeping computation
+expense low. On the Docling path it replaces the heuristic reading order and PyMuPDF `find_tables`
+with learned layout/table-structure/reading-order models; the cheap native path remains the default
+for everything else.
+
+```bash
+pip install -r requirements-docling.txt     # heavy: pulls torch/transformers + onnx models
+# then opt in per parse/corpus:
+#   ParserConfig(layout_backend="docling")  # "native" (default) | "docling"
+```
+- Models cache locally under `models/docling/` (on-prem; nothing leaves the machine).
+- If Docling is missing or recovers nothing, PDFs/images fall back to the native path (never crash).
+- Provenance records `docling_version` / `layout_model`; reading order is authoritative on this path.
+- `app/parser/loaders/docling_loader.py` mirrors the lazy-engine pattern of `ocr.py`.
+
 ## Key design properties
 - **Parser independence** — every format returns the same DOM; new formats are new loaders only.
 - **Idempotent + content-addressed** — `document_id = sha256(source)`; same bytes ⇒ same DOM.

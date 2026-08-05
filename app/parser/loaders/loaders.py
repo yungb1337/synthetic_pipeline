@@ -19,29 +19,13 @@ import json
 from xml.etree import ElementTree as ET
 
 from ..config import ParserConfig
+from ..mime import MIME as _MIME
 from ..parts import (
     RecoveredBlock,
     RecoveredDocument,
     RecoveredImage,
     RecoveredTable,
 )
-
-_MIME = {
-    "pdf": "application/pdf",
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "csv": "text/csv",
-    "tsv": "text/tab-separated-values",
-    "json": "application/json",
-    "xml": "application/xml",
-    "html": "text/html",
-    "markdown": "text/markdown",
-    "plaintext": "text/plain",
-    "png": "image/png",
-    "jpg": "image/jpeg",
-    "gif": "image/gif",
-    "tiff": "image/tiff",
-}
 
 
 class UnsupportedFormat(Exception):
@@ -94,8 +78,23 @@ class Loaders:
 
     def load(self, detected, data: bytes) -> RecoveredDocument:
         slug = detected.slug
+        # ADR-007: Docling triggers only where layout analysis is required.
+        # When layout_backend == "docling", PDFs (and bare images) route through
+        # the Docling loader (layout + tables + reading order); if Docling is
+        # unavailable or recovers nothing, we fall through to the native path.
+        if self.config.layout_backend == "docling" and slug in ("pdf", "png", "jpg", "gif", "tiff"):
+            from . import docling_loader
+
+            if docling_loader.engine_available():
+                rec = docling_loader.parse(data, f"doc.{slug}", self.config.docling_models_dir)
+                if rec is not None:
+                    rec.detected_type = slug
+                    rec.mime = detected.mime
+                    rec.declared_extension = detected.declared_extension
+                    rec.probe = detected.probe
+                    return rec
         if slug in ("plaintext", "txt"):
-            return self._plain(data, detected)
+            return self._text(data, detected)
         if slug in ("png", "jpg", "gif", "tiff"):
             return self._image(data, detected)
         if slug == "pdf":
@@ -198,7 +197,7 @@ class Loaders:
                     rects = page.get_image_rects(xref[0])
                     bbox = tuple(rects[0]) if rects else None
                     ext = einfo.get("ext", "png")
-                    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "tiff": "image/tiff"}.get(ext, "image/" + ext)
+                    mime = {"png": _MIME["png"], "jpg": _MIME["jpg"], "jpeg": _MIME["jpg"], "tiff": _MIME["tiff"]}.get(ext, "image/" + ext)
                     blob = einfo["image"]
                     rec.images.append(
                         RecoveredImage(page=pno, bbox=bbox, mime=mime,

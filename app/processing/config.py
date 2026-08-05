@@ -22,7 +22,9 @@ class ProcessingConfig:
     manifest_path: str = "work/manifest.json"
     # batching of model-boundary calls
     ocr_warm: bool = True         # preload OCR engine once before the pool
-    embed_batch_size: int = 64    # row-batch for embedding calls (seam)
+    embed_batch_size: int = 32    # row-batch for embedding calls (seam); fp16 envelope on the
+                                  # 4 GB RTX 3050 (B≈32 @ L=1024 is near-OOM) — the chunk pipeline
+                                  # passes its own token-budget caps and never inherits this
 
     def snapshot(self) -> dict:
         return {k: v for k, v in vars(self).items() if not k.startswith("_")}

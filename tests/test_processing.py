@@ -66,3 +66,20 @@ def test_failed_docs_do_not_crash_batch(tmp_path):
     refs = _refs(str(tmp_path / "inputs"), cfg)
     rep = worker.run(refs)
     assert rep.ok == 1 and rep.failed == 1
+
+
+def test_batch_crosses_flush_boundary(tmp_path):
+    """Regression: `_record`->`_flush` deadlock when crossing the flush boundary.
+
+    The batch saves the manifest every 256 processed docs; this run of 300 docs
+    crosses that boundary and would hang without the lock fix.
+    """
+    _write_corpus(tmp_path, n=300)
+    cfg = _cfg(manifest_path=str(tmp_path / "manifest.json"))
+    store = FilesystemStore(str(tmp_path / "store"))
+    worker = BatchWorker(cfg, ParseNormalizePipeline(store))
+    refs = _refs(str(tmp_path / "inputs"), cfg)
+    rep = worker.run(refs)
+    assert rep.ok == 300 and rep.failed == 0
+    from app.processing.corpus import load_manifest
+    assert len(load_manifest(cfg.manifest_path)) == 300

@@ -75,3 +75,9 @@ class RecoveredDocument:
     images: list[RecoveredImage] = field(default_factory=list)
     annotations: list[RecoveredAnnotation] = field(default_factory=list)
     references: list[tuple[str, str]] = field(default_factory=list)  # (kind,target)
+    # ADR-007: when True, `blocks` are already in final reading order (e.g. Docling's
+    # iterate_items order); the DOM builder must NOT re-run the heuristic ROG on them.
+    reading_order_authoritative: bool = False
+    # ADR-007: engine/model identity for provenance + idempotent re-parse stability.
+    docling_version: Optional[str] = None
+    layout_model: Optional[str] = None

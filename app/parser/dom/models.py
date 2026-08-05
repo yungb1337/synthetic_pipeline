@@ -19,21 +19,6 @@ class BBox(BaseModel):
     y1: float
 
 
-class BlockKind(str):
-    PARAGRAPH = "paragraph"
-    HEADING = "heading"
-    LIST = "list"
-    LIST_ITEM = "list_item"
-    TABLE = "table"
-    IMAGE = "image"
-    CAPTION = "caption"
-    CODE = "code"
-    FORMULA = "formula"
-    QUOTE = "quote"
-    ANNOTATION = "annotation"
-    OTHER = "other"
-
-
 class Block(BaseModel):
     """A text-bearing region (spatial or logical) of the document."""
     id: str
@@ -121,6 +106,9 @@ class Provenance(BaseModel):
     dom_schema_version: str
     ocr_engine: Optional[str] = None
     oct_level: bool = False
+    # ADR-007: Docling backend identity (present only when the Docling path ran).
+    docling_version: Optional[str] = None
+    layout_model: Optional[str] = None
     config: dict = Field(default_factory=dict)
     # --- normalization stage (Module #2) ---
     normalizer_version: Optional[str] = None

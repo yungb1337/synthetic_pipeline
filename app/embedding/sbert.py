@@ -1,9 +1,10 @@
 """A real, local, open-source embedding model (sentence-transformers / PyTorch).
 
-This replaces the `DummyEmbedder` when PyTorch + CUDA are available: a model
-(e.g. BAAI/bge-small-en-v1.5, or all-MiniLM-L6-v2) downloads once to the local
-HF cache and embeds in batched calls on the RTX 3050 (GPU, `cuda`) with a CPU
-fallback. Deterministic: same model + same inputs => same vectors.
+This replaces the `DummyEmbedder` when PyTorch + CUDA are available: BGE-M3
+(1024-dim, multilingual) loads from the local `models/bge-m3` copy and embeds
+in batched calls on the RTX 3050 (GPU, `cuda`, fp16) with a CPU fallback.
+Deterministic: same model + same inputs => same vectors (bit-exact on CPU,
+cosine-stable on GPU-fp16 — ADR-010).
 
 The pipeline never depends on it being present — `factory.default_embedder`
 falls back to `DummyEmbedder` if torch/this model isn't installed (CI, cramped
@@ -11,6 +12,7 @@ machines). See README §"embedding seam".
 """
 from __future__ import annotations
 
+import hashlib
 import os
 
 
@@ -40,13 +42,38 @@ def resolve_device(preferred: str = "auto") -> str:
 class SentenceTransformerEmbedder:
     """Local embedding model — batched (list-in -> list[list[float]]), GPU-aware."""
 
-    name = "sentence-transformers"
+    @property
+    def name(self) -> str:
+        """Model identity + revision + dtype (ADR-009).
+
+        `emb-` storage keys must be unambiguous across models/dtypes, so the
+        generic "sentence-transformers" label is gone. Example:
+        ``BAAI/bge-m3@3f9a1c2b-fp16``.
+        """
+        dtype = "fp16" if self.fp16 else "fp32"
+        return f"{self.model_name}@{self.revision}-{dtype}"
+
+    @property
+    def revision(self) -> str:
+        """Deterministic, on-prem revision of the local model copy.
+
+        sha256(config.json bytes)[:8] when the local model dir is present;
+        "local" otherwise. Never reads remote state.
+        """
+        cfg = os.path.join(self._model_ref, "config.json")
+        if os.path.isfile(cfg):
+            try:
+                with open(cfg, "rb") as fh:
+                    return hashlib.sha256(fh.read()).hexdigest()[:8]
+            except OSError:
+                return "local"
+        return "local"
 
     def __init__(
         self,
         model: str = "BAAI/bge-m3",
         device: str = "auto",
-        batch_size: int = 128,
+        batch_size: int = 32,
         model_dir: str = "models",
         fp16: bool = True,
     ):

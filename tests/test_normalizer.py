@@ -43,6 +43,20 @@ def test_rule_collapse():
     assert changed is True
 
 
+def test_rule_collapse_idempotent_interleaved():
+    """Regression: interleaved space/tab/newline runs must collapse in ONE pass.
+
+    The rewritten `_WS_RE` (with `(?:[ \t]*\n)+` grouping) consumes the whole
+    whitespace run, so a second pass is a no-op — the contract the batch
+    layer's incremental re-run depends on.
+    """
+    for s in ("a \n \n b", "a\n\t \nb", "a \n\t\n b"):
+        once, _ = rules.collapse_whitespace(s)
+        twice, _ = rules.collapse_whitespace(once)
+        assert once == twice
+        assert once == "a b"
+
+
 def test_rule_nfkc():
     out, changed = rules.nfkc("É  text")  # É + nbsp
     assert " " not in out

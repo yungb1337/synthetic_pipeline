@@ -22,7 +22,7 @@ from .storage import Store
 @dataclass
 class ParseOutcome:
     document_id: str
-    status: str                # "parsed" | "unsupported" | "unresolved" | "empty"
+    status: str                # "parsed" | "unsupported" | "unresolved" | "failed"
     document: Document | None = None
     detected: detection.Detected | None = None
     report: dict = field(default_factory=dict)
@@ -45,20 +45,26 @@ class Extractor:
         self.loaders = Loaders(config)
         self.builder = DocumentBuilder(config)
 
-    def extract(self, data: bytes, filename: str = "") -> ParseOutcome:
+    def extract(self, data: bytes, filename: str = "", sha256: str | None = None) -> ParseOutcome:
         t0 = time.time()
-        sha = hashlib.sha256(data).hexdigest()
+        # the corpus scan already has the content hash; only recompute when the
+        # caller could not provide it (single-doc / interactive path).
+        sha = sha256 or hashlib.sha256(data).hexdigest()
         doc_id = f"d-{sha[:16]}"
 
         detected = detection.detect(data, filename)
         if detected.unresolved:
-            self._emit("document.unresolved", doc_id, {"slug": detected.slug})
+            self._emit("document.parse_failed", doc_id, {"reason": "unresolved", "slug": detected.slug})
             return ParseOutcome(doc_id, "unresolved", None, detected)
+
+        if len(data) > self.config.max_file_bytes:
+            self._emit("document.parse_failed", doc_id, {"reason": "too_large", "bytes": len(data)})
+            return ParseOutcome(doc_id, "failed", None, detected, {"error": "file exceeds max_file_bytes"})
 
         try:
             rec = self.loaders.load(detected, data)
         except UnsupportedFormat as e:
-            self._emit("document.failed", doc_id, {"reason": f"unsupported:{e}"})
+            self._emit("document.parse_failed", doc_id, {"reason": f"unsupported:{e}"})
             return ParseOutcome(doc_id, "unsupported", None, detected, {"error": str(e)})
 
         # persist extracted images (same pass; image bytes are already in rec)

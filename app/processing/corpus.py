@@ -56,18 +56,10 @@ def hash_paths(paths: list[str], concurrency: int | None = None) -> list[DocRef]
 def _hash_one(path: str) -> DocRef:
     p = Path(path)
     try:
-        sha, size = _hash_file(p)
+        sha, size = _hash_file(path)   # streaming/chunked; never whole-file read
     except OSError:
         sha, size = "", 0
     return DocRef(path=path, name=p.name, size=size, sha256=sha)
-
-
-def _hash_file(p: Path) -> tuple[str, int]:
-    return _hash_bytes(p.read_bytes())
-
-
-def _hash_bytes(data: bytes) -> tuple[str, int]:
-    return hashlib.sha256(data).hexdigest(), len(data)
 
 
 def load_manifest(path: str) -> set[str]:
@@ -87,4 +79,7 @@ def save_manifest(path: str, shas: set[str]) -> None:
 
 
 def pending(ref: DocRef, manifest: set[str]) -> bool:
-    return bool(ref.sha256) and ref.sha256 not in manifest
+    # an empty hash means the file failed to hash during the scan; treat it as
+    # pending so it is attempted and surfaced as a failure instead of being
+    # silently counted as skipped and never reported.
+    return ref.sha256 not in manifest

@@ -13,6 +13,7 @@ This repo runs as an autonomous engineering organization. The **Project Orchestr
 - `app/normalizer/` — Module #2: DOM → clean DOM
 - `app/processing/` — batch/scale execution (thousands→millions of docs)
 - `app/embedding/` — batching-capable embedding seam (BGE-M3 1024-dim, GPU)
+- `app/chunking/` — Module #3: DOM → content-addressed semantic chunks + BGE-M3 embeddings (retrieval-grounding seam)
 - `docs/` — design specs (parser, normalizer, scale-batch, universal engine, gate protocol)
 - `project_memory/` — the shared blackboard (master context, ADRs, module status, questions, index)
 - `checkpoints/` — durable checkpoints per milestone and per run (`checkpoints/run/<run_id>/`)

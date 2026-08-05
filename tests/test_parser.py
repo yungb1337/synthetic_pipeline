@@ -104,6 +104,34 @@ def test_store_writes_dom_and_raw(tmp_path):
     assert ex.store.get(dom_key) is not None
 
 
+def test_txt_plaintext_loader(tmp_path):
+    """Regression: `plaintext`/`txt` dispatch used to hit a missing `_plain`."""
+    data = b"Patient A: stable.\nPatient B: improving.\n"
+    out = _extractor(tmp_path).extract(data, "notes.txt")
+    assert out.ok
+    assert out.detected.slug == "plaintext"
+    assert out.document.num_blocks() == 2
+    text = " ".join(b.text for p in out.document.pages for b in p.blocks)
+    assert "Patient A" in text and "Patient B" in text
+
+
+def test_image_doc_reparse_deterministic(tmp_path):
+    """Same bytes -> identical DOM bytes AND identical storage keys."""
+    raw = _make_pdf_with_image()
+    a = _extractor(tmp_path).extract(raw, "img1.pdf")
+    b = _extractor(tmp_path).extract(raw, "img2.pdf")
+    assert a.ok and b.ok
+    assert a.document_id == b.document_id
+    assert a.document.model_dump_json() == b.document.model_dump_json()
+    assert a.report["dom_key"] == b.report["dom_key"]
+    assert a.report["raw_key"] == b.report["raw_key"]
+    keys_a = [i.storage_ref for p in a.document.pages for i in p.images]
+    keys_b = [i.storage_ref for p in b.document.pages for i in p.images]
+    assert keys_a and keys_a == keys_b
+    # versioned layout: dom/<doc_id>/dom-v{version}.docJSON
+    assert "/dom-v" in a.report["dom_key"]
+
+
 def _make_bytes() -> bytes:
     return _make_pdf_bytes()
 
@@ -115,4 +143,18 @@ def _make_pdf_bytes():
     page.insert_text((72, 100), "Clinical Report", fontsize=20)
     page.insert_text((72, 130), "The patient has stable diabetes on metformin.", fontsize=11)
     page.insert_text((72, 150), "Monitoring of renal function is advised.", fontsize=11)
+    return doc.tobytes()
+
+
+def _make_pdf_with_image():
+    import fitz
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((72, 100), "Image report", fontsize=14)
+    # a small solid-gradient RGB pixmap so the PDF carries an embedded image
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 64, 64))
+    for y in range(64):
+        for x in range(64):
+            pix.set_pixel(x, y, (x * 3 % 255, y * 3 % 255, 128))
+    page.insert_image(fitz.Rect(72, 150, 172, 250), pixmap=pix)
     return doc.tobytes()

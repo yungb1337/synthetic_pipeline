@@ -25,9 +25,14 @@ class ParserConfig:
     pdf_extract_tables: bool = True
     pdf_heading_threshold_ratio: float = 1.12  # font size ratio that marks a heading
 
+    # Layout backend (ADR-007): Docling is present but only triggers where layout
+    # analysis is required. "native" = cheap PyMuPDF + heuristic ROG + find_tables;
+    # "docling" = Docling layout/table/reading-order engine (lazy, local models).
+    layout_backend: str = "native"
+    docling_models_dir: str = "models/docling"  # on-prem model cache
+
     # Security / resource limits
-    max_file_bytes: int = 512 * 1024 * 1024   # 512 MiB
-    max_pages_for_ocr: int = 200              # don't blast huge scans through OCR
+    max_file_bytes: int = 512 * 1024 * 1024   # 512 MiB; enforced in Extractor.extract
 
     temp_dir: str = "work"
     event_sink: str = "console"
@@ -35,13 +40,6 @@ class ParserConfig:
     def snapshot(self) -> dict:
         """A JSON-safe fingerprint of this config (for provenance)."""
         return {k: v for k, v in vars(self).items() if not k.startswith("_") and k != "event_sink"}
-
-
-@dataclass
-class ParseLimits:
-    """Expressed limits that don't change code, surfaced for monitoring."""
-    max_file_bytes: int = 512 * 1024 * 1024
-    max_pages_for_ocr: int = 200
 
 
 def default_config() -> ParserConfig:

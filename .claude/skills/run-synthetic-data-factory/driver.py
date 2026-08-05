@@ -99,7 +99,8 @@ def main() -> int:
     # 1. Parser — directory of three formats.
     run(["app.parser.cli", "--in", str(WORK / "samples"), "--out", str(store)],
         check_in="parsed 3/3 documents")
-    dom_files = sorted((store / "dom").glob("*.dom.json"))
+    # versioned layout: dom/<doc_id>/dom-v{version}.docJSON
+    dom_files = sorted((store / "dom").rglob("dom-v*.docJSON"))
     if len(dom_files) != 3:
         print(f"FAIL: expected 3 DOM files in store, got {len(dom_files)}")
         return 1

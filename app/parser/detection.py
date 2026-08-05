@@ -18,6 +18,8 @@ import zipfile
 
 from dataclasses import dataclass
 
+from .mime import MIME as _MIME
+
 
 @dataclass(frozen=True)
 class Detected:
@@ -28,49 +30,25 @@ class Detected:
     declared_extension: str
     unresolved: bool = False
 
-
-_MIME = {
-    "pdf": "application/pdf",
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "epub": "application/epub+zip",
-    "png": "image/png",
-    "jpg": "image/jpeg",
-    "gif": "image/gif",
-    "tiff": "image/tiff",
-    "rtf": "application/rtf",
-    "csv": "text/csv",
-    "tsv": "text/tab-separated-values",
-    "json": "application/json",
-    "xml": "application/xml",
-    "html": "text/html",
-    "markdown": "text/markdown",
-    "plaintext": "text/plain",
-    "zip": "application/zip",
-    "riff": "application/octet-stream",
-    "unknown": "application/octet-stream",
-}
-
 _MAGIC = (
-    (b"%PDF-", "pdf", "application/pdf"),
-    (b"\x89PNG\r\n\x1a\n", "png", "image/png"),
-    (b"\xff\xd8\xff", "jpg", "image/jpeg"),
-    (b"GIF87a", "gif", "image/gif"),
-    (b"GIF89a", "gif", "image/gif"),
-    (b"II*\x00", "tiff", "image/tiff"),
-    (b"MM\x00*", "tiff", "image/tiff"),
-    (b"{\\rtf", "rtf", "application/rtf"),
-    (b"RIFF", "riff", "application/octet-stream"),
+    (b"%PDF-", "pdf", _MIME["pdf"]),
+    (b"\x89PNG\r\n\x1a\n", "png", _MIME["png"]),
+    (b"\xff\xd8\xff", "jpg", _MIME["jpg"]),
+    (b"GIF87a", "gif", _MIME["gif"]),
+    (b"GIF89a", "gif", _MIME["gif"]),
+    (b"II*\x00", "tiff", _MIME["tiff"]),
+    (b"MM\x00*", "tiff", _MIME["tiff"]),
+    (b"{\\rtf", "rtf", _MIME["rtf"]),
+    (b"RIFF", "riff", _MIME["riff"]),
 )
 
 _ZIP_HEADERS = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
 
 _CONTAINER = {
-    "word/": ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-    "xl/": ("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-    "ppt/": ("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
-    "META-INF/": ("epub", "application/epub+zip"),
+    "word/": ("docx", _MIME["docx"]),
+    "xl/": ("xlsx", _MIME["xlsx"]),
+    "ppt/": ("pptx", _MIME["pptx"]),
+    "META-INF/": ("epub", _MIME["epub"]),
 }
 
 

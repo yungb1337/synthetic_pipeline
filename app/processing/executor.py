@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
 
 from ..parser import ocr as parser_ocr
-from ..parser.events import EventPublisher, _silent
+from ..parser.events import EventPublisher, silent_sink
 from ..parser.extraction import Extractor
 from ..parser.storage import FilesystemStore, Store
 from ..normalizer.config import NormalizerConfig
@@ -34,6 +34,7 @@ class DocResult:
     result_type: str = ""
     error: str = ""
     ms: float = 0.0
+    retriable: bool = True       # False => deterministic failure, do not retry
 
 
 @dataclass
@@ -55,8 +56,8 @@ class ParseNormalizePipeline:
     def __init__(self, store: Store):
         from ..parser.config import default_config as parser_cfg
 
-        # batch pipelines emit to a broker, not stdout (see _silent)
-        self.extractor = Extractor(parser_cfg(), store, events=EventPublisher(sink=_silent))
+        # batch pipelines emit to a broker, not stdout (see silent_sink)
+        self.extractor = Extractor(parser_cfg(), store, events=EventPublisher(sink=silent_sink()))
         self.normalizer = Normalizer(NormalizerConfig())
         self.store = store
 
@@ -65,11 +66,14 @@ class ParseNormalizePipeline:
         try:
             data = open(ref.path, "rb").read()
         except OSError as e:
-            return DocResult(ref, status="failed", error=str(e), ms=(time.time()-t0)*1000)
+            return DocResult(ref, status="failed", error=str(e), ms=(time.time()-t0)*1000, retriable=False)
         try:
-            po = self.extractor.extract(data, filename=ref.name)
+            # sha256 is already known from the corpus scan; hand it through so
+            # extract does not re-hash the full file (idempotency + scale).
+            po = self.extractor.extract(data, filename=ref.name, sha256=ref.sha256)
             if not po.ok:
-                return DocResult(ref, status="failed", error=po.status, ms=(time.time()-t0)*1000)
+                # unsupported/unresolved/too-large are deterministic outcomes
+                return DocResult(ref, status="failed", error=po.status, ms=(time.time()-t0)*1000, retriable=False)
             normalized = self.normalizer.normalize(po.document)
             self.store.put_normalized(po.document_id, normalized)
             return DocResult(
@@ -88,6 +92,7 @@ class BatchWorker:
         self.pipeline = pipeline
         self._lock = threading.Lock()
         self._manifest: set[str] = set()
+        self._manifest_dirty = False      # set on new sha; _flush rewrites only if set
         self._report = BatchReport(manifest_path=config.manifest_path)
         self._flush_every = 256
 
@@ -99,6 +104,7 @@ class BatchWorker:
         # fresh report + manifest per run (a worker may be reused across runs)
         self._report = BatchReport(manifest_path=self.config.manifest_path)
         self._manifest = load_manifest(self.config.manifest_path)
+        self._manifest_dirty = False
         todo = [r for r in refs if pending(r, self._manifest)]
         self._report.total = len(refs)
         self._report.skipped = len(refs) - len(todo)
@@ -117,28 +123,43 @@ class BatchWorker:
             res = self.pipeline.process(ref)
             if res.status == "ok":
                 return res
-            if attempt < self.config.max_retries - 1:
-                time.sleep(self.config.base_backoff_s * (2 ** attempt))
+            # deterministic failures (unsupported/unresolved/unreadable) are
+            # not going to fix themselves; retry only transient exceptions.
+            if not res.retriable or attempt >= self.config.max_retries - 1:
+                return res
+            time.sleep(self.config.base_backoff_s * (2 ** attempt))
         return res
 
     def _record(self, res: DocResult) -> None:
+        # skipped status never touches the branch below; keep a default so
+        # needs_flush is always bound.
+        needs_flush = False
         with self._lock:
             r = self._report
             if res.status == "ok":
                 r.ok += 1
                 r.ids.append(res.document_id)
                 r.per_format[res.result_type] = r.per_format.get(res.result_type, 0) + 1
-                self._manifest.add(res.docref.sha256)
+                if res.docref.sha256:
+                    self._manifest.add(res.docref.sha256)
+                    self._manifest_dirty = True
             elif res.status == "failed":
                 r.failed += 1
                 r.errors.append(f"{res.docref.name}: {res.error}")
             # skipped counted at start
-            if (r.ok + r.failed) % self._flush_every == 0:
-                self._flush()
+            needs_flush = (r.ok + r.failed) % self._flush_every == 0
+        # never flush while holding the lock (_flush re-acquires it)
+        if needs_flush:
+            self._flush()
 
     def _flush(self) -> None:
         with self._lock:
+            if not self._manifest_dirty:
+                # nothing new since the last write — skip the full rewrite
+                # (avoids O(n²) rewrite churn from boundary-crossing flushes)
+                return
             save_manifest(self.config.manifest_path, self._manifest)
+            self._manifest_dirty = False
 
 
 def build_default_pipeline(store_root: str) -> ParseNormalizePipeline:

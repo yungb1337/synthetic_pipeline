@@ -44,8 +44,13 @@ class DocumentBuilder:
         self.config = config
 
     def build(self, recovered: RecoveredDocument, document_id: str, sha256: str) -> Document:
-        # 1) read order over the *loader* blocks (bbox + seq present here)
-        ordered = reading_order.recover_reading_order(recovered.blocks)
+        # 1) read order over the *loader* blocks (bbox + seq present here).
+        #    ADR-007: a loader that provides authoritative reading order (e.g.
+        #    Docling's iterate_items) opts out of the heuristic ROG.
+        if recovered.reading_order_authoritative:
+            ordered = list(recovered.blocks)
+        else:
+            ordered = reading_order.recover_reading_order(recovered.blocks)
 
         pages: dict[int, Page] = {}
         chain: list[str] = []
@@ -130,6 +135,8 @@ class DocumentBuilder:
             dom_schema_version=self.config.dom_schema_version,
             ocr_engine=sorted(ocr_engines)[0] if ocr_engines else None,
             oct_level=bool(ocr_engines),
+            docling_version=recovered.docling_version,
+            layout_model=recovered.layout_model,
             config=self.config.snapshot(),
         )
 

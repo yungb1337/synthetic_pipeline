@@ -1,5 +1,5 @@
 ---
-description: Run the engineering organization on the current run brief (project_memory/active_objective.md) — research → architecture → plan → implement → review → checkpoint, looping until gates pass. Optional argument: new run id / notes to record first.
+description: "Run the engineering organization on the current run brief (project_memory/active_objective.md) — research → architecture → plan → implement → review → checkpoint, looping until gates pass. Optional argument: new run id / notes to record first."
 argument-hint: [new-run-notes]
 allowed-tools: Read, Grep, Glob, Edit, Write, Bash, Agent
 ---

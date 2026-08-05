@@ -76,11 +76,15 @@ def ocr_bytes(data: bytes) -> list[tuple[str, tuple[float, float, float, float],
 
 
 def batch_ocr_bytes(items: list[bytes]) -> list[list[tuple[str, tuple[float, float, float, float], float]]]:
-    """OCR many images reusing ONE loaded engine (batched model-boundary call).
+    """OCR many images sequentially, reusing ONE loaded engine.
 
     The heavy model is loaded once (see `engine_available`) and reused across
-    all items, instead of a cold-start per image. Returns a per-item list of
+    all items, avoiding a cold-start per image. This is a warm loop, not a true
+    model-batched call (RapidOCR is per-image). Returns a per-item list of
     (text, bbox, confidence); an unavailable engine yields [] for every item.
+
+    NOTE: not yet wired into the pipeline (scale-batch spec overstates this);
+    kept as the seam a future batch caller would use.
     """
     if not engine_available():
         return [[] for _ in items]

@@ -1,6 +1,8 @@
 """Tests for the real local embedder (skipped when torch/the model is absent)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.embedding.sbert import SentenceTransformerEmbedder
@@ -10,17 +12,18 @@ def _available() -> bool:
     try:
         import sentence_transformers  # noqa: F401
         import torch  # noqa: F401
-        return True
+        # production model must be local, not a download-on-demand HF fetch
+        return Path("models/bge-m3/config.json").exists()
     except Exception:
         return False
 
 
-pytestmark = pytest.mark.skipif(not _available(), reason="sentence-transformers/torch unavailable")
+pytestmark = pytest.mark.skipif(not _available(), reason="sentence-transformers/torch/bge-m3 unavailable")
 
 
 @pytest.fixture(scope="module")
 def embed():
-    return SentenceTransformerEmbedder(model="BAAI/bge-small-en-v1.5")
+    return SentenceTransformerEmbedder(model="BAAI/bge-m3")
 
 
 def test_dims(embed):
@@ -43,6 +46,13 @@ def test_similar_to_cosine_positive(embed):
     sim_ab = _cos(a, b)
     sim_ac = _cos(a, c)
     assert sim_ab > sim_ac
+
+
+def test_name_identity(embed):
+    """ADR-009: `name` carries model identity + dtype, never the generic label."""
+    assert "bge-m3" in embed.name
+    assert "fp16" in embed.name or "fp32" in embed.name
+    assert embed.name != "sentence-transformers"
 
 
 def _cos(x, y) -> float:

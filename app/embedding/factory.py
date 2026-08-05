@@ -6,8 +6,10 @@ Policy:
   2. Otherwise fall back to the deterministic `DummyEmbedder` so the pipeline
      still runs (CI, machines without torch) and tests stay hermetic.
 
-The model downloads to the local HF cache on first use; it's still fully local
-and the larger `Embedder` contract (list-in -> vectors-out, batched) is met.
+The real model loads from the local `models/bge-m3` copy (fetched ahead of time
+by `scripts/download_models.py`) — runtime is on-prem, no fetch from the HF hub
+— and still meets the larger `Embedder` contract (list-in -> vectors-out,
+batched).
 """
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ from .sbert import SentenceTransformerEmbedder
 class EmbeddingOptions:
     model: str = "BAAI/bge-m3"    # 1024-dim, multilingual; loads from models/bge-m3
     device: str = "auto"          # "auto" | "cuda" | "cpu"
-    batch_size: int = 128
+    batch_size: int = 32          # fp16 envelope on the 4 GB RTX 3050: B≈32 @ L=1024 is near-OOM
     fp16: bool = True             # lower VRAM on GPU (fits RTX 3050 4GB)
     real_if_available: bool = True
 

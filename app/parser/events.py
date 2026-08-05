@@ -24,6 +24,11 @@ def _silent(name: str, payload: dict) -> None:
     return None
 
 
+def silent_sink() -> Sink:
+    """Public factory for a no-op sink (batch/long-running pipelines)."""
+    return _silent
+
+
 @dataclass
 class EventPublisher:
     sink: Sink = field(default_factory=lambda: _console)

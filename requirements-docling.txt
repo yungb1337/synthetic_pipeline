@@ -1,0 +1,10 @@
+# Optional Docling backend (ADR-007) — layout + table-structure engine, gated.
+# Install ONLY where layout analysis is required; the native parser path works
+# without this. Docling is heavy (pulls torch/transformers/onnx models) and
+# downloads ML model artifacts to models/docling on first use (cache via
+# DOCLING_MODELS_PATH / the artifacts_path we set). Everything stays on-prem.
+#
+#     pip install -r requirements-docling.txt
+#
+# Then run the parser with ParserConfig(layout_backend="docling").
+docling>=2.0
