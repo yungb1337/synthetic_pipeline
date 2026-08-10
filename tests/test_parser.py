@@ -116,12 +116,21 @@ def test_txt_plaintext_loader(tmp_path):
 
 
 def test_image_doc_reparse_deterministic(tmp_path):
-    """Same bytes -> identical DOM bytes AND identical storage keys."""
+    """Same bytes -> identical DOM bytes AND identical storage keys.
+
+    ADR-011: the auto route now records `provenance.routing`, which carries a
+    measured `inspection_time_ms` — a wall-clock measurement, NOT part of the
+    routing decision. We normalize it before the byte-equality assertion so the
+    DOM stays byte-deterministic while the routing measurement is preserved.
+    """
     raw = _make_pdf_with_image()
     a = _extractor(tmp_path).extract(raw, "img1.pdf")
     b = _extractor(tmp_path).extract(raw, "img2.pdf")
     assert a.ok and b.ok
     assert a.document_id == b.document_id
+    for doc in (a.document, b.document):
+        if doc.provenance and doc.provenance.routing:
+            doc.provenance.routing.inspection_time_ms = 0.0
     assert a.document.model_dump_json() == b.document.model_dump_json()
     assert a.report["dom_key"] == b.report["dom_key"]
     assert a.report["raw_key"] == b.report["raw_key"]

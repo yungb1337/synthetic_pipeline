@@ -118,3 +118,118 @@ Reason recorded so a future change doesn't silently revert to single-slot overwr
 **Challenge (recorded):** cosine-stable is weaker than literal "idempotent". A future audit that demands bit-exact reproducibility flips the default to strict-mode/fp32 with the VRAM consequence, or to a deterministic-algorithms path proven on this GPU. Also note: stored bytes of fp16-derived vectors may differ run-to-run at the last ulp — accepted by this policy, and stored as float32 numpy (deterministic bytes given the same array).
 
 Reason recorded so the determinism wording is never silently overpromised (bit-exact) or under-delivered (nondeterministic) again.
+
+---
+
+## ADR-007 AMENDMENT — Docling default flips from static `"native"` to an **auto-router** (`"auto"`) (2026-08-06, run-2026-08-06-router)
+
+**What was:** `ParserConfig.layout_backend: str = "native"`, with `"docling"` as a manual opt-in that
+routes PDFs and bare images through the Docling loader (ADR-007). Routing was effectively static /
+binary: the whole document went one way or the other, decided by config, not by the document.
+
+**What's now:** `ParserConfig.layout_backend` defaults to `"auto"` — the new **Intelligent Document
+Router** (ADR-011) inspects each document and dispatches it to Native / Enrichment / Docling *before*
+expensive parsing. `"native"` and `"docling"` remain valid manual overrides with identical semantics
+to ADR-007 (a `"native"`-forced config routes to native; a `"docling"`-forced config routes PDFs/
+images to Docling, with the same lazy-load/fallback-to-native behavior). Only the default changed.
+
+**What improved:** replaces the "does every document need Docling?" heuristic with a per-document,
+deterministic, explainable, versioned decision (ADR-011) — Docling is engaged only where the
+document genuinely needs learned layout/table/reading-order, so the cheap native path stays the
+default for plain text PDFs. The lazy Docling engine, on-prem model cache, provenance
+`docling_version`/`layout_model`, and native-fallback are all preserved and untouched.
+
+**Fact** (decision adopted this run). **Why it does not contradict ADR-007:** ADR-007 explicitly
+declared "Not in scope: making Docling the default for all PDFs (needs a benchmark)" — this
+amendment keeps Docling *not*-default (only routed when needed) and adds the per-doc arbiter that
+ADR-007 lacked. What would reverse it: a regression showing the router is more wrong than the old
+static default on the real verification corpus.
+
+---
+
+## ADR-011 — Intelligent Document Router module: separate, deterministic, explainable decision layer (2026-08-06, run-2026-08-06-router)
+
+**Decision:** Build **`app/routing/`** as an independent decision layer between ingestion and
+extraction, per `docs/routing-spec.md`. It inspects each document cheaply and routes it to the
+cheapest pipeline (Native / Enrichment / Docling) that reliably yields the required fidelity —
+`{complexity:0.82, confidence:0.94}` vs `{complexity:0.82, confidence:0.42}` route differently via a
+defined low-confidence policy. **Fact** (adopted this run). Architecture + full trade-off review:
+`checkpoints/run/run-2026-08-06-router/architecture.md`.
+
+**What is locked:**
+- **Separation (§3, §18):** Inspector answers "what can I cheaply observe?" (decision-free features);
+  Detectors answer "what do I note?" (one concern each); Scorer+Policy answer "complexity/
+  confidence/band"; Router answers "which pipeline?"; extraction executes the decision. No routing
+  logic in extraction, no extraction logic in the router, no pipeline-execution in detectors.
+- **Detector contract (§5):** each detector has `name`/`version`/`can_evaluate`/`evaluate` → a
+  `DetectorResult` of structured `Signal`s (`name, value, confidence, evidence, status`). Missing →
+  `status="missing"`, never coerced to a false negative; failure → `status="failed"` recorded, never
+  a negative (§4, §11). Registered via a **plain list**, not a plugin-discovery framework (§16).
+- **Scoring abstraction (§6):** `Scorer.score(signals, features) -> (complexity 0-100, confidence
+  0-1, reasons)` behind a `Protocol`; v1 = `WeightedHeuristicScorer` (config weights, normalized to
+  clamped [0,100]). Swappable later for rules/statistical/ML without touching the pipeline.
+- **Policy + bands (§6, §14):** tiers are config (`0-30 native / 31-60 enrichment / 61-100
+  docling`); **conservative-toward-complex**: on low confidence the router escalates one tier
+  (native→enrichment, enrichment→docling), never downgrades. False-positive is safe/wasteful;
+  false-negative loses fidelity.
+- **Determinism (§12):** routing is a pure function of `(bytes, Detection, RoutingConfig snapshot)`;
+  no randomness, no env-dependent thresholds, no implicit global state.
+- **Versioning (§10):** `router_version`, `policy_version`, `scoring_version`, and per-detector
+  `detector_versions` are all stamped into the decision so "why Docling six months ago?" can be
+  answered from persisted metadata.
+- **Persistence (§9):** a `RoutingDecision` (route, complexity_score, confidence, reasons, signals,
+  versions, inspection_time_ms) is written additively into `Document.provenance.routing` (typed,
+  optional — old DOMs keep `routing=None` and stay valid; §16).
+- **Enrichment band (§7, ADR-012):** native extraction + OCR of pages that yield no text blocks
+  (via the existing `ocr.ocr_bytes`). Interfaces reserve (do not build) future page/region
+  selectivity. No page-level orchestration in v1.
+- **Diagnostics (§13):** router exposes `RoutingStats` counters (docs inspected / routed
+  native-enrich-docling / detector failures / score & confidence distribution) and extends the
+  existing `document.parsed.v1` event with the `route` (no new event bus; §16).
+
+**Why:** the authority (`docs/routing-spec.md`) is ratified; ADR-007 was a static gate and cannot
+pick the cheapest sufficient pipeline per document. A separate, versioned, explainable decision
+layer is the trust-safe way to add routing without leaking it into the parser or making Docling the
+default.
+
+**Challenge (recorded):** the initial **weights / band thresholds / low-confidence thresholds are
+guesses** — must be calibrated against the `_cli_out` verification corpus (12 PDFs + 2 JPGs:
+text papers, a scanned ticket, receipts, an image-based certificate) before the policy is trusted at
+scale. Confidence as a separate signal can be noisy; if uncalibrated, the fallback policy should
+default to the more conservative tier rather than trust a false-confident score.
+What would change this ADR: a measured quality regression (router sends complex doc to native) that
+is not fixable by weight/threshold tuning, or a demonstration that Docling misroutes more of the real
+corpus than the old static default.
+
+---
+
+## ADR-012 — OCR of scanned PDF pages (Enrichment band) (2026-08-06, run-2026-08-06-router)
+
+**Decision:** the Enrichment pipeline path performs **native extraction + OCR of pages that yield no
+text blocks**, using the existing on-prem `ocr.ocr_bytes` (the ADR image-path OCR wrapper) — in-place
+on the native `RecoveredDocument`, with zero new OCR dependency. **Fact** (adopted this run). This
+closes the deferred "PDF OCR fallback for scanned pages" item in `project_memory/questions.md`.
+
+**What was:** OCR was handled for **standalone image files** only (`_image` loader path); the PDF
+loader had **no OCR fallback** for scanned page images — a scanned PDF under the native path could
+recover no text from those pages.
+
+**What's now:** when the router selects `enrichment` for a PDF (localised complexity: isolated
+scanned pages), the native loader runs, then pages with zero text blocks are rendered (leaf `fitz`
+render) and OCR'd via `ocr.ocr_bytes`; the OCR lines become `RecoveredBlock(page=p, source="ocr")`
+appended to the DOM, and the builder already sets `ocr_engine`/`oct_level` from block-level OCR
+(observability without new provenance fields).
+
+**What improved:** scanned pages in an otherwise-text PDF now yield extracted text (rather than empty
+pages) at the cheapest tier that fixes the problem; Docling is not invoked whole-document for a
+localized scan. 
+
+**Not in v1 (§16):** page-level orchestration, page/region selectivity, per-page table detection via
+OCR, page-based re-embedding. A named-arg page/region selector on the OCR post-pass is the *reserved
+seam*, not built.
+
+**Challenge (recorded):** per-page OCR is CPU; whole-scanned PDFs are better served by Docling — the
+router is the arbiter (an OCR-only enrichment path should not become the default for fully scanned
+docs). What would change this ADR: evidence that region-level or per-page-table OCR is required for
+the target DOMs (then the seam extends additively) or that `ocr.ocr_bytes` stability is not
+sufficient for this band.

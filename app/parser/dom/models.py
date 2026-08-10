@@ -10,6 +10,12 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+# Leaf import (app.routing.schema imports only pydantic) so the canonical DOM
+# can carry the routing decision with no parser->router coupling beyond a plain
+# type reference (architecture §2; ADR-011 §9). Optional => old DOMs keep valid
+# (routing=None).
+from app.routing.schema import RoutingDecision
+
 
 class BBox(BaseModel):
     """Coordinates in source space (PDF points by default). Nullable per node."""
@@ -110,6 +116,9 @@ class Provenance(BaseModel):
     docling_version: Optional[str] = None
     layout_model: Optional[str] = None
     config: dict = Field(default_factory=dict)
+    # ADR-011: the intelligent router's decision (present only when the auto
+    # route ran); None for manual-native/docling and pre-router DOMs (additive).
+    routing: Optional[RoutingDecision] = None
     # --- normalization stage (Module #2) ---
     normalizer_version: Optional[str] = None
     normalization_report: Optional[dict] = None

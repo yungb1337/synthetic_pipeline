@@ -138,6 +138,7 @@ class DocumentBuilder:
             docling_version=recovered.docling_version,
             layout_model=recovered.layout_model,
             config=self.config.snapshot(),
+            routing=recovered.routing,  # ADR-011: forwarded when the auto route ran
         )
 
         return Document(

@@ -76,13 +76,19 @@ class Loaders:
     def __init__(self, config: ParserConfig):
         self.config = config
 
-    def load(self, detected, data: bytes) -> RecoveredDocument:
+    def load(self, detected, data: bytes, *, route: str | None = None) -> RecoveredDocument:
         slug = detected.slug
-        # ADR-007: Docling triggers only where layout analysis is required.
-        # When layout_backend == "docling", PDFs (and bare images) route through
-        # the Docling loader (layout + tables + reading order); if Docling is
-        # unavailable or recovers nothing, we fall through to the native path.
-        if self.config.layout_backend == "docling" and slug in ("pdf", "png", "jpg", "gif", "tiff"):
+        # ADR-007 + ADR-011 (route-aware dispatch). When a `route` is supplied
+        # (from the Extractor after detection) we honor it; when it's None we
+        # fall back to the legacy behaviour decided purely by
+        # `config.layout_backend` ("docling"/"native" manual overrides, which
+        # are preserved). In "auto", a non-PDF gets route=None here and stays on
+        # its existing native loader path (Gap A: images keep native OCR).
+        if route is None:
+            route = self.config.layout_backend
+
+        # docling tier: PDFs (and bare images under a manual "docling" override)
+        if route == "docling" and slug in ("pdf", "png", "jpg", "gif", "tiff"):
             from . import docling_loader
 
             if docling_loader.engine_available():
@@ -93,6 +99,18 @@ class Loaders:
                     rec.declared_extension = detected.declared_extension
                     rec.probe = detected.probe
                     return rec
+
+        # enrichment tier (auto-routed PDFs): native extraction + OCR post-pass
+        if route == "enrichment" and slug == "pdf":
+            rec = self._pdf(data, detected)
+            from . import enrichment
+
+            rec = enrichment.enrich_scanned_pages(rec, self.config, data=data)
+            rec.reading_order_authoritative = False
+            return rec
+
+        # native per-format paths unchanged (covers route in {"auto","native",
+        #  None} for PDFs and every non-PDF format).
         if slug in ("plaintext", "txt"):
             return self._text(data, detected)
         if slug in ("png", "jpg", "gif", "tiff"):

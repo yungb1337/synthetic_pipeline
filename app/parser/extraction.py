@@ -44,6 +44,7 @@ class Extractor:
         self.events = events or EventPublisher()
         self.loaders = Loaders(config)
         self.builder = DocumentBuilder(config)
+        self._router = None  # lazily built on the auto path
 
     def extract(self, data: bytes, filename: str = "", sha256: str | None = None) -> ParseOutcome:
         t0 = time.time()
@@ -61,8 +62,19 @@ class Extractor:
             self._emit("document.parse_failed", doc_id, {"reason": "too_large", "bytes": len(data)})
             return ParseOutcome(doc_id, "failed", None, detected, {"error": "file exceeds max_file_bytes"})
 
+        route, decision, rec = None, None, None
+        # ADR-011: compute the route after detection, before dispatch (only in
+        # "auto" for PDFs; manual native/docling overrides pass through). The
+        # router never touches the loaders and only decides.
         try:
-            rec = self.loaders.load(detected, data)
+            route, decision = self._compute_route(data, detected)
+        except Exception:
+            route, decision = None, None  # a routing failure never kills the parse
+
+        try:
+            rec = self.loaders.load(detected, data, route=route)
+            if decision is not None:
+                rec.routing = decision
         except UnsupportedFormat as e:
             self._emit("document.parse_failed", doc_id, {"reason": f"unsupported:{e}"})
             return ParseOutcome(doc_id, "unsupported", None, detected, {"error": str(e)})
@@ -83,6 +95,7 @@ class Extractor:
             "images": document.num_images(),
             "pages": len(document.pages),
             "ocr": document.provenance.ocr_engine if document.provenance else None,
+            "route": route,  # ADR-011: which tier ran (or None)
             "dom_key": dom_key,
             "raw_key": raw_key,
         }
@@ -98,6 +111,34 @@ class Extractor:
             },
         )
         return ParseOutcome(doc_id, "parsed", document, detected, report)
+
+    def _compute_route(self, data: bytes, detected) -> tuple[str | None, object | None]:
+        """Decide the extraction tier + capture the RoutingDecision (ADR-011).
+
+        Manual overrides (`layout_backend` in {"native","docling"}) pass through
+        unchanged and record NO routing decision (old behaviour). "auto" routes
+        PDFs via the router; every other format keeps the legacy native path.
+        """
+        lb = self.config.layout_backend
+        if lb == "docling":
+            return "docling", None
+        if lb == "native":
+            return "native", None
+        if lb == "auto":
+            if getattr(detected, "slug", None) == "pdf":
+                dec = self._get_router().route(data, detected)
+                if dec is not None:
+                    return dec.route, dec
+            return None, None
+        return None, None
+
+    def _get_router(self):
+        if self._router is None:
+            from app.routing import Router, RoutingConfig
+
+            rc = self.config.routing or RoutingConfig()
+            self._router = Router(rc)
+        return self._router
 
     def _emit(self, name, doc_id, payload=None):
         base = {"document_id": doc_id, "parser_version": self.config.parser_version}

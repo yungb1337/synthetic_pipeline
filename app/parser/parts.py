@@ -8,7 +8,10 @@ interchangeable (SYN4: "every parser produces the same Document object").
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:  # leaf import only for type hints; no runtime coupling
+    from app.routing.schema import RoutingDecision
 
 
 @dataclass
@@ -81,3 +84,6 @@ class RecoveredDocument:
     # ADR-007: engine/model identity for provenance + idempotent re-parse stability.
     docling_version: Optional[str] = None
     layout_model: Optional[str] = None
+    # ADR-011: the router's decision for this document (additive; None when
+    # routing didn't run, e.g. manual native/docling or non-PDF).
+    routing: Optional["RoutingDecision"] = None

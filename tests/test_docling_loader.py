@@ -113,10 +113,13 @@ def test_docling_mapping_logic(tmp_path):
     assert rec.images[0].page == 1
 
 
-def test_default_layout_backend_is_native():
+def test_default_layout_backend_is_auto():
+    """ADR-007 amendment: the default flips from "native" to "auto" so the
+    intelligent router (ADR-011) picks the tier per document. Manual "native"/
+    "docling" overrides remain valid (asserted elsewhere)."""
     from app.parser.config import default_config
 
-    assert default_config().layout_backend == "native"
+    assert default_config().layout_backend == "auto"
 
 
 def test_docling_missing_falls_back_to_native(tmp_path):
