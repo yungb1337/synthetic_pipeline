@@ -17,4 +17,6 @@ pydantic>=2.7
 pytest>=8
 
 # --- on-prem OCR (optional runtime; lazily imported so the parser works without it) ---
-rapidocr-onnxruntime>=1.2
+# Modern `rapidocr` (PP-OCRv6), the same package+models Docling's OCR uses, so
+# the pipeline has a single OCR engine. (Legacy rapidocr_onnxruntime removed.)
+rapidocr>=3.9,<4

@@ -7,10 +7,10 @@ and the caller can treat the region as OCR-unavailable rather than crash.
 
 Engine: the modern `rapidocr` package (PP-OCRv6 models bundled with the pip
 package, fully on-prem — no Hugging Face / network inference). This is the
-SAME engine family + version Docling's OCR stage uses, so the pipeline is
+SAME engine package + model files Docling's OCR stage uses, so the pipeline is
 unified on one RapidOCR (v6) instead of two different models (2026-08-11).
-A legacy `rapidocr_onnxruntime` (PP-OCRv4) engine is still supported as a
-fallback if only the old package is installed.
+The legacy `rapidocr_onnxruntime` (PP-OCRv4) package has been removed — this is
+the only OCR dependency.
 
 Output: per text line [quad(4 pts), text, confidence].
 """
@@ -32,17 +32,13 @@ def engine_available() -> bool:
     if _engine is None:
         with _lock:
             if _engine is None:
-                # Prefer the modern `rapidocr` (PP-OCRv6 — same as Docling's
-                # OCR); fall back to legacy `rapidocr_onnxruntime` (PP-OCRv4).
+                # The modern `rapidocr` package (PP-OCRv6 — the same engine
+                # Docling uses). Fully on-prem; models bundled in the venv.
                 try:
                     from rapidocr import RapidOCR  # type: ignore
                     _engine = RapidOCR()
                 except Exception:
-                    try:
-                        from rapidocr_onnxruntime import RapidOCR  # type: ignore
-                        _engine = RapidOCR()
-                    except Exception:
-                        _engine = False
+                    _engine = False
     return _engine is not False  # type: ignore[comparison-overlap]
 
 
@@ -57,37 +53,20 @@ def _quad_to_bbox(quad) -> tuple[float, float, float, float]:
 
 
 def _extract_results(res) -> list[tuple[str, tuple[float, float, float, float], float]]:
-    """Parse an engine result into (text, bbox, confidence) lines.
+    """Parse a `rapidocr` v6 result into (text, bbox, confidence) lines.
 
-    Handles both:
-      * `rapidocr` v6 -> a `RapidOCROutput` exposing `.txts` / `.scores` /
-        `.boxes` (numpy arrays), and
-      * legacy `rapidocr_onnxruntime` -> `(result, elapse)` where `result` is a
-        list of `[quad(4 pts), text, confidence]`.
-    Malformed items are skipped; a failure in one line never drops the doc.
+    The engine returns a `RapidOCROutput` exposing `.txts` / `.scores` /
+    `.boxes` (numpy arrays). Malformed items are skipped; a failure in one line
+    never drops the doc; any non-conforming result yields [] safely.
     """
     out: list[tuple[str, tuple[float, float, float, float], float]] = []
-    # modern `rapidocr` output object
-    if res is not None and hasattr(res, "txts") and hasattr(res, "boxes"):
-        txts = res.txts or ()
-        for i, text in enumerate(txts):
-            try:
-                quad = res.boxes[i]
-                conf = res.scores[i]
-                out.append((str(text), _quad_to_bbox(quad), float(conf)))
-            except Exception:
-                continue
+    if res is None or not hasattr(res, "txts") or not hasattr(res, "boxes"):
         return out
-    # legacy tuple form
-    try:
-        result = res[0] if isinstance(res, tuple) else res
-    except Exception:
-        result = None
-    if not result:
-        return out
-    for item in result:
+    txts = res.txts or ()
+    for i, text in enumerate(txts):
         try:
-            quad, text, conf = item
+            quad = res.boxes[i]
+            conf = res.scores[i]
             out.append((str(text), _quad_to_bbox(quad), float(conf)))
         except Exception:
             continue

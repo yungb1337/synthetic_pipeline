@@ -171,16 +171,25 @@ def _make_pdf_with_image():
 
 # ---------------------------------------------------------------------------
 def test_ocr_pil_image_converted_to_ndarray(monkeypatch):
-    """RapidOCR rejects PIL Images (str|ndarray|bytes|Path only); a PIL image
-    passed to ocr_image must be converted to a numpy array, not swallowed into
-    an empty result (regression for the 2026-08-05 bugfix)."""
+    """A PIL image passed to ocr_image must be converted to a numpy array, and
+    the rapidocr v6 `RapidOCROutput` (.txts/.boxes/.scores) parsed into
+    (text, bbox, conf) — regression for the 2026-08-05 PIL-rejection bug and the
+    2026-08-11 v6 engine unification."""
     from app.parser import ocr
+
+    import numpy as np
 
     seen = {}
 
+    class FakeOutput:
+        def __init__(self):
+            self.txts = ("hello",)
+            self.boxes = np.array([[[0, 0], [10, 0], [10, 5], [0, 5]]], dtype=float)
+            self.scores = (0.91,)
+
     def fake_engine(image):
         seen["type"] = type(image).__module__ + "." + type(image).__name__
-        return (None, 0.0)
+        return FakeOutput()
 
     monkeypatch.setattr(ocr, "engine_available", lambda: True)
     monkeypatch.setattr(ocr, "_engine", fake_engine)
@@ -189,5 +198,7 @@ def test_ocr_pil_image_converted_to_ndarray(monkeypatch):
 
     img = Image.new("RGB", (20, 20), "white")
     result = ocr.ocr_image(img)
-    assert result == []
     assert seen["type"] == "numpy.ndarray", f"engine received {seen['type']}, expected ndarray"
+    assert [t for t, _, _ in result] == ["hello"]
+    assert result[0][1] == (0.0, 0.0, 10.0, 5.0)  # quad -> bbox
+    assert round(result[0][2], 2) == 0.91

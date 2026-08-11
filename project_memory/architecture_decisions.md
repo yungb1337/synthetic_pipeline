@@ -256,7 +256,10 @@ previously used legacy `rapidocr_onnxruntime` (PP‑OCRv4); Docling's OCR used m
 imports the modern `rapidocr` package (PP‑OCRv6), so ours and Docling's OCR now share the **same
 model files** (bundled in `.venv/Lib/site-packages/rapidocr/models/`). The engine call shape changed
 (`RapidOCROutput` `.txts/.boxes/.scores`, not the old `(result, elapse)` tuple) — handled in
-`_extract_results`, with a legacy fallback if only `rapidocr_onnxruntime` is installed. Resolves the
+`_extract_results`. The legacy `rapidocr_onnxruntime` package and its fallback branch were then
+**removed** (2026-08-11): `rapidocr` v6 is now the single OCR dependency in `requirements.txt`, and
+both engine loads read the exact same `PP-OCRv6_*.onnx` files from `.venv/Lib/site-packages/
+rapidocr/models/`. Resolves the
 old PIL‑vs‑numpy accepted-input bug (the v6 package also takes numpy/bytes, not PIL; `ocr_image`
 still converts PIL→numpy). **Verified:** prescriptions read 61/28 lines (v4 was 36/23); a scanned
 ticket through the enrichment path yields 112 OCR‑source blocks; full suite 159 green.
