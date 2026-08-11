@@ -233,3 +233,19 @@ router is the arbiter (an OCR-only enrichment path should not become the default
 docs). What would change this ADR: evidence that region-level or per-page-table OCR is required for
 the target DOMs (then the seam extends additively) or that `ocr.ocr_bytes` stability is not
 sufficient for this band.
+
+**Addendum (2026-08-11) — Docling OCR uses RapidOCR too (user request):** Docling itself has an OCR
+stage whose `RapidOcrOptions` backend runs **RapidOCR/onnxruntime — the same engine family as
+`app/parser/ocr.py`** (an older `rapidocr_onnxruntime`, Docling bundles the newer `rapidocr`;
+both are RapidOCR). Our Docling loader previously built the pipeline with `do_ocr=False`.
+**What's now:** `ParserConfig.docling_ocr: bool = True` (default) makes the Docling path build with
+`do_ocr=True` and `RapidOcrOptions(mode=OcrMode.DEFAULT, scale=2.0)` — on-demand OCR (only
+low-text regions/pages are OCR'd, so text-rich pages are not wasted) at a conservative scale to
+bound memory on the 4 GB box. **Verified:** running a previously-empty scanned ticket through
+Docling now yields 66 OCR'd blocks (6.5k chars) with heading/paragraph/list_item kinds + authoritative
+reading order; a text paper through Docling still parses cleanly with no OOM; full suite 159 green.
+**Judgment:** in the automatic routing, fully-scanned docs still go to **enrichment** (cheaper
+RapidOCR) rather than Docling; Docling OCR fires mainly for a *docling-routed* doc that has
+low-text/scanned pages. Caveat: Docling OCR is heavier (≈42s for 2 scanned pages) and a very large
+doc with many low-text pages could still be memory-heavy — on-demand mode mitigates but is not a
+hard cap.

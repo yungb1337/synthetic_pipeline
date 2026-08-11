@@ -105,7 +105,17 @@ def _build_converter():
         except Exception:
             from docling.datamodel.pipeline_options import PdfPipelineOptions as PipelineOptions
 
-        opts = _make_pipeline_options(PipelineOptions)
+        # Docling OCR (the user-requested feature): use Docling's built-in
+        # RapidOCR/onnxruntime backend (same engine family as app/parser/ocr.py),
+        # on-demand, read from ParserConfig.docling_ocr.
+        try:
+            from ..config import default_config
+
+            ocr = bool(default_config().docling_ocr)
+        except Exception:
+            ocr = True
+
+        opts = _make_pipeline_options(PipelineOptions, ocr=ocr)
         kwargs = {}
 
         # Preferred: per-format PdfFormatOption with the custom pipeline.
@@ -135,21 +145,47 @@ def _build_converter():
         return False
 
 
-def _make_pipeline_options(cls):
+def _make_pipeline_options(cls, ocr: bool = True):
+    """Build Docling pipeline options; `ocr` enables Docling's OCR stage (its
+    built-in RapidOCR/onnxruntime backend — the same engine family as
+    `app/parser/ocr.py`). Defensive across docling's API drift: falls back to
+    defaults and best-effort attribute setting rather than failing hard."""
     try:
-        opts = cls(do_ocr=False, do_code_formula=False)
-        return opts
+        opts = cls(do_ocr=ocr, do_code_formula=False)
     except Exception:
         try:
             opts = cls()
             for attr in ("do_ocr", "do_code_formula"):
                 try:
-                    setattr(opts, attr, False)
+                    setattr(opts, attr, ocr if attr == "do_ocr" else False)
                 except Exception:
                     pass
-            return opts
         except Exception:
             return None
+    if ocr:
+        _set_ocr_options(opts)
+    return opts
+
+
+def _set_ocr_options(opts) -> None:
+    """Point Docling's OCR stage at RapidOCR (RapidOcrOptions), on-demand.
+
+    `OcrMode.DEFAULT` makes Docling OCR only the regions/pages it considers
+    low-text, so a text-rich document is not wastefully OCR'd. `scale` is kept
+    conservative to bound memory on the 4 GB box. All defensively wrapped: if
+    the class is absent (docling version drift) we keep defaults.
+    """
+    try:
+        from docling.datamodel.pipeline_options import OcrMode, RapidOcrOptions
+
+        opts.ocr_options = RapidOcrOptions(mode=OcrMode.DEFAULT, scale=2.0)
+    except Exception:
+        try:
+            from docling.datamodel.pipeline_options import RapidOcrOptions
+
+            opts.ocr_options = RapidOcrOptions()
+        except Exception:
+            pass
 
 
 def _models_dir() -> str:

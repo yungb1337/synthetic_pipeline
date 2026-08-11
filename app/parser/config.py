@@ -36,6 +36,11 @@ class ParserConfig:
     # preserved; only the default flipped).
     layout_backend: str = "auto"
     docling_models_dir: str = "models/docling"  # on-prem model cache
+    # When True, the Docling pipeline runs its built-in OCR stage using
+    # RapidOCR/onnxruntime (the SAME engine family as app/parser/ocr.py) with
+    # on-demand OcrMode.DEFAULT so text-rich pages are NOT OCR'd. This lets a
+    # docling-routed document with scanned pages still recover their text.
+    docling_ocr: bool = True
 
     # ADR-011: the routing config snapshot used when layout_backend == "auto".
     # None => factory defaults (RoutingConfig()). Also gates routing on/off.
