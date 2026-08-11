@@ -5,7 +5,14 @@ environment — raw data never leaves the hospital. The engine is imported
 lazily and defensively: if it ever fails to load, `ocr_image` returns []
 and the caller can treat the region as OCR-unavailable rather than crash.
 
-RapidOCR returns, per text line: [quad(4 pts), text, confidence].
+Engine: the modern `rapidocr` package (PP-OCRv6 models bundled with the pip
+package, fully on-prem — no Hugging Face / network inference). This is the
+SAME engine family + version Docling's OCR stage uses, so the pipeline is
+unified on one RapidOCR (v6) instead of two different models (2026-08-11).
+A legacy `rapidocr_onnxruntime` (PP-OCRv4) engine is still supported as a
+fallback if only the old package is installed.
+
+Output: per text line [quad(4 pts), text, confidence].
 """
 from __future__ import annotations
 
@@ -15,6 +22,8 @@ from pathlib import Path
 # Minimize import cost + keep module importable without the heavy engine.
 _engine = None
 _lock = threading.Lock()
+# engine_name() reports the onnxruntime family; version kept generic so the
+# upgrade to the v6 `rapidocr` package is transparent to provenance consumers.
 _engine_name = "rapidocr-onnxruntime"
 
 
@@ -23,11 +32,17 @@ def engine_available() -> bool:
     if _engine is None:
         with _lock:
             if _engine is None:
+                # Prefer the modern `rapidocr` (PP-OCRv6 — same as Docling's
+                # OCR); fall back to legacy `rapidocr_onnxruntime` (PP-OCRv4).
                 try:
-                    from rapidocr_onnxruntime import RapidOCR  # type: ignore
+                    from rapidocr import RapidOCR  # type: ignore
                     _engine = RapidOCR()
                 except Exception:
-                    _engine = False
+                    try:
+                        from rapidocr_onnxruntime import RapidOCR  # type: ignore
+                        _engine = RapidOCR()
+                    except Exception:
+                        _engine = False
     return _engine is not False  # type: ignore[comparison-overlap]
 
 
@@ -41,16 +56,54 @@ def _quad_to_bbox(quad) -> tuple[float, float, float, float]:
     return (min(xs), min(ys), max(xs), max(ys))
 
 
+def _extract_results(res) -> list[tuple[str, tuple[float, float, float, float], float]]:
+    """Parse an engine result into (text, bbox, confidence) lines.
+
+    Handles both:
+      * `rapidocr` v6 -> a `RapidOCROutput` exposing `.txts` / `.scores` /
+        `.boxes` (numpy arrays), and
+      * legacy `rapidocr_onnxruntime` -> `(result, elapse)` where `result` is a
+        list of `[quad(4 pts), text, confidence]`.
+    Malformed items are skipped; a failure in one line never drops the doc.
+    """
+    out: list[tuple[str, tuple[float, float, float, float], float]] = []
+    # modern `rapidocr` output object
+    if res is not None and hasattr(res, "txts") and hasattr(res, "boxes"):
+        txts = res.txts or ()
+        for i, text in enumerate(txts):
+            try:
+                quad = res.boxes[i]
+                conf = res.scores[i]
+                out.append((str(text), _quad_to_bbox(quad), float(conf)))
+            except Exception:
+                continue
+        return out
+    # legacy tuple form
+    try:
+        result = res[0] if isinstance(res, tuple) else res
+    except Exception:
+        result = None
+    if not result:
+        return out
+    for item in result:
+        try:
+            quad, text, conf = item
+            out.append((str(text), _quad_to_bbox(quad), float(conf)))
+        except Exception:
+            continue
+    return out
+
+
 def ocr_image(image) -> list[tuple[str, tuple[float, float, float, float], float]]:
     """Run OCR on an image. Returns list of (text, bbox, confidence).
 
     `image` may be raw bytes, a file path, a numpy array, or a PIL image.
     Returns [] if the engine is not available.
 
-    NOTE (bugfix, 2026-08-05): RapidOCR.__call__ only accepts str |
-    numpy.ndarray | bytes | pathlib.Path — passing a PIL Image raises
-    LoadImageError, which used to be swallowed into an empty result. A PIL
-    image is now converted to a numpy array first.
+    NOTE (bugfix, 2026-08-05): the engine's `__call__` only accepts str |
+    numpy.ndarray | bytes | pathlib.Path — a PIL Image raised an error that used
+    to be swallowed into an empty result. A PIL image is converted to a numpy
+    array first (the modern `rapidocr` also accepts numpy/bytes, not PIL).
     """
     if not engine_available():
         return []
@@ -60,19 +113,10 @@ def ocr_image(image) -> list[tuple[str, tuple[float, float, float, float], float
             import numpy as _np
             image = _np.asarray(image)
     try:
-        result, _elapse = _engine(image)
+        res = _engine(image)
     except Exception:
         return []
-    if not result:
-        return []
-    out = []
-    for item in result:
-        try:
-            quad, text, conf = item
-            out.append((str(text), _quad_to_bbox(quad), float(conf)))
-        except Exception:
-            continue
-    return out
+    return _extract_results(res)
 
 
 def ocr_bytes(data: bytes) -> list[tuple[str, tuple[float, float, float, float], float]]:

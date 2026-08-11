@@ -249,3 +249,17 @@ RapidOCR) rather than Docling; Docling OCR fires mainly for a *docling-routed* d
 low-text/scanned pages. Caveat: Docling OCR is heavier (≈42s for 2 scanned pages) and a very large
 doc with many low-text pages could still be memory-heavy — on-demand mode mitigates but is not a
 hard cap.
+
+**Second addendum (2026-08-11) — OCR unified on one RapidOCR v6 engine:** `app/parser/ocr.py`
+previously used legacy `rapidocr_onnxruntime` (PP‑OCRv4); Docling's OCR used modern `rapidocr`
+(PP‑OCRv6) — two different RapidOCR model versions for the same task. **What's now:** `ocr.py`
+imports the modern `rapidocr` package (PP‑OCRv6), so ours and Docling's OCR now share the **same
+model files** (bundled in `.venv/Lib/site-packages/rapidocr/models/`). The engine call shape changed
+(`RapidOCROutput` `.txts/.boxes/.scores`, not the old `(result, elapse)` tuple) — handled in
+`_extract_results`, with a legacy fallback if only `rapidocr_onnxruntime` is installed. Resolves the
+old PIL‑vs‑numpy accepted-input bug (the v6 package also takes numpy/bytes, not PIL; `ocr_image`
+still converts PIL→numpy). **Verified:** prescriptions read 61/28 lines (v4 was 36/23); a scanned
+ticket through the enrichment path yields 112 OCR‑source blocks; full suite 159 green.
+**Clarification recorded:** Docling's layout + reading order are produced by its **layout model**, not
+OCR; Docling OCR only recovers text on low-text pages. So this unification affects only text
+recovery — layout/reading-order quality is untouched.
