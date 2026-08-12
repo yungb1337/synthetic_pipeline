@@ -52,7 +52,10 @@ def main(argv: list[str] | None = None) -> int:
             ok += 1
             print(f"OK   {f.name:28} {outcome.detected.slug:10} pages={len(outcome.document.pages):<3} "
                   f"blocks={outcome.report['blocks']:<4} tables={outcome.report['tables']:<3} "
-                  f"el={outcome.report['elapsed_ms']}ms")
+                  f"route={outcome.report.get('route') or '-'}")
+            t = outcome.report.get("timings") or {}
+            parts = "  ".join(f"{k}={v}ms" for k, v in t.items())
+            print(f"      timings: {parts}  total={outcome.report['elapsed_ms']}ms")
         else:
             print(f"SKIP {f.name:28} {outcome.status}")
 

@@ -89,6 +89,7 @@ class DocumentBuilder:
                     rows=[Row(cells=[Cell(text=c) for c in r]) for r in t.rows],
                     source=t.source,
                     confidence=t.confidence,
+                    caption=t.caption,
                 )
             )
         for img in recovered.images:

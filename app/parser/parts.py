@@ -36,6 +36,17 @@ class RecoveredTable:
     rows: list[list[str]] = field(default_factory=list)   # values only (strings)
     source: str = "native"
     confidence: float = 1.0
+    # Caption/title text associated with the table by the upstream extractor
+    # (e.g. Docling's caption refs), or the table's own full-width title row when
+    # no explicit caption is available. Preserved (never fused into the header).
+    caption: str = ""
+    # Column x-positions (left edges) from the upstream header cells, plus the
+    # header/body y-extent — used by the evidence-graph row reconstruction when
+    # the upstream table structure collapsed. Internal intermediate detail;
+    # not serialized to the DOM.
+    column_starts: list[float] = field(default_factory=list)
+    header_bottom: float = 0.0
+    body_bottom: float = 0.0
 
 
 @dataclass
@@ -87,3 +98,7 @@ class RecoveredDocument:
     # ADR-011: the router's decision for this document (additive; None when
     # routing didn't run, e.g. manual native/docling or non-PDF).
     routing: Optional["RoutingDecision"] = None
+    # Performance metrics accumulated by the loaders (wall-clock ms): e.g.
+    # "docling_ms", "docling_map_ms", "table_reconstruct_ms", "ocr_ms",
+    # "ocr_pages". Internal observability; NOT serialized to the DOM.
+    timings: dict = field(default_factory=dict)

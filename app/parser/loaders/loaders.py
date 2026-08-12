@@ -155,6 +155,11 @@ class Loaders:
         rec = self._base(detected, RecoveredDocument)
         rec.page_count = doc.page_count
 
+        from ._pdfmeta import fitz_metadata
+
+        for key, val in fitz_metadata(doc).items():
+            setattr(rec, key, val)
+
         all_blocks = []          # (page, size) for heading classification
         for pno in range(doc.page_count):
             page = doc[pno]
@@ -390,12 +395,16 @@ class Loaders:
 
     # --- image / scanned -----------------------------------------------------
     def _image(self, data, detected):
+        import time as _time
         from .. import ocr
         rec = self._base(detected, RecoveredDocument)
         rec.page_count = 1
         if not self.config.ocr_enabled:
             return rec
+        t_ocr = _time.time()
         lines = ocr.ocr_bytes(data)
+        rec.timings["ocr_ms"] = round((_time.time() - t_ocr) * 1000, 1)
+        rec.timings["ocr_pages"] = 1
         for i, (text, bbox, conf) in enumerate(lines):
             rec.blocks.append(
                 RecoveredBlock(page=0, seq=i, text=text, bbox=bbox,

@@ -57,6 +57,11 @@ class Table(BaseModel):
     rows: list[Row] = Field(default_factory=list)
     source: str = "native"   # "native" | "ocr" | "heuristic"
     confidence: float = 1.0
+    # Caption/title text associated with the table (from source structure, e.g.
+    # Docling caption refs or a full-width title row). Kept separate from the
+    # header so caption text never becomes column names. Additive: absent in
+    # older DOMs.
+    caption: str = ""
 
 
 class ImageObject(BaseModel):

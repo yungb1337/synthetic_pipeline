@@ -53,6 +53,7 @@ class Extractor:
         sha = sha256 or hashlib.sha256(data).hexdigest()
         doc_id = f"d-{sha[:16]}"
 
+        t_detect = time.time()
         detected = detection.detect(data, filename)
         if detected.unresolved:
             self._emit("document.parse_failed", doc_id, {"reason": "unresolved", "slug": detected.slug})
@@ -66,11 +67,14 @@ class Extractor:
         # ADR-011: compute the route after detection, before dispatch (only in
         # "auto" for PDFs; manual native/docling overrides pass through). The
         # router never touches the loaders and only decides.
+        t_route0 = time.time()
         try:
             route, decision = self._compute_route(data, detected)
         except Exception:
             route, decision = None, None  # a routing failure never kills the parse
+        t_route1 = time.time()
 
+        t_load0 = time.time()
         try:
             rec = self.loaders.load(detected, data, route=route)
             if decision is not None:
@@ -78,18 +82,33 @@ class Extractor:
         except UnsupportedFormat as e:
             self._emit("document.parse_failed", doc_id, {"reason": f"unsupported:{e}"})
             return ParseOutcome(doc_id, "unsupported", None, detected, {"error": str(e)})
+        t_load1 = time.time()
 
         # persist extracted images (same pass; image bytes are already in rec)
+        t_store0 = time.time()
         for img in rec.images:
             img.storage_ref = self.store.put_image(doc_id, img)
-
+        t_build0 = time.time()
         document = self.builder.build(rec, doc_id, sha)
+        t_store1 = time.time()
         dom_key = self.store.put_dom(doc_id, document)
         raw_key = self.store.put_raw(doc_id, sha, data, detected.slug)
+        t_store2 = time.time()
 
         elapsed = (time.time() - t0) * 1000
+        timings = {
+            "detect_ms": round((t_route0 - t_detect) * 1000, 1),
+            "route_ms": round((t_route1 - t_route0) * 1000, 1),
+            "load_ms": round((t_load1 - t_load0) * 1000, 1),
+            "build_ms": round((t_store1 - t_build0) * 1000, 1),
+            "store_ms": round(((t_build0 - t_store0) + (t_store2 - t_store1)) * 1000, 1),
+            "total_ms": round(elapsed, 1),
+        }
+        if rec.timings:  # loader sub-stages (docling_ms, ocr_ms, ...)
+            timings.update(rec.timings)
         report = {
             "elapsed_ms": round(elapsed, 1),
+            "timings": timings,
             "blocks": document.num_blocks(),
             "tables": document.num_tables(),
             "images": document.num_images(),

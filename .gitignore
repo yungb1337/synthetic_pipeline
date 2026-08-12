@@ -10,7 +10,9 @@ models/
 .cache/
 
 # Parser runtime output
+parser_out/
 _parser_out/
+testrun/
 _cli_out/
 _samples/
 _scale_corpus/

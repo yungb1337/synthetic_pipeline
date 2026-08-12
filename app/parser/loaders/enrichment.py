@@ -66,8 +66,10 @@ def enrich_scanned_pages(
     except Exception:
         return rec
 
+    import time as _time
     engine = ocr.engine_name()
     done = 0
+    t_ocr = _time.time()
     for pno in empty:
         if done >= max_pages:
             break
@@ -95,4 +97,7 @@ def enrich_scanned_pages(
         except Exception:
             continue                     # page failed; keep going (§11)
 
+    # observability: OCR wall-time (render + engine) + how many pages OCR'd
+    rec.timings["ocr_ms"] = round((_time.time() - t_ocr) * 1000, 1)
+    rec.timings["ocr_pages"] = done
     return rec
