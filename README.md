@@ -1,95 +1,173 @@
-# Synthetic Data Factory — Parser Module (Extraction → DOM)
+# Synthetic Data Factory (MedFactory AI) — Pipeline Overview
 
-The first module of an enterprise **Synthetic Data Factory** whose product is **trust**: transforming a hospital's proprietary documents into a canonical, parser-independent Document Object Model (DOM) that everything downstream (normalization, chunking, knowledge graph, generation, validation) consumes.
+An enterprise **Synthetic Data Factory** designed for maximum **trust, privacy, and explainability**. The platform ingests proprietary, unstructured enterprise documents (healthcare, legal, technical) and transforms them into a canonical, parser-independent **Document Object Model (DOM)**, clean normalized DOMs, semantic chunks, and vector embeddings for downstream retrieval, knowledge graph construction, and synthetic data generation.
 
-## Status
-**Module #1 — Parser (Extraction → DOM): implemented, tested, green.**
-**Module #2 — Normalizer (DOM → clean DOM): implemented, tested, green.**
-**Batch/Scale layer + OCR/embedding batching: implemented, tested (24 tests green).**
-Each process is an independent package (modular monolith).
+---
 
-## Layout (modular monolith)
+## Status & Capabilities
+
+| Module / Component | Function | Status | Key Features |
+|---|---|---|---|
+| **Module #1 — Parser** | Extraction → Canonical DOM | **Implemented & Tested** | PyMuPDF, layout analysis, DOM models (`Document`, `Block`, `Table`, `Image`, `Provenance`), lazy OCR. |
+| **Module #2 — Normalizer** | DOM → Clean DOM | **Implemented & Tested** | Pure, idempotent rules (`strip_controls`, `nfkc`, `dehyphenate`, `ws`, `typography`) + modification reporting. |
+| **Module #3 — Intelligent Router** | Quality & Pipeline Selection | **Implemented & Tested** | `FastInspector` + 9 pluggable detectors + complexity scoring → 3 routing bands (`Native`, `Enrichment`, `Docling`). |
+| **Module #4 — Semantic Chunking** | Clean DOM → Grounded Chunks | **Implemented & Tested** | Structural DOM anchoring (~400-token target, 2048 hard cap, heading seam overlap, PySBD sentence splitting), `ChunkStore`. |
+| **Embedding Seam** | Vector Embedding Pipeline | **Implemented & Tested** | Local `BAAI/bge-m3` (1024-dim, multilingual) CUDA fp16 (RTX 3050), automatic CPU fallback, `ChunkEmbedPipeline`. |
+| **On-Prem OCR Engine** | Scanned / Image Extraction | **Unified on RapidOCR v6** | On-demand PP-OCRv6 engine running locally via ONNXRuntime across native, enrichment, and Docling paths. |
+| **Batch / Scale Layer** | High-Throughput Corpus Execution | **Implemented & Tested** | Worker pool, parallel hashing, persistent `{sha256}` manifest for incremental/crash-safe processing. |
+
+---
+
+## System Architecture (Modular Monolith)
+
 ```
-app/parser/       Module #1 — Parser
-  config.py       versioned, immutable per-parse config
-  detection.py    magic bytes → container probe → content sniff (extension last)
-  parts.py        format-agnostic "recovered" intermediates (loader→DOM seam)
-  dom/            models.py · reading_order.py (in-memory ROG) · builder.py
-  loaders/        one loader per format → RecoveredDocument
-  ocr.py          on-prem RapidOCR (lazy, never blocks other formats)
-  storage.py      Store protocol + FilesystemStore (swap to S3/DB later)
-  events.py       outbound events (document.parsed.v1 / failed)
-  extraction.py   Detect → Load → Build → Store → Emit (public entry)
-  cli.py          `python -m app.parser.cli --in <file|dir> --out <store>`
+app/
+  parser/         # Module #1 — Ingestion & Extraction → Canonical DOM
+    config.py     # Parser configuration (layout_backend: "auto" | "native" | "docling", OCR toggles)
+    detection.py  # Format detection (magic bytes → container probe → content sniff → extension last)
+    dom/          # Models (Document, Block, Section, Page, Table, Image, Provenance), ROG, DOM builder
+    loaders/      # Format-specific loaders (PDF, DOCX, XLSX, CSV, JSON, XML, HTML, MD, TXT, Docling)
+    ocr.py        # Unified RapidOCR v6 engine (lazy, on-demand local ONNXRuntime)
+    storage.py    # Content-addressed FilesystemStore (`dom/{doc_id}/dom-v{version}.docJSON`)
+    extraction.py # Main entry point: Detect → Inspect/Route → Load → Build → Store → Emit
 
-app/normalizer/   # Module #2 — Text Normalization
-  rules.py        pure, idempotent rules (strip_controls·nfkc·dehyphenate·ws·typography)
-  normalizer.py   DOM → normalized DOM + provenance report
-  cli.py          `python -m app.normalizer.cli --dom <parsed.json> --out <normalized.json>`
+  normalizer/     # Module #2 — Text Normalization & Cleaning
+    rules.py      # Idempotent rules (strip_controls, NFKC, dehyphenate, whitespace, typography)
+    normalizer.py # DOM → Normalized DOM + detailed provenance report
+    cli.py        # CLI for stand-alone DOM normalization
 
-app/processing/   # Batch/scale execution layer (thousands→millions of docs)
-  corpus.py       parallel hashing + persistent {sha256} manifest (incremental/durable)
-  executor.py     worker pool: parse→normalize, retries, BatchReport, crash-safe manifest
-  cli.py          `python -m app.processing.cli --in <corpus> --out <store> [--concurrency N]`
+  routing/        # Module #3 — Intelligent Document Router
+    config.py     # Calibrated RoutingConfig weights & score band thresholds
+    inspectors.py # FastInspector: cheap PyMuPDF feature extraction (no render)
+    detectors/    # 9 pluggable detectors (Metadata, Text, Image, Layout, OCR, Table, Form, ReadingOrder, Font)
+    scoring.py    # Absolute-sum complexity scoring (0–100 scale)
+    policy.py     # 3-band routing policy (0-30 Native / 31-60 Enrichment / 61-100 Docling)
+    router.py     # Aggregates signals → RoutingDecision persisted into Provenance.routing
 
-app/embedding/    # Batching-capable embedding seam (real model drops in later)
-  embedder.py     `Embedder` protocol (list-in → vectors-out, never one-at-a-time)
-  dummy.py        deterministic placeholder `DummyEmbedder`
-  runner.py       `batch_embed()` (model-sized batches, shape-guard) + embed_document_blocks
+  chunking/       # Module #4 — DOM-Anchored Semantic Chunking
+    config.py     # ChunkingConfig (~400-token target, 2048 token hard cap, heading seam overlap)
+    chunker.py    # Heading hierarchy & DOM structural block chunker
+    sentences.py  # PySBD sentence segmentation preserving sentence boundaries
+    tokenize.py   # Fast tiktoken/HuggingFace tokenizer & budget tracker
+    store.py      # ChunkStore interface & FilesystemChunkStore (retrieval-grounding seam)
+    pipeline.py   # ChunkEmbedPipeline (idempotent chunking + embedding)
+
+  embedding/      # Embedding Integration Seam
+    embedder.py   # Embedder protocol (list-in → vectors-out)
+    sbert.py      # SentenceTransformerEmbedder (BAAI/bge-m3 on PyTorch CUDA / CPU)
+    runner.py     # batch_embed() with token-budget batching (≤16k tokens / ≤32 texts)
+    factory.py    # default_embedder() picking local GPU model or DummyEmbedder fallback
+
+  processing/     # Batch & Scale Processing Layer
+    corpus.py     # Corpus scanning, parallel SHA256 hashing, and durable manifest
+    executor.py   # ThreadPoolExecutor worker pool with retries, backoff, and progress flushing
 ```
 
-## Run
+---
+
+## Intelligent Document Routing (3-Band Policy)
+
+The router evaluates document complexity via `FastInspector` before full parsing to dispatch documents to the optimal, most cost-effective extraction path:
+
+1. **Native Band (Score 0–30):** Direct, high-speed extraction via PyMuPDF / native loaders for clean digital PDFs and structured formats.
+2. **Enrichment Band (Score 31–60):** Native extraction augmented with targeted RapidOCR v6 for pages that yield no text blocks (e.g. mixed digital PDFs with scanned inserts).
+3. **Docling Band (Score 61–100):** Deep layout, table-structure, and reading-order recovery using local Docling layout models (gated for complex multi-column documents, academic papers, and complex forms).
+
+> **Explainable Routing:** Every decision persists complete diagnostics into `Provenance.routing`, including complexity scores, confidence, triggered reasons, individual detector signals, and detector/policy versions (`router_v`, `policy_v`, `scoring_v`).
+
+---
+
+## Semantic Chunking & Embedding Seam
+
+Semantic chunking converts normalized DOMs into content-addressed chunks (`chunk_id = sha256(...)`):
+- **DOM Anchoring:** Every chunk retains precise provenance referencing `doc_id`, structural `block_ids`, `section_id`, `heading_path`, and `page_numbers`.
+- **Structural Integrity:** Respects section headers and sentence boundaries without slicing mid-sentence or mid-heading.
+- **Heading Seam Overlap:** Preserves section context across chunk boundaries (~48 tokens overlap).
+- **GPU Embeddings:** Chunks are projected into 1024-dimensional vectors using **`BAAI/bge-m3`** loaded locally on PyTorch CUDA (RTX 3050 fp16). `ChunkEmbedPipeline` prevents redundant re-embedding.
+
+---
+
+## Supported Input Formats
+- **Documents:** PDF (text, layout, headings, tables, scanned), DOCX, XLSX, CSV, TSV, JSON, XML, HTML, Markdown, Plain Text (`.txt`).
+- **Images:** PNG, JPG, JPEG, TIFF, BMP (processed on-prem via RapidOCR v6).
+
+---
+
+## Quick Start & Usage
+
+### 1. Environment Setup
 ```bash
+# Create and activate virtual environment
 python -m venv .venv
-# activate (Windows: .venv\Scripts\activate)
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+
+# Install core dependencies
 pip install -r requirements.txt
 
-# end-to-end:
-python -m app.parser.cli --in <file_or_dir> --out parser_out
+# Install GPU / Sentence-Transformers support (RTX / CUDA)
+pip install -r requirements-gpu.txt
 
-# tests:
+# Download BGE-M3 embedding weights into models/
+PYTHONPATH=. python scripts/download_models.py
+```
+
+### 2. Optional Docling Layout Engine Setup
+```bash
+pip install -r requirements-docling.txt
+```
+
+### 3. Execution Commands
+
+#### Single Document / Directory Parsing:
+```bash
+python -m app.parser.cli --in path/to/document.pdf --out parser_out
+```
+
+#### Document Normalization:
+```bash
+python -m app.normalizer.cli --dom parser_out/dom/<doc_id>/dom-v1.docJSON --out parser_out/normalized/<doc_id>.json
+```
+
+#### Semantic Chunking & Embedding:
+```bash
+# Chunk only:
+python -m app.chunking.cli --doc <doc_id> --store parser_out
+
+# Chunk and compute BGE-M3 embeddings:
+python -m app.chunking.cli --doc <doc_id> --store parser_out --embed
+```
+
+#### Batch Processing over a Large Corpus:
+```bash
+python -m app.processing.cli --in path/to/corpus --out store_out --concurrency 8
+```
+
+#### Verification & Test Suite:
+```bash
+# Verify GPU embedder:
+python scripts/check_embedder.py
+
+# Run full test suite:
 python -m pytest
 ```
 
-## Supported inputs (Extraction → DOM)
-PDF (text + layout + headings + tables + images), DOCX, XLSX, CSV/TSV, JSON, XML, HTML, Markdown, plain text, and images / scanned (on-prem OCR).
+---
 
-## Local models & GPU
-Two local, open-source model types are used; **no document ever leaves the machine**. Model weights live in the repo under `models/` (git-ignored; large binaries).
+## Key Guarantees & Design Principles
 
-- **OCR — already local.** RapidOCR-onnxruntime bundles PaddleOCR detection+recognition models and runs on the on-prem `onnxruntime` (CPU by default). Batched for many pages; engine loads only when a doc needs OCR.
-- **Embeddings — `BAAI/bge-m3` (1024-dim, multilingual) on your GPU.** `app/embedding/` uses `sentence-transformers` via PyTorch **CUDA** onto the RTX 3050 (fp16 to fit 4GB), with automatic CPU fallback. `factory.default_embedder()` picks whichever is available; `DummyEmbedder` is only the deterministic fallback for tests/CI/machines without torch.
-  - Install/update the model into `models/`:
-    `PYTHONPATH=. python scripts/download_models.py`  (→ `models/bge-m3`)
-  - Installed for this machine (verified): `torch-2.13.0+cu126`, `sentence-transformers-5.6.1` (see `requirements-gpu.txt`).
-  - Verify: `PYTHONPATH=. python scripts/check_embedder.py`
+- **100% On-Premise & Privacy-Preserving:** No document, text, chunk, or vector ever leaves the local machine. All OCR and embedding models run locally.
+- **Parser Independence:** Downstream modules consume the unified, canonical DOM (`Document`), completely isolated from source format quirks.
+- **Idempotency & Content Addressing:** `document_id = sha256(source)` and `chunk_id = sha256(content + provenance)`. Identical input always yields identical outputs.
+- **Faithful & Fallible:** Unknown values are represented as `None` without halluncinations (strict trust boundary).
+- **Full Lineage & Auditability:** Complete provenance preserved across extraction, normalization, routing, and chunking stages.
 
-## Optional Docling backend (ADR-007) — layout + tables, gated
-Docling is **present but triggers only where layout analysis is required**, keeping computation
-expense low. On the Docling path it replaces the heuristic reading order and PyMuPDF `find_tables`
-with learned layout/table-structure/reading-order models; the cheap native path remains the default
-for everything else.
+---
 
-```bash
-pip install -r requirements-docling.txt     # heavy: pulls torch/transformers + onnx models
-# then opt in per parse/corpus:
-#   ParserConfig(layout_backend="docling")  # "native" (default) | "docling"
-```
-- Models cache locally under `models/docling/` (on-prem; nothing leaves the machine).
-- If Docling is missing or recovers nothing, PDFs/images fall back to the native path (never crash).
-- Provenance records `docling_version` / `layout_model`; reading order is authoritative on this path.
-- `app/parser/loaders/docling_loader.py` mirrors the lazy-engine pattern of `ocr.py`.
+## Documentation & Project Memory
 
-## Key design properties
-- **Parser independence** — every format returns the same DOM; new formats are new loaders only.
-- **Idempotent + content-addressed** — `document_id = sha256(source)`; same bytes ⇒ same DOM.
-- **Versioned** — `parser_version` + `dom_schema_version` in every DOM's `provenance`.
-- **Lazy OCR** — the heavy engine only loads when a doc actually needs OCR.
-- **Fallible + faithful** — unknown values are `None`, never fabricated (trust boundary).
-
-## Docs / memory
-- `docs/parser-module-spec.md` — full 25-field module spec.
-- `project_memory/` — evolving decision log (master context, decisions, reading notes, questions, status, checkpoints).
-
-## Notable open items
-See `project_memory/questions.md` (stack choices are now confirmed; KG-phase contradiction is deferred by design).
+- `docs/parser-module-spec.md` — Canonical DOM specification & extraction pipeline.
+- `docs/normalizer-module-spec.md` — Text normalization rules & provenance specification.
+- `docs/routing-spec.md` — Intelligent Document Router design & scoring spec.
+- `docs/scale-batch-spec.md` — High-throughput batch processing & worker pool architecture.
+- `project_memory/` — Architectural Decision Records (ADRs), module status, and team blackboard.
