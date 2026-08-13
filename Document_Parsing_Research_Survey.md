@@ -71,6 +71,67 @@ Canonical Document Object Model (DOM)
 [Downstream Processing]
 ```
 
+### Recommended Module Structure
+
+Following modular monolith pattern (as used in Apache Tika, Tesseract, PDFBox):
+
+```
+parser/
+├── __init__.py
+├── config.py                      # Configuration management
+├── extraction.py                  # Main orchestrator (entry point)
+│
+├── detection/                     # File type detection
+│   ├── __init__.py
+│   ├── detector.py                # Magic bytes + container probing
+│   └── mime_types.py              # MIME type registry
+│
+├── loaders/                       # Format-specific parsers
+│   ├── __init__.py
+│   ├── loader_registry.py         # Loader dispatch by file type
+│   ├── pdf_loader.py              # PDF parsing (PyMuPDF)
+│   ├── docx_loader.py             # DOCX parsing (python-docx)
+│   ├── image_loader.py            # Image parsing (PIL)
+│   └── text_loader.py             # Plain text parsing
+│
+├── layout/                        # Layout analysis algorithms
+│   ├── __init__.py
+│   ├── reading_order.py           # XY-Cut algorithm
+│   ├── region_classifier.py       # Font-based classification
+│   ├── table_extractor.py         # 3-tier table detection
+│   ├── caption_linker.py          # Figure/table caption association
+│   ├── multipage_handler.py       # Multi-page table merging
+│   └── geometry_utils.py          # Bbox operations, clustering
+│
+├── dom/                           # Document Object Model
+│   ├── __init__.py
+│   ├── models.py                  # Pydantic schemas (Document, Page, Block, Table)
+│   ├── builder.py                 # Converts RecoveredDocument → Document
+│   └── serializer.py              # JSON/dict serialization
+│
+├── ocr/                           # OCR integration (optional)
+│   ├── __init__.py
+│   └── ocr_engine.py              # RapidOCR or Tesseract wrapper
+│
+└── utils/
+    ├── __init__.py
+    ├── bbox.py                    # Bounding box utilities
+    └── text.py                    # Text normalization helpers
+```
+
+### Module Responsibilities
+
+| Module | Purpose | Key Functions | Dependencies |
+|--------|---------|---------------|--------------|
+| `detection/` | File type identification | `detect()`, `probe_container()` | stdlib only |
+| `loaders/` | Format-specific extraction | `load_pdf()`, `load_docx()` | PyMuPDF, python-docx |
+| `layout/reading_order.py` | XY-Cut algorithm | `xycut_order()`, `compute_projection()` | numpy |
+| `layout/region_classifier.py` | Semantic labeling | `classify_blocks()`, `is_heading()` | None |
+| `layout/table_extractor.py` | Table detection | `extract_tables()`, `evidence_reconstruct()` | scikit-learn |
+| `layout/caption_linker.py` | Caption association | `link_captions()`, `find_nearest()` | None |
+| `dom/` | Canonical representation | `build()`, `to_dict()` | pydantic |
+| `ocr/` | Scanned page OCR | `ocr_image()`, `batch_ocr()` | rapidocr |
+
 ### Data Contract: RecoveredDocument
 
 Standard intermediate representation used by Apache Tika and similar systems:
@@ -82,6 +143,67 @@ Standard intermediate representation used by Apache Tika and similar systems:
 - **Provenance:** Parser version, extraction method, confidence metrics
 
 **Design Pattern:** Format-agnostic contract separates extraction from downstream processing.
+
+**Python Schema:**
+
+```python
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
+class RecoveredBlock:
+    """Text region with layout metadata."""
+    page: int
+    kind: str              # "paragraph" | "heading" | "caption" | "code" | "formula"
+    text: str
+    bbox: tuple[float, float, float, float]  # (x0, y0, x1, y1)
+    confidence: float
+    font_size: Optional[float] = None
+    bold: Optional[bool] = None
+
+@dataclass
+class RecoveredTable:
+    """Structured table with provenance."""
+    page: int
+    bbox: tuple[float, float, float, float]
+    header: list[str]
+    rows: list[list[str]]
+    confidence: float
+    source: str            # "native" | "geometric" | "native+evidence"
+    caption: str = ""
+
+@dataclass
+class RecoveredDocument:
+    """Format-agnostic extraction result."""
+    detected_type: str     # "pdf", "docx", etc.
+    mime_type: str
+    page_count: int
+    blocks: list[RecoveredBlock]
+    tables: list[RecoveredTable]
+    images: list[RecoveredImage]
+    reading_order_authoritative: bool = False
+```
+
+### Integration Pattern
+
+**Entry Point:**
+
+```python
+from parser import Extractor, ParserConfig
+
+def parse_document(file_bytes: bytes, filename: str):
+    """
+    Main entry point following Apache Tika pattern.
+    """
+    config = ParserConfig()
+    extractor = Extractor(config)
+    
+    # Single-pass extraction
+    result = extractor.extract(file_bytes, filename)
+    
+    # Result contains canonical Document object
+    return result.document
+```
 
 ---
 

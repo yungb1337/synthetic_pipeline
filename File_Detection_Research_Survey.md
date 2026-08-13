@@ -488,6 +488,71 @@ def detect_with_polyglot_check(data: bytes):
 
 ---
 
+## Software Architecture
+
+### Recommended Module Structure
+
+Following single-responsibility principle (as in libmagic, Apache Tika):
+
+```
+detection/
+├── __init__.py
+├── detector.py                    # Main detection orchestrator
+├── magic_bytes.py                 # Signature database + matching
+├── container_probe.py             # ZIP/OLE structural analysis
+├── content_sniffer.py             # Text format heuristics
+├── mime_registry.py               # MIME type mappings (IANA)
+└── models.py                      # DetectionResult dataclass
+```
+
+### Module Responsibilities
+
+| Module | Purpose | Key Functions | Dependencies |
+|--------|---------|---------------|--------------|
+| `detector.py` | Orchestrates 4-tier detection | `detect()`, `detect_with_security()` | All other modules |
+| `magic_bytes.py` | Binary signature matching | `check_magic()`, `get_signature_db()` | stdlib only |
+| `container_probe.py` | ZIP/OLE format analysis | `probe_zip()`, `probe_ole()` | zipfile, olefile |
+| `content_sniffer.py` | Text format classification | `sniff_text()`, `detect_delimiter()` | json, re |
+| `mime_registry.py` | Slug → MIME mapping | `get_mime_type()`, `MIME_TYPES` | stdlib only |
+| `models.py` | Data structures | `DetectionResult` dataclass | dataclasses |
+
+### Integration with Parser Pipeline
+
+```
+Parser Entry Point
+    ↓
+detect(file_bytes, filename)  ← Detection module
+    ↓
+DetectionResult(type, mime, confidence, method)
+    ↓
+if unresolved:
+    return "unsupported"
+else:
+    route_to_loader(result.file_type)
+```
+
+### DetectionResult Schema
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class DetectionResult:
+    """
+    File type detection result.
+    
+    Immutable to prevent accidental modification after detection.
+    """
+    file_type: str              # Canonical slug: "pdf", "docx", "csv"
+    mime_type: str              # RFC 6838 MIME type
+    confidence: float           # 0.0-1.0
+    detection_method: str       # "magic" | "container" | "content" | "unknown"
+    declared_extension: str     # Original extension (audit trail)
+    unresolved: bool = False    # True if type couldn't be determined
+```
+
+---
+
 ## Implementation Guide
 
 ### Production-Ready Implementation
