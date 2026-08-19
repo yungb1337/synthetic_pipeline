@@ -1,35 +1,68 @@
-"""Extraction orchestrator: single-pass Detect -> Load -> Build DOM -> Store -> emit.
+"""Extraction orchestrator (ADR-013 T14) — thin facade over the page-centric engine.
 
-This is the module's public entry point. Workers/API call into `Extractor.extract`.
-Produces a `ParseOutcome` reflecting success / unsupported / unresolved — never
-throws for bad input, so an idempotent worker can retry or dead-letter cleanly.
+The public entry point `Extractor.extract(data, filename, sha256=None) ->
+ParseOutcome` is UNCHANGED (signature + report keys). Internally it now drives
+the page-centric pipeline:
+
+    SourceScan.scan  ->  Planner.plan  ->  Scheduler.run_plan  ->  Assembler.assemble
+
+The document is assembled by reusing `DocumentBuilder.build` (unchanged,
+constraint #2) and persisted through `Store.put_image/put_dom/put_raw`
+(additive `pages/`+`manifest/` prefixes for the page store + ledger, constraint
+#3 — the `raw/`,`dom/`,`images/` layout is untouched). The reported `pages` is
+validated against `expected_page_set` so a document is never reported `parsed`
+when `actual < expected` (constraint #8 — ZERO silent page loss).
 """
 from __future__ import annotations
 
 import hashlib
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
 from . import detection
 from .config import ParserConfig
-from .dom import Document, DocumentBuilder
+from .dom import DocumentBuilder
 from .events import EventPublisher
 from .loaders import Loaders
 from .loaders.loaders import UnsupportedFormat
 from .storage import Store
+
+# Page-centric seams (additive; never break the legacy contract).
+from .assembler import Assembler
+from .planner import Planner
+from .scheduler import Scheduler
+from .source import SourceScan, SourceScanError
+from .storage_pages import Ledger, PageStore
 
 
 @dataclass
 class ParseOutcome:
     document_id: str
     status: str                # "parsed" | "unsupported" | "unresolved" | "failed"
-    document: Document | None = None
-    detected: detection.Detected | None = None
+    document: object | None = None
+    detected: object | None = None
     report: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
         return self.status == "parsed"
+
+
+@dataclass
+class _SharedScheduler:
+    """Process-wide shared scheduler (set by the executor / CLI)."""
+
+    scheduler: Optional[Scheduler] = None
+
+
+def get_shared_scheduler() -> Optional[Scheduler]:
+    return _SharedScheduler.scheduler
+
+
+def set_shared_scheduler(s: Optional[Scheduler]) -> None:
+    _SharedScheduler.scheduler = s
 
 
 class Extractor:
@@ -38,86 +71,133 @@ class Extractor:
         config: ParserConfig,
         store: Store,
         events: EventPublisher | None = None,
+        scheduler: Scheduler | None = None,
+        page_store: PageStore | None = None,
+        ledger: Ledger | None = None,
     ):
         self.config = config
         self.store = store
         self.events = events or EventPublisher()
         self.loaders = Loaders(config)
-        self.builder = DocumentBuilder(config)
+        self.builder = DocumentBuilder(config)  # reused for any legacy path
         self._router = None  # lazily built on the auto path
 
-    def extract(self, data: bytes, filename: str = "", sha256: str | None = None) -> ParseOutcome:
+        # Derive the store root for additive page store + ledger.
+        root = getattr(store, "root", None)
+        if root is None:
+            root = Path(getattr(store, "root_path", "."))
+        self.root = Path(root)
+        self.page_store = page_store or PageStore(str(self.root))
+        self.ledger = ledger or Ledger(str(self.root))
+        self.planner = Planner(self.page_store, self.ledger)
+        self.assembler = Assembler(config, store, self.ledger)
+
+        # Use the shared scheduler (injected by the executor) if present, else
+        # build a one-off scheduler that runs heavy pages in-process (no fork for
+        # a single-doc interactive call).
+        self.scheduler = scheduler or get_shared_scheduler()
+        self._own_scheduler = self.scheduler is None
+        if self.scheduler is None:
+            self.scheduler = Scheduler(
+                config, page_store=self.page_store, ledger=self.ledger,
+                prefer_in_process_heavy=True,
+            )
+
+    def extract(self, data: bytes, filename: str = "", sha256: str | None = None,
+                 resume: bool = False) -> ParseOutcome:
         t0 = time.time()
-        # the corpus scan already has the content hash; only recompute when the
-        # caller could not provide it (single-doc / interactive path).
         sha = sha256 or hashlib.sha256(data).hexdigest()
-        doc_id = f"d-{sha[:16]}"
 
         t_detect = time.time()
         detected = detection.detect(data, filename)
         if detected.unresolved:
-            self._emit("document.parse_failed", doc_id, {"reason": "unresolved", "slug": detected.slug})
-            return ParseOutcome(doc_id, "unresolved", None, detected)
+            self._emit("document.parse_failed", None, {"reason": "unresolved", "slug": detected.slug})
+            return ParseOutcome(None, "unresolved", None, detected)
 
         if len(data) > self.config.max_file_bytes:
-            self._emit("document.parse_failed", doc_id, {"reason": "too_large", "bytes": len(data)})
-            return ParseOutcome(doc_id, "failed", None, detected, {"error": "file exceeds max_file_bytes"})
+            self._emit("document.parse_failed", None, {"reason": "too_large", "bytes": len(data)})
+            return ParseOutcome(None, "failed", None, detected, {"error": "file exceeds max_file_bytes"})
 
-        route, decision, rec = None, None, None
-        # ADR-011: compute the route after detection, before dispatch (only in
-        # "auto" for PDFs; manual native/docling overrides pass through). The
-        # router never touches the loaders and only decides.
+        # --- route (legacy router kept; only informs the Planner band) --------
         t_route0 = time.time()
+        route, decision = None, None
         try:
             route, decision = self._compute_route(data, detected)
         except Exception:
-            route, decision = None, None  # a routing failure never kills the parse
+            route, decision = None, None
         t_route1 = time.time()
 
-        t_load0 = time.time()
+        # --- source scan (expected page set) ---------------------------------
+        t_scan0 = time.time()
         try:
-            rec = self.loaders.load(detected, data, route=route)
-            if decision is not None:
-                rec.routing = decision
+            manifest = SourceScan.scan(data, filename, self._fs_store())
         except UnsupportedFormat as e:
-            self._emit("document.parse_failed", doc_id, {"reason": f"unsupported:{e}"})
-            return ParseOutcome(doc_id, "unsupported", None, detected, {"error": str(e)})
-        t_load1 = time.time()
+            self._emit("document.parse_failed", None, {"reason": f"unsupported:{e}"})
+            return ParseOutcome(None, "unsupported", None, detected, {"error": str(e)})
+        except SourceScanError as e:
+            # Corrupt / unreadable source: never report `parsed` with 0 pages.
+            self._emit("document.parse_failed", None, {"reason": f"source_scan:{e}"})
+            return ParseOutcome(None, "failed", None, detected, {"error": str(e)})
+        t_scan1 = time.time()
 
-        # persist extracted images (same pass; image bytes are already in rec)
-        t_store0 = time.time()
-        for img in rec.images:
-            img.storage_ref = self.store.put_image(doc_id, img)
-        t_build0 = time.time()
-        document = self.builder.build(rec, doc_id, sha)
-        t_store1 = time.time()
-        dom_key = self.store.put_dom(doc_id, document)
-        raw_key = self.store.put_raw(doc_id, sha, data, detected.slug)
-        t_store2 = time.time()
+        doc_id = manifest.doc_id
 
+        # --- plan ------------------------------------------------------------
+        t_plan0 = time.time()
+        # D1: genuine page-level resume. The batch executor opts in (resume=True)
+        # so re-runs skip already-OK pages and reschedule FAILED/DEAD pages
+        # instead of reparsing everything. A single Extractor.extract() call
+        # defaults to resume=False (always reproduce the full document).
+        plan = self.planner.plan(manifest, route, decision, self.config, resume=resume)
+        t_plan1 = time.time()
+
+        # --- execute pages (scheduler persists each result) ------------------
+        t_run0 = time.time()
+        results = self.scheduler.run_plan(plan)
+        t_run1 = time.time()
+
+        # --- assemble + validate (hard gate) --------------------------------
+        t_assemble0 = time.time()
+        report = self.assembler.assemble(plan, results, manifest.src_path, sha,
+                                          max_retries=self.config.page_retries)
+        t_assemble1 = time.time()
+
+        document = report.document
         elapsed = (time.time() - t0) * 1000
         timings = {
             "detect_ms": round((t_route0 - t_detect) * 1000, 1),
             "route_ms": round((t_route1 - t_route0) * 1000, 1),
-            "load_ms": round((t_load1 - t_load0) * 1000, 1),
-            "build_ms": round((t_store1 - t_build0) * 1000, 1),
-            "store_ms": round(((t_build0 - t_store0) + (t_store2 - t_store1)) * 1000, 1),
+            "scan_ms": round((t_scan1 - t_scan0) * 1000, 1),
+            "plan_ms": round((t_plan1 - t_plan0) * 1000, 1),
+            "run_ms": round((t_run1 - t_run0) * 1000, 1),
+            "assemble_ms": round((t_assemble1 - t_assemble0) * 1000, 1),
             "total_ms": round(elapsed, 1),
         }
-        if rec.timings:  # loader sub-stages (docling_ms, ocr_ms, ...)
-            timings.update(rec.timings)
-        report = {
+        doc_report = {
             "elapsed_ms": round(elapsed, 1),
             "timings": timings,
-            "blocks": document.num_blocks(),
-            "tables": document.num_tables(),
-            "images": document.num_images(),
-            "pages": len(document.pages),
-            "ocr": document.provenance.ocr_engine if document.provenance else None,
-            "route": route,  # ADR-011: which tier ran (or None)
-            "dom_key": dom_key,
-            "raw_key": raw_key,
+            "blocks": document.num_blocks() if document else 0,
+            "tables": document.num_tables() if document else 0,
+            "images": document.num_images() if document else 0,
+            "pages": report.actual_pages,
+            "expected_pages": report.expected_pages,
+            "ocr": document.provenance.ocr_engine if document and document.provenance else None,
+            "route": route,
+            "dom_key": report.dom_key,
+            "raw_key": report.raw_key,
         }
+
+        # ZERO silent page loss: only report `parsed` when assembled == expected.
+        if report.status == "ok":
+            status = "parsed"
+        elif report.status == "partial":
+            status = "parsed" if report.actual_pages == report.expected_pages else "partial"
+            # a partial with actual==expected (all PARTIAL but complete set) is parsed
+            if report.actual_pages == report.expected_pages:
+                status = "parsed"
+        else:
+            status = "failed"
+
         self._emit(
             "document.parsed.v1",
             doc_id,
@@ -126,18 +206,31 @@ class Extractor:
                 "probe": detected.probe,
                 "parser_version": self.config.parser_version,
                 "sha256": sha,
-                **report,
+                "expected_pages": report.expected_pages,
+                "actual_pages": report.actual_pages,
+                "assembly_status": report.status,
+                **doc_report,
             },
         )
-        return ParseOutcome(doc_id, "parsed", document, detected, report)
+        if status != "parsed":
+            self._emit("document.parse_failed", doc_id,
+                       {"reason": "incomplete", "expected": report.expected_pages,
+                        "actual": report.actual_pages,
+                        "missing": report.missing_pages,
+                        "failed": report.failed_pages,
+                        "dead": report.dead_pages})
+        return ParseOutcome(doc_id, status, document, detected, doc_report)
+
+    # --- small helpers -------------------------------------------------------
+    def _fs_store(self):
+        # SourceScan needs a FilesystemStore (it uses `.root`); wrap if needed.
+        if isinstance(self.store, Store) and getattr(self.store, "root", None) is not None:
+            return self.store
+        from .storage import FilesystemStore
+
+        return FilesystemStore(str(self.root))
 
     def _compute_route(self, data: bytes, detected) -> tuple[str | None, object | None]:
-        """Decide the extraction tier + capture the RoutingDecision (ADR-011).
-
-        Manual overrides (`layout_backend` in {"native","docling"}) pass through
-        unchanged and record NO routing decision (old behaviour). "auto" routes
-        PDFs via the router; every other format keeps the legacy native path.
-        """
         lb = self.config.layout_backend
         if lb == "docling":
             return "docling", None

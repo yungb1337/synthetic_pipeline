@@ -10,6 +10,11 @@ from dataclasses import dataclass
 class ProcessingConfig:
     # parallelism
     concurrency: int = min(16, (os.cpu_count() or 4) + 1)   # worker pool size
+    # Page-centric engine (ADR-013): native pool is wide; heavy (Docling) pool is
+    # bounded by measured RAM. None => auto-derived by ResourceGovernor. Pass an
+    # explicit int to override (e.g. --heavy-concurrency 2 on a small box).
+    native_concurrency: int | None = None
+    heavy_concurrency: int | None = None
     # file discovery
     exts: tuple[str, ...] = (
         ".pdf", ".docx", ".xlsx", ".csv", ".tsv", ".json", ".xml",

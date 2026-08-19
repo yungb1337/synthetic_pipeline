@@ -17,8 +17,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ..parser import ocr as parser_ocr
 from ..parser.events import EventPublisher, silent_sink
-from ..parser.extraction import Extractor
+from ..parser.extraction import Extractor, set_shared_scheduler
+from ..parser.scheduler import Scheduler
 from ..parser.storage import FilesystemStore, Store
+from ..parser.storage_pages import Ledger, PageStore
 from ..normalizer.config import NormalizerConfig
 from ..normalizer.normalizer import Normalizer
 
@@ -51,15 +53,53 @@ class BatchReport:
 
 
 class ParseNormalizePipeline:
-    """One batch worker's unit of work: parse -> normalize -> persist."""
+    """One batch worker's unit of work: parse -> normalize -> persist.
 
-    def __init__(self, store: Store):
+    A single per-process `Scheduler` is shared across every document in the run
+    (the heavy Docling engine is built once inside the worker pool and reused —
+    ADR-013). The pipeline closes its scheduler at the end of the run via
+    `close_scheduler()`.
+    """
+
+    _scheduler: Scheduler | None = None
+
+    def __init__(self, store: Store, config: "ProcessingConfig | None" = None):
         from ..parser.config import default_config as parser_cfg
 
+        parser_config = parser_cfg()
+        proc_cfg = config or self._processing_cfg()
+        # Additive page store + ledger share the SAME store root (constraint #3).
+        root = str(getattr(store, "root", "."))
+        page_store = PageStore(root)
+        ledger = Ledger(root)
+        if ParseNormalizePipeline._scheduler is None:
+            ParseNormalizePipeline._scheduler = Scheduler(
+                parser_config,
+                native_concurrency=proc_cfg.native_concurrency,
+                heavy_concurrency=proc_cfg.heavy_concurrency,
+                page_store=page_store, ledger=ledger,
+            )
         # batch pipelines emit to a broker, not stdout (see silent_sink)
-        self.extractor = Extractor(parser_cfg(), store, events=EventPublisher(sink=silent_sink()))
+        self.extractor = Extractor(
+            parser_config, store, events=EventPublisher(sink=silent_sink()),
+            scheduler=ParseNormalizePipeline._scheduler,
+            page_store=page_store, ledger=ledger,
+        )
         self.normalizer = Normalizer(NormalizerConfig())
         self.store = store
+        self._page_store = page_store
+        self._ledger = ledger
+
+    @staticmethod
+    def _processing_cfg() -> "ProcessingConfig":
+        from .config import ProcessingConfig
+        return ProcessingConfig()
+
+    @classmethod
+    def close_scheduler(cls) -> None:
+        if cls._scheduler is not None:
+            cls._scheduler.close()
+            cls._scheduler = None
 
     def process(self, ref: DocRef) -> DocResult:
         t0 = time.time()
@@ -70,7 +110,8 @@ class ParseNormalizePipeline:
         try:
             # sha256 is already known from the corpus scan; hand it through so
             # extract does not re-hash the full file (idempotency + scale).
-            po = self.extractor.extract(data, filename=ref.name, sha256=ref.sha256)
+            po = self.extractor.extract(data, filename=ref.name, sha256=ref.sha256,
+                                         resume=True)
             if not po.ok:
                 # unsupported/unresolved/too-large are deterministic outcomes
                 return DocResult(ref, status="failed", error=po.status, ms=(time.time()-t0)*1000, retriable=False)
@@ -116,6 +157,10 @@ class BatchWorker:
                     self._record(fut.result())
         self._flush()
         self._report.elapsed_ms = (time.time() - t_start) * 1000
+        # NOTE: the shared heavy pool is NOT closed here — the pipeline (and its
+        # shared Scheduler) is reused across runs in the same process, so closing
+        # after the first run would break every subsequent extract(). The pool is
+        # released exactly once at process exit via `close_scheduler()` (CLI / atexit).
         return self._report
 
     def _run_with_retries(self, ref: DocRef) -> DocResult:

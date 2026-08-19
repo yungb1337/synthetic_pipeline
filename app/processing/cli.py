@@ -26,6 +26,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--in", dest="input", required=True, help="corpus directory")
     ap.add_argument("--out", dest="out", default="parser_out", help="store root")
     ap.add_argument("--concurrency", type=int, default=None)
+    ap.add_argument("--native-concurrency", type=int, default=None,
+                    help="override native (ThreadPool) pool size")
+    ap.add_argument("--heavy-concurrency", type=int, default=None,
+                    help="override Docling (ProcessPool) pool size (auto by default)")
     ap.add_argument("--manifest", default="work/manifest.json")
     ap.add_argument("--no-ocr", action="store_true")
     ap.add_argument("--embed", action="store_true", help="also run batched (dummy) embeddings over normalized blocks")
@@ -34,12 +38,16 @@ def main(argv: list[str] | None = None) -> int:
     cfg = ProcessingConfig()
     if args.concurrency is not None:
         cfg = replace(cfg, concurrency=args.concurrency)
+    if args.native_concurrency is not None:
+        cfg = replace(cfg, native_concurrency=args.native_concurrency)
+    if args.heavy_concurrency is not None:
+        cfg = replace(cfg, heavy_concurrency=args.heavy_concurrency)
     if args.no_ocr:
         cfg = replace(cfg, ocr_warm=False)
     cfg = replace(cfg, manifest_path=args.manifest)
 
     store = FilesystemStore(args.out)
-    pipeline = ParseNormalizePipeline(store)
+    pipeline = ParseNormalizePipeline(store, config=cfg)
     worker = BatchWorker(cfg, pipeline)
 
     print(f"scanning {args.input} ...")
@@ -57,6 +65,9 @@ def main(argv: list[str] | None = None) -> int:
         _embed_pass(report, store, cfg)
 
     _write_report(args.out, report)
+    # Release the shared heavy pool (and any worker processes) exactly once,
+    # at process exit — the pipeline is reused across runs within a process.
+    ParseNormalizePipeline.close_scheduler()
     return 0
 
 

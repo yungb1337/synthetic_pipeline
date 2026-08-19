@@ -46,6 +46,10 @@ class ParserConfig:
     # None => factory defaults (RoutingConfig()). Also gates routing on/off.
     routing: Optional["RoutingConfig"] = None
 
+    # Retry policy (ADR-013 T13): bounded page-level retries in the Assembler.
+    # Threaded Extractor -> Assembler; the assembler no longer hardcodes a literal.
+    page_retries: int = 2
+
     # Security / resource limits
     max_file_bytes: int = 512 * 1024 * 1024   # 512 MiB; enforced in Extractor.extract
 

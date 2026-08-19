@@ -160,82 +160,34 @@ class Loaders:
         for key, val in fitz_metadata(doc).items():
             setattr(rec, key, val)
 
-        all_blocks = []          # (page, size) for heading classification
-        for pno in range(doc.page_count):
-            page = doc[pno]
-            rec.page_sizes[pno] = (page.rect.width, page.rect.height)
+        # Delegate to the single-source-of-truth per-page native extractor
+        # (ADR-013 T5). The whole doc is already open from bytes here; each page
+        # is folded into one RecoveredDocument — no duplicated extraction logic.
+        from ..engines.native_pdf import _native_page_from_doc
 
-            # text blocks with font info (single pass)
-            for blk in page.get_text("dict").get("blocks", []):
+        seq = 0
+        # F1: document-wide median body size for heading classification, matching
+        # the legacy behaviour (a block is a heading if its font size exceeds the
+        # whole-document median * threshold). Computed once, then shared.
+        _sizes: list[float] = []
+        for pno in range(doc.page_count):
+            for blk in doc[pno].get_text("dict").get("blocks", []):
                 if blk.get("type") != 0:
                     continue
-                bbox = tuple(blk["bbox"])
-                parts_text = []
-                size = 0.0
-                bold = False
                 for line in blk.get("lines", []):
-                    line_text = ""
                     for span in line.get("spans", []):
-                        line_text += span.get("text", "")
-                        size = max(size, span.get("size", 0.0))
-                        if span.get("flags") & 16:
-                            bold = True
-                    parts_text.append(line_text)
-                text = "\n".join(s.strip() for s in parts_text).strip()
-                if not text:
-                    continue
-                all_blocks.append(
-                    RecoveredBlock(
-                        page=pno, kind="paragraph", text=text, bbox=tuple(bbox),
-                        seq=len(all_blocks), font_size=size, bold=bold, source="text",
-                    )
-                )
-
-            # tables
-            if self.config.pdf_extract_tables:
-                try:
-                    finder = page.find_tables()
-                except Exception:
-                    finder = None
-                if finder is not None:
-                    for t in getattr(finder, "tables", []):
-                        try:
-                            rows = t.extract()
-                        except Exception:
-                            rows = []
-                        if not rows:
-                            continue
-                        header = [str(c).strip() for c in rows[0]]
-                        data = [[str(c).strip() for c in r] for r in rows[1:]]
-                        bbox = getattr(t, "bbox", None)
-                        rec.tables.append(
-                            RecoveredTable(page=pno, bbox=tuple(bbox) if bbox else None,
-                                           header=header, rows=data, source="native")
-                        )
-
-            # images
-            try:
-                for xref in page.get_images(full=True):
-                    einfo = doc.extract_image(xref[0])
-                    rects = page.get_image_rects(xref[0])
-                    bbox = tuple(rects[0]) if rects else None
-                    ext = einfo.get("ext", "png")
-                    mime = {"png": _MIME["png"], "jpg": _MIME["jpg"], "jpeg": _MIME["jpg"], "tiff": _MIME["tiff"]}.get(ext, "image/" + ext)
-                    blob = einfo["image"]
-                    rec.images.append(
-                        RecoveredImage(page=pno, bbox=bbox, mime=mime,
-                                       checksum=hashlib.sha256(blob).hexdigest(), blob=blob)
-                    )
-            except Exception:
-                pass
-
-        # heading classification by font size vs median body size
-        sizes = [b.font_size for b in all_blocks if b.font_size]
-        body_med = sorted(sizes)[len(sizes)//2] if sizes else 12.0
-        for b in all_blocks:
-            if b.font_size and b.font_size > body_med * self.config.pdf_heading_threshold_ratio:
-                b.kind = "heading"
-        rec.blocks = all_blocks
+                        if span.get("text", "").strip():
+                            _sizes.append(float(span.get("size", 0.0)))
+        _body_med = sorted(_sizes)[len(_sizes) // 2] if _sizes else 12.0
+        for pno in range(doc.page_count):
+            rec.page_sizes[pno] = (doc[pno].rect.width, doc[pno].rect.height)
+            pr = _native_page_from_doc(doc[pno], pno, self.config, body_med=_body_med)
+            for b in pr.blocks:
+                b.seq = seq
+                seq += 1
+                rec.blocks.append(b)
+            rec.tables.extend(pr.tables)
+            rec.images.extend(pr.images)
         return rec
 
     # --- CSV / TSV -----------------------------------------------------------
@@ -395,24 +347,35 @@ class Loaders:
 
     # --- image / scanned -----------------------------------------------------
     def _image(self, data, detected):
-        import time as _time
-        from .. import ocr
         rec = self._base(detected, RecoveredDocument)
         rec.page_count = 1
-        if not self.config.ocr_enabled:
-            return rec
-        t_ocr = _time.time()
-        lines = ocr.ocr_bytes(data)
-        rec.timings["ocr_ms"] = round((_time.time() - t_ocr) * 1000, 1)
-        rec.timings["ocr_pages"] = 1
-        for i, (text, bbox, conf) in enumerate(lines):
-            rec.blocks.append(
-                RecoveredBlock(page=0, seq=i, text=text, bbox=bbox,
-                               confidence=conf if conf <= 1.0 else conf/100.0,
-                               source="ocr", ocr_engine=ocr.engine_name())
-            )
+        _image_bytes(rec, data, self.config)
         return rec
 
 
 def _NSW(tag):
     return "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}" + tag
+
+
+def _image_bytes(rec: RecoveredDocument, data: bytes, config: ParserConfig) -> None:
+    """Shared image→OCR helper used by both `Loaders._image` and the standalone
+    `ImageEngine`. Appends OCR `RecoveredBlock`s (page 0) to `rec` in place.
+
+    OCR is gated by `config.ocr_enabled`; with it disabled the record stays
+    empty but OK (no crash). Reuses the on-prem `ocr.ocr_bytes` wrapper.
+    """
+    if not config.ocr_enabled:
+        return
+    import time as _time
+    from .. import ocr
+
+    t_ocr = _time.time()
+    lines = ocr.ocr_bytes(data)
+    rec.timings["ocr_ms"] = round((_time.time() - t_ocr) * 1000, 1)
+    rec.timings["ocr_pages"] = 1
+    for i, (text, bbox, conf) in enumerate(lines):
+        rec.blocks.append(
+            RecoveredBlock(page=0, seq=i, text=text, bbox=bbox,
+                           confidence=conf if conf <= 1.0 else conf / 100.0,
+                           source="ocr", ocr_engine=ocr.engine_name())
+        )

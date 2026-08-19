@@ -50,9 +50,27 @@ _KIND = {
 }
 
 
+# C5: cached result of the startup drift-guard. `None` => not yet run.
+_docling_guard_ok: bool | None = None
+
+
 def engine_available() -> bool:
-    """True if a working Docling converter is loaded (lazy, once per process)."""
-    global _engine
+    """True if a working Docling converter is loaded (lazy, once per process).
+
+    C5: before trusting the engine we run the `docling_guard()` startup
+    drift-check (cached per process). If the installed docling exposes an
+    incompatible `status`/`ErrorItem.page_no`/`page_range` API, the guard fails
+    and we report the engine as unavailable so the pipeline degrades gracefully
+    to native at availability time instead of failing per-page mid-run.
+    """
+    global _engine, _docling_guard_ok
+    if _docling_guard_ok is None:
+        try:
+            _docling_guard_ok = docling_guard()
+        except Exception:
+            _docling_guard_ok = False
+    if _docling_guard_ok is False:
+        return False
     if _engine is None:
         with _lock:
             if _engine is None:
@@ -188,6 +206,16 @@ def _make_pipeline_options(cls, ocr: bool = True):
         opts.images_scale = 2.0
     except Exception:
         pass
+    # C4: defensively apply per-page heap-reclaim options on the heavy path
+    # (§5). These bound Docling's C++ layout/segmentation heap to one page at a
+    # time (the root-cause mitigation for `std::bad_alloc`), trading a little
+    # speed for RAM safety. Guarded so API drift never breaks engine construction.
+    for attr in ("release_native_memory_every_n_pages", "doc_batch_concurrency",
+                 "page_batch_concurrency"):
+        try:
+            setattr(opts, attr, 1)
+        except Exception:
+            pass
     if ocr:
         _set_ocr_options(opts)
     return opts
@@ -981,3 +1009,152 @@ def _convert(converter, data: bytes, filename: str) -> object | None:
             os.unlink(path)
         except Exception:
             pass
+
+
+# --- page-centric seam (ADR-013, additive) ---------------------------------
+# The heavy engine is built INSIDE each worker process (never pickled) and is
+# the per-process singleton reused across all page jobs. `convert_path` returns
+# the FULL ConversionResult (status + errors + input.page_count) so the caller
+# can detect silent truncation; it bounds the C++ heap to ONE page and reads
+# the reusable source path directly (no per-page temp file).
+_GUARD_OK: bool | None = None
+
+
+def get_engine():
+    """The per-process Docling converter singleton (lazy, once per process).
+
+    Returns the converter or None when Docling is unavailable. Used by the
+    heavy worker so the engine is reused across page jobs (no N× warm-up).
+    """
+    engine_available()  # ensures _engine is built
+    return _engine if _engine is not False else None
+
+
+def convert_path(path: str, page: int, models_dir: str | None = None) -> object | None:
+    """Convert ONE page (0-based `page`) of `path` via `page_range=(page+1, page+1)`.
+
+    Returns the full `ConversionResult` (so status/errors/page_count are
+    inspectable), or None when the engine is unavailable. Reads `path` directly
+    — no temp file — so the single reusable source path is the only write.
+    """
+    if models_dir:
+        os.environ.setdefault("DOCLING_MODELS_PATH", models_dir)
+    engine = get_engine()
+    if engine is None:
+        return None
+    try:
+        return engine.convert(path, page_range=(page + 1, page + 1))
+    except Exception:
+        return None
+
+
+def docling_guard() -> bool:
+    """Startup guard: assert the Docling APIs the page-centric engine relies on.
+
+    Checks that `ConversionResult` exposes `status` + `errors`, `ErrorItem`
+    carries `page_no`, and `convert` accepts `page_range`. Returns False (and
+    marks the engine unavailable) if any are missing so the pipeline degrades
+    to native rather than silently mis-handle failures.
+    """
+    global _GUARD_OK
+    if _GUARD_OK is not None:
+        return _GUARD_OK
+    _GUARD_OK = False
+    try:
+        from docling.datamodel.base_models import ErrorItem
+        from docling.document_converter import ConversionResult, DocumentConverter
+        import inspect
+
+        # Docling 2.x uses pydantic v2 models, so fields live in `model_fields`
+        # (NOT class-level attributes readable via `hasattr`). The page-centric
+        # engine relies on `status`, `errors`, `input.page_count`, and
+        # `ErrorItem.page_no`. Verify those exist as model fields.
+        cr_fields = set(getattr(ConversionResult, "model_fields", {}))
+        if not ({"status", "errors", "input"}.issubset(cr_fields)):
+            return False
+        ei_fields = set(getattr(ErrorItem, "model_fields", {}))
+        if "page_no" not in ei_fields:
+            return False
+        if "page_range" not in inspect.signature(DocumentConverter.convert).parameters:
+            return False
+        _GUARD_OK = True
+        return True
+    except Exception:
+        return False
+
+
+def docling_guard_status(result) -> tuple[str, list[dict], int, int]:
+    """The silent-loss detector (the FIX).
+
+    Reads a `ConversionResult` and returns:
+        (status_name, errors, expected_page_count, produced_content_pages)
+
+    * `status_name` — the `ConversionStatus` name (`SUCCESS`, `PARTIAL_SUCCESS`,
+      `FAILURE`, ...).
+    * `errors` — list of `{page_no, category, message}` dicts (page_no 1-based
+      per Docling; None when document-wide).
+    * `expected_page_count` — `result.input.page_count` (the TRUE expected count
+      for this single-page call it is 1, but we surface it generically).
+    * `produced_content_pages` — number of page-numbers whose document page
+      actually carries content (non-empty stub). For a per-page call, a
+      stub/preserved empty page yields 0 while a real one yields 1.
+
+    Never guesses success: a FAILURE / empty-stub page is reported as such so the
+    caller can mark the page FAILED/PARTIAL rather than synthesize completeness.
+    """
+    from docling.datamodel.base_models import ErrorItem
+
+    status = getattr(result, "status", None)
+    status_name = getattr(status, "name", None) or str(status)
+
+    errs: list[dict] = []
+    for e in getattr(result, "errors", []) or []:
+        if isinstance(e, ErrorItem):
+            errs.append(
+                {
+                    "page_no": getattr(e, "page_no", None),
+                    "category": getattr(getattr(e, "category", None), "name", None)
+                    or getattr(e, "category", ""),
+                    "message": getattr(e, "error_message", "") or "",
+                }
+            )
+        elif isinstance(e, dict):
+            errs.append(
+                {
+                    "page_no": e.get("page_no"),
+                    "category": e.get("category", ""),
+                    "message": e.get("error_message", "") or e.get("message", ""),
+                }
+            )
+        else:
+            # Defensive: a plain error-like object (page_no / error_message / category)
+            # — never crash on an unexpected error representation.
+            errs.append(
+                {
+                    "page_no": getattr(e, "page_no", None),
+                    "category": getattr(getattr(e, "category", None), "name", None)
+                    or getattr(e, "category", ""),
+                    "message": getattr(e, "error_message", "") or getattr(e, "message", ""),
+                }
+            )
+
+    expected = 0
+    try:
+        expected = int(getattr(getattr(result, "input", None), "page_count", 0) or 0)
+    except Exception:
+        expected = 0
+
+    produced = 0
+    doc = getattr(result, "document", None)
+    if doc is not None:
+        try:
+            for pno, page in doc.pages.items():
+                # A genuine (stub-free) page has at least one text item OR any
+                # non-text item (table/picture). Empty preserved stubs have none.
+                items = list(page.items()) if hasattr(page, "items") else []
+                if items:
+                    produced += 1
+        except Exception:
+            produced = 0
+
+    return status_name, errs, expected, produced

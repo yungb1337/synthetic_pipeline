@@ -266,3 +266,60 @@ ticket through the enrichment path yields 112 OCR‑source blocks; full suite 15
 **Clarification recorded:** Docling's layout + reading order are produced by its **layout model**, not
 OCR; Docling OCR only recovers text on low-text pages. So this unification affects only text
 recovery — layout/reading-order quality is untouched.
+
+---
+
+## ADR-013 — Page-centric execution model + resource-aware scheduling (2026-08-19, run-2026-08-19-page-centric)
+
+**Decision:** Redesign the parser execution model so the **page is the fundamental
+processing and durable-storage unit** and the **document is the orchestration unit**.
+Adopt a **page-centric pipeline** with (1) a decision-only router (ADR-011) deciding one
+band per document, applied uniformly page-by-page; (2) a **`Scheduler`** decoupling a wide
+`native_pool` (`ThreadPoolExecutor`: PyMuPDF/enrichment/image/simple) from a **bounded
+`heavy_pool` (`ProcessPoolExecutor`)** for Docling/OCR; (3) Docling invoked per page via
+`page_range=(p,p)` so peak C++ heap is bounded to one page; (4) a **`ResourceGovernor`**
+deriving `heavy_concurrency = f(ram_cap, measured F, headroom, gpu)` from measured RAM/GPU
+(not a fixed cap) — "scale by hardware"; (5) a **per-page `PageResult`** + **page store**
+(`pages/<doc_id>/p<idx>/page-v<ver>.docJSON`) + **per-document ledger**
+(`manifest/<doc_id>/plan.json`) enabling idempotent resume/retry without reparsing done
+pages; (6) a **`DocumentValidator`** gate allowing assembly to succeed **only** when
+`assembled_page_set == expected_page_set` (established before paging), with dead-letter on
+exhausted retries so any loss is explicit, never silent. **Fact** (adopted this run).
+
+**Why:**
+- Research established the root cause as **document-length × concurrency C++ heap
+  multiplication** (20 `std::bad_alloc` on 3 concurrent whole-doc Docling workers) and that
+  Docling **back-fills empty stub pages** while the loader ignored `status`/`page_count`
+  → silent loss. `page_range=(p,p)` is a supported knob bounding peak heap to one page;
+  per-page `status`+content inspection makes loss detection trivial.
+- Research established the GIL prevents `ThreadPoolExecutor` from parallelizing Docling
+  (the current single-pool failure mode), and that process isolation + a **persistent
+  per-process warmed engine** is required (fresh process per page = N× model warm-up,
+  rejected). Decoupling native (wide, GIL-releasing) from heavy (bounded, process-isolated)
+  matches the research's "serialized-heavy + wide-native is strictly better" economics.
+- The BLAS-thread multiplier (`heavy_concurrency × cpu_count` OpenMP/MKL threads) is
+  neutralized by `OMP_NUM_THREADS=1`/`MKL_NUM_THREADS=1` set in every heavy process, with
+  `F` measured under those env vars — so the budget holds and scaling is by process count.
+
+**How to apply:**
+- New modules under `app/parser/`: `source.py`, `engines/` (`base.py`, `native_pdf.py`,
+  `enrichment.py`, `heavy_docling.py`, `image.py`, `simple.py`), `page_result.py`,
+  `planner.py`, `storage_pages.py`, `scheduler.py`, `assembler.py`.
+- `Extractor.extract` stays a thin synchronous facade; `FilesystemStore` (`raw/`,`dom/`,
+  `images/`) layout unchanged; final DOM still written via `put_dom`. Additive dirs `pages/`,
+  `manifest/` under the store root.
+- `docling_loader` gains `convert_path(path, page, models_dir)` (reads `ConversionResult`,
+  no per-page temp) + `get_engine()` (per-process singleton). `DocumentBuilder.build` is
+  reused unchanged (pages folded into one `RecoveredDocument`).
+- `ProcessingConfig` gains `native_concurrency`/`heavy_concurrency` (None => auto). CLIs
+  gain `--native-concurrency`/`--heavy-concurrency`; `--concurrency` (doc-level) retained.
+
+**Challenge (recorded):** page-at-a-time could be slower than a small chunked range if
+per-page overhead dominates; mitigated by the persistent per-process engine (no warm-up per
+page) and by keeping `native_pool` wide. What would reverse it: a measured corpus where a
+bounded chunked range (2–4 pp) is both faster and RAM-safe — revisit only with the same
+per-page `status` validation + `heavy_pool` governor. Docling version drift is contained
+by a pinned version + startup API guard test; GPU term is dormant pending CUDA enablement.
+
+**Verdict:** evidence-backed; eliminates silent `std::bad_alloc` loss and scales by
+hardware. Adopted.

@@ -11,65 +11,45 @@ metadata:
 > reads this file at the start of a run. Replace the contents for a new run; keep this file.
 
 ## Run id
-`run-2026-08-06-router`
+`run-2026-08-19-page-centric`
 
 ## Objective
-Implement the **Intelligent Document Routing Engine** per **`docs/routing-spec.md`** (the ratified
-authority — read it fully, it is the contract). Replace the static `layout_backend` heuristic with a
-separate, deterministic, explainable, configurable, extensible decision layer between ingestion and
-extraction, so each document is routed to the cheapest pipeline (Native / Enriched / Docling) that
-reliably delivers the required fidelity.
+Redesign the parser execution model so that the **page becomes the fundamental processing and durable-storage unit**, while the **document remains the orchestration unit**. Eliminate silent page loss from `std::bad_alloc` and similar OOM crashes by making the pipeline resource-aware, hardware-scaling, and resilient.
+
+**Problem statement:** Docling's C++ layout engine allocates large per-instance heaps. Running multiple document-level Docling workers concurrently exhausts RAM, causing `std::bad_alloc` in the C++ preprocess stage. Docling swallows these per-page exceptions and returns partial documents. The pipeline reports these as "success" — creating silent data loss (e.g. 24-page PDF truncated to 10 pages). This is not a 4GB GPU problem; it will occur on any system when concurrency exceeds what the heavy ML engines can tolerate.
+
+**User directive:** "I want a design which will scale depending on the hardware instead of limiting."
 
 ## Scope
-- **New `app/routing/` module**: `config.py` (decision/policy versions, 3 score bands, per-detector
-  weights — all config), `inspectors.py` (FastInspector: cheap pre-parse feature pass, decision-free),
-  `detectors/` (pluggable, one detector per concern — Metadata/Text/Image/Layout/OCR/Table/Form/
-  ReadingOrder/Font), `router.py` (aggregates detector signals → complexity_score 0–100 + confidence
-  + route + structured reasons; determinism + versioning), `schema.py` (RoutingDecision pydantic).
-- **Separation:** Inspector answers "what can I cheaply observe?"; Router answers "which pipeline?";
-  detectors answer "what do I note?"; pipeline executes the decision. No routing logic in extraction;
-  no extraction logic in the router; no pipeline-execution in detectors.
-- **Routing policy (config):** 0–30 → Native · 31–60 → Enrichment · 61–100 → Docling.
-  Conservative toward complex docs on low confidence (defined fallback).
-- **Metadata:** persist `routing` block (route, complexity_score, confidence, reasons, router + policy
-  + detector versions, inspection_time_ms, signals) into `Document.provenance.routing` (optional,
-  additive — old DOMs must keep validating) and reason-generating from detector results.
-- **Integration (surgical):** `ParserConfig.layout_backend` becomes `"auto"` (default, router-driven)
-  while keeping `"native"`/`"docling"` as manual overrides. Extraction runs the router after type
-  detection and dispatches to native / enrichment / docling loaders. Existing loaders unchanged;
-  only the dispatch switch is routing-aware.
-- **Enrichment band (v1, simple):** native extraction + OCR of pages that yield no text blocks
-  (scanned-page fallback via the existing/writable `ocr.ocr_bytes`). Design interfaces so future
-  page/region selectivity isn't precluded, but do not build page-level orchestration now. Page-based
-  re-embedding is NOT part of v1.
+- **Execution model redesign:** Transform from single-pass document-level parsing (`Detect → Route → Load(whole doc) → Build → Store`) to a page-centric pipeline.
+- **Resource-aware scheduling:** Decouple thread pools so cheap native tasks and heavy ML tasks (Docling, OCR) run under separate, hardware-scaling concurrency limits. The heavy pool must be explicitly capped based on available system RAM / GPU memory, not total worker count.
+- **Page as durable unit:** Write per-page intermediate DOM outputs to storage. Track execution progress in a document ledger for resume/retry without reparsing completed pages.
+- **Zero silent page loss:** Every page must have an explicit status. Document assembly must validate `assembled_page_count == expected_page_set` before marking success.
+- **Docling page bounding:** Use `page_range=(p,p)` to bound peak C++ memory per job to a single page rather than scaling linearly with document length.
+- **Intelligent router integration:** The existing router (ADR-011) decides the route band per document; page-level execution applies the route uniformly across pages, with enrichment exceptions for individual scanned pages.
+- **Backward compatibility:** Existing CLI (`app.processing.cli`), existing `Extractor.extract()` API, and existing DOM schema must remain functional. The redesign is an internal execution-model change.
 
 ## Constraints
-- Follow `docs/routing-spec.md` §15–§16: preserve the canonical-DOM contract; do not leak routing
-  into the rest of the parser; do not modify unrelated modules; keep v1 simple (strong architecture,
-  no ML model / distributed infra / plugin-discovery framework / external DB / page-level orchestration).
-- Trust boundary preserved: deterministic, idempotent, faithful, provenance-recorded, on-prem.
-- Existing behavior must not change for docs whose routing decision is Native; regression tests
-  persist representative docs + expected decisions.
+- Follow `docs/org-gate-protocol.md` hard gates.
+- Do not build a distributed system. Keep the modular monolith.
+- Do not add external databases. Filesystem storage only.
+- Do not invent hardware detection heuristics without evidence (research gate required).
+- Preserve the canonical DOM contract; do not modify `Document`, `Page`, `Block` schemas unless additive.
+- Tests are part of done.
 
 ## Definition of done
 1. Both reviewers emit `VERDICT: PASS`.
-2. `.venv/Scripts/python.exe -m pytest tests/ -q` green, including new router tests (detector,
-   scoring, routing bands, boundary 30/31/60/61, missing-signal, detector-failure, determinism,
-   regression).
-3. Knowledge Curator checkpoint at `checkpoints/run/run-2026-08-06-router/checkpoint.md`.
-4. Final report at `checkpoints/run/run-2026-08-06-router/final-report.md`.
-5. ADR(s): amendment to ADR-007 (Docling default → auto-router) + new ADR-011 (Document Router) +
-   ADR-012 (OCR in PDF for scanned pages); questions.md (close the deferred PDF-OCR item;
-   record the Hindi/multilingual-OCR decision as tracked); module_status.md updated.
+2. `.venv/Scripts/python.exe -m pytest tests/ -q` green.
+3. Run the real test corpus (`C:/Users/Asus/Downloads/test_cases`: 12 PDFs + 3 images) and verify:
+   - Zero `std::bad_alloc` or OOM crashes.
+   - Zero silent page loss (every document reports actual vs expected page count).
+   - All 15 documents parse successfully with correct routing.
+4. Knowledge Curator checkpoint at `checkpoints/run/run-2026-08-19-page-centric/checkpoint.md`.
+5. Final report at `checkpoints/run/run-2026-08-19-page-centric/final-report.md`.
+6. ADR(s): new ADR for page-centric execution model + resource-aware scheduling.
 
 ## Notes for the team
-- Authority is `docs/routing-spec.md`. The routing module must be its own decision layer; do not
-  spread detector logic across the parser. Detectors register via a pluggable hook; adding one must
-  not touch the router algorithm or pipelines.
-- The real test corpus (this run's verification corpus = `_cli_out` from `C:/Users/Asus/Downloads/
-  test_cases`) has 12 PDFs + 2 JPGs incl. text papers, a scanned ticket, receipts, and an image-based
-  certificate — use it to sanity-check routing decisions (native vs enrichment vs docling) and that
-  reading order improves where the router sends docs to Docling.
-- Prior runs: audit (deadlock/storage fixes), docling (ADR-007 gated backend), chunking (Module #3).
-  This run builds the router; it does NOT rewrite the native heading heuristic or chunking unless
-  required to integrate cleanly (those are tracked follow-ups).
+- Authority is the user's message + existing ADRs + `CLAUDE.md`.
+- Prior runs: routing engine (run-2026-08-06-router) built the decision-only router. This run builds the execution engine that *uses* those decisions safely.
+- The test corpus is the ground truth for verification. The redesign must pass it.
+- Do not over-engineer. The goal is bounded peak memory + zero silent drops, not a full distributed orchestrator.

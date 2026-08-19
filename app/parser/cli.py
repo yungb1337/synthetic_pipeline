@@ -15,8 +15,10 @@ from pathlib import Path
 
 from .config import default_config
 from .events import EventPublisher
-from .extraction import Extractor
+from .extraction import Extractor, set_shared_scheduler
+from .scheduler import Scheduler
 from .storage import FilesystemStore
+from .storage_pages import Ledger, PageStore
 
 
 def _file_types():
@@ -29,38 +31,55 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--in", dest="input", required=True, help="input file or directory")
     ap.add_argument("--out", dest="out", default="parser_out", help="store root dir")
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
+    ap.add_argument("--native-concurrency", type=int, default=None)
+    ap.add_argument("--heavy-concurrency", type=int, default=None)
     args = ap.parse_args(argv)
 
     cfg = default_config()
     if args.no_ocr:
         cfg = replace(cfg, ocr_enabled=False)
     store = FilesystemStore(args.out)
-    extractor = Extractor(cfg, store, events=EventPublisher())
+    # Single-doc/interactive CLI: run heavy pages IN-PROCESS (no ProcessPool per
+    # file) for simplicity; the batch CLI uses the bounded ProcessPool.
+    page_store = PageStore(str(store.root))
+    ledger = Ledger(str(store.root))
+    scheduler = Scheduler(
+        cfg, native_concurrency=args.native_concurrency,
+        heavy_concurrency=args.heavy_concurrency,
+        page_store=page_store, ledger=ledger, prefer_in_process_heavy=True,
+    )
+    set_shared_scheduler(scheduler)
+    try:
+        extractor = Extractor(cfg, store, events=EventPublisher(),
+                              scheduler=scheduler, page_store=page_store, ledger=ledger)
 
-    path = Path(args.input)
-    files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.suffix.lower() in _file_types())
+        path = Path(args.input)
+        files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.suffix.lower() in _file_types())
 
-    if not files:
-        print("no supported files found", file=sys.stderr)
-        return 2
+        if not files:
+            print("no supported files found", file=sys.stderr)
+            return 2
 
-    ok = 0
-    for f in files:
-        data = f.read_bytes()
-        outcome = extractor.extract(data, filename=f.name)
-        if outcome.ok:
-            ok += 1
-            print(f"OK   {f.name:28} {outcome.detected.slug:10} pages={len(outcome.document.pages):<3} "
-                  f"blocks={outcome.report['blocks']:<4} tables={outcome.report['tables']:<3} "
-                  f"route={outcome.report.get('route') or '-'}")
-            t = outcome.report.get("timings") or {}
-            parts = "  ".join(f"{k}={v}ms" for k, v in t.items())
-            print(f"      timings: {parts}  total={outcome.report['elapsed_ms']}ms")
-        else:
-            print(f"SKIP {f.name:28} {outcome.status}")
+        ok = 0
+        for f in files:
+            data = f.read_bytes()
+            outcome = extractor.extract(data, filename=f.name)
+            if outcome.ok:
+                ok += 1
+                print(f"OK   {f.name:28} {outcome.detected.slug:10} pages={len(outcome.document.pages):<3} "
+                      f"blocks={outcome.report['blocks']:<4} tables={outcome.report['tables']:<3} "
+                      f"route={outcome.report.get('route') or '-'}")
+                t = outcome.report.get("timings") or {}
+                parts = "  ".join(f"{k}={v}ms" for k, v in t.items())
+                print(f"      timings: {parts}  total={outcome.report['elapsed_ms']}ms")
+            else:
+                print(f"SKIP {f.name:28} {outcome.status}")
 
-    print(f"\nparsed {ok}/{len(files)} documents -> store under {args.out}")
-    return 0
+        print(f"\nparsed {ok}/{len(files)} documents -> store under {args.out}")
+        return 0
+    finally:
+        set_shared_scheduler(None)
+        scheduler.close()
 
 
 if __name__ == "__main__":

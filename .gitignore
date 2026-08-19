@@ -22,6 +22,13 @@ _demo_out/
 _workspace/
 work/
 
+# Corpus verification run outputs (regenerable)
+_verif_store/
+_verif_store_clean/
+_corpus_run.log
+_cli_out_parse.log
+_cli_out_rerun_*.log
+
 # Tooling
 .pytest_cache/
 .mypy_cache/
