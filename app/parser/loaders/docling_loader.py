@@ -202,8 +202,12 @@ def _make_pipeline_options(cls, ocr: bool = True):
             except Exception:
                 return None
     try:
-        # 2x figure fidelity (crops are 72 dpi x scale), matching the OCR scale.
-        opts.images_scale = 2.0
+        # Figure fidelity (crops are 72 dpi x scale). Lowered 2.0 -> 1.5
+        # (ADR-013 addendum): the upscaled crop pixel AREA scales with scale^2,
+        # so each 0.5 reduction is a 4x smaller OCR tensor and a much lower
+        # `std::bad_alloc` risk. 1.5 still preserves legible text for normal
+        # documents while cutting the worst-case OCR heap meaningfully.
+        opts.images_scale = 1.5
     except Exception:
         pass
     # C4: defensively apply per-page heap-reclaim options on the heavy path
@@ -232,7 +236,11 @@ def _set_ocr_options(opts) -> None:
     try:
         from docling.datamodel.pipeline_options import OcrMode, RapidOcrOptions
 
-        opts.ocr_options = RapidOcrOptions(mode=OcrMode.DEFAULT, scale=2.0)
+        # Lowered scale 2.0 -> 1.5 (ADR-013 addendum): RapidOCR's C++ tensor is
+        # proportional to the upscaled image AREA (scale^2), so 1.5 instead of
+        # 2.0 is a ~1.8x smaller worst-case OCR allocation -> far fewer
+        # `std::bad_alloc`. 1.5 keeps text legible for normal documents.
+        opts.ocr_options = RapidOcrOptions(mode=OcrMode.DEFAULT, scale=1.5)
     except Exception:
         try:
             from docling.datamodel.pipeline_options import RapidOcrOptions

@@ -26,6 +26,19 @@ _lock = threading.Lock()
 # upgrade to the v6 `rapidocr` package is transparent to provenance consumers.
 _engine_name = "rapidocr-onnxruntime"
 
+# --- OCR memory guard -------------------------------------------------------
+# RapidOCR/onnxruntime builds C++ tensors proportional to the IMAGE PIXEL AREA
+# during its `preprocess`/`ocr` stage. On a large-rendered page that allocation
+# can exceed what the process can allocate -> `std::bad_alloc` (the "Stage
+# preprocess failed ...: std::bad_alloc" lines). The page-centric model already
+# CONTAINS these (per-page retry + dead-letter), but we additionally bound the
+# image size BEFORE it reaches RapidOCR so the allocation is far less likely to
+# fail in the first place. `OCR_MAX_EDGE` caps the longest edge (px) of any image
+# handed to RapidOCR. 2000px is comfortably below the OOM threshold on a 4GB box
+# while preserving legible text for normal documents. (Hardcoded; tune here if a
+# specific corpus needs more/less fidelity vs alloc headroom.)
+OCR_MAX_EDGE = 2000
+
 
 def engine_available() -> bool:
     global _engine
@@ -50,6 +63,34 @@ def _quad_to_bbox(quad) -> tuple[float, float, float, float]:
     xs = [pt[0] for pt in quad]
     ys = [pt[1] for pt in quad]
     return (min(xs), min(ys), max(xs), max(ys))
+
+
+def downscale_for_ocr(data: bytes, max_edge: int = OCR_MAX_EDGE) -> bytes:
+    """Shrink an image so its longest edge <= `max_edge` before it reaches
+    RapidOCR. Keeps the byte stream (PNG) the OCR wrapper expects.
+
+    RapidOCR's C++ preprocess tensor is proportional to pixel area, so capping
+    the edge (=> 4x smaller area at most) is the single biggest lever against
+    `std::bad_alloc` on large pages. Defensive: any failure returns the original
+    bytes so callers never lose the image (the existing retry/dead-letter net
+    still applies downstream)."""
+    try:
+        from io import BytesIO
+        from PIL import Image
+
+        img = Image.open(BytesIO(data))
+        w, h = img.size
+        longest = max(w, h)
+        if longest <= max_edge:
+            return data
+        scale = max_edge / float(longest)
+        nw, nh = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
+        img = img.resize((nw, nh), Image.LANCZOS)
+        out = BytesIO()
+        img.convert("RGB").save(out, format="PNG")
+        return out.getvalue()
+    except Exception:
+        return data
 
 
 def _extract_results(res) -> list[tuple[str, tuple[float, float, float, float], float]]:

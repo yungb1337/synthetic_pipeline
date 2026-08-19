@@ -370,6 +370,12 @@ def _image_bytes(rec: RecoveredDocument, data: bytes, config: ParserConfig) -> N
     from .. import ocr
 
     t_ocr = _time.time()
+    # Bound the image's longest edge before OCR (ADR-013 addendum): RapidOCR
+    # allocates C++ tensors proportional to pixel AREA, so a very large scanned
+    # image can exceed process memory -> `std::bad_alloc`. Downscale to <=
+    # OCR_MAX_EDGE px longest edge first. Defensive: returns `data` unchanged
+    # on any error, so OCR still runs (and the per-page net still catches it).
+    data = ocr.downscale_for_ocr(data, ocr.OCR_MAX_EDGE)
     lines = ocr.ocr_bytes(data)
     rec.timings["ocr_ms"] = round((_time.time() - t_ocr) * 1000, 1)
     rec.timings["ocr_pages"] = 1

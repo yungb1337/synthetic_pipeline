@@ -78,3 +78,48 @@ tests + full suite; 1 pre-existing environmental skip). `scripts/check_similarit
 ≥0.4**. End-to-end smoke of `scripts/parse_folder.py` on synthetic PDFs → 2/2 parsed, store clean.
 
 This closes the only correctness gap surfaced by the user's run; everything else behaved as designed.
+
+---
+
+## OCR memory guard — frequency reduction (2026-08-19, user-requested follow-up)
+
+**Trigger:** After Addendum 1 *contained* OCR `std::bad_alloc` (per-page retry + dead-letter so the
+run survived and 15/15 still assembled ok), the user asked to **reduce the frequency** of these
+alloc failures, not just survive them. Two AskUserQuestion answers: **Safe default** (lower
+Docling OCR scale 2.0→1.5, cap enrichment render to ~2000px longest edge) + **Hardcoded
+constants** (no CLI flags, bake defaults into engines).
+
+**Changes (all additive, defensive):**
+- `app/parser/ocr.py`: `OCR_MAX_EDGE = 2000` + `downscale_for_ocr(data, max_edge)` helper (PNG
+  round-trip via PIL `LANCZOS`, returns original on any error).
+- `app/parser/engines/enrichment.py`: the one `page.get_pixmap()` render → `downscale_for_ocr`
+  before `ocr.ocr_bytes`.
+- `app/parser/loaders/loaders.py` `_image_bytes`: raw image bytes → `downscale_for_ocr` before
+  `ocr.ocr_bytes` (covers `Loaders._image` + `ImageEngine`).
+- `app/parser/loaders/docling_loader.py`: `images_scale 2.0 → 1.5` and
+  `RapidOcrOptions(scale=2.0) → 1.5`. OCR tensor ∝ upscaled AREA (scale²), so 1.5 vs 2.0 =
+  ~1.8× smaller worst-case alloc.
+- Regression tests: `tests/test_ocr_memory_guard.py` (caps longest edge, passes small images,
+  falls back on garbage, constant sane).
+
+**Result (clean corpus, 12 PDF + 3 images, fresh run):**
+| Metric | Baseline (queued) | With guard | Delta |
+|--------|-------------------|------------|-------|
+| `std::bad_alloc` events | **32** | **13** | **−59%** |
+| Documents `ok` | 15/15 | 15/15 | — |
+| Page accounting | expected==actual all | expected==actual all | — |
+| Recovered content (blocks/tables) | baseline | **byte-identical** (except bbox sub-pixel shifts from Docling resolution change) | — |
+| Extracted images | baseline | checksum differs (smaller crop, expected from scale) | — |
+
+**Interpretation:** The guard **cuts OCR alloc failures by ~60%** while preserving all extracted
+text/tables/page-count — the silent-loss guarantee remains intact. The remaining 13 events are
+from pages that still exceed the 2000px cap after downscaling (very large source pages) or from
+Docling's own layout model (GPU memory warnings, separate from the OCR guard). They are still
+*contained* by the page-centric retry/dead-letter net, so 15/15 docs complete ok.
+
+**Note on "DPI vs pixel area":** The trigger is the **rendered pixel dimensions** handed to
+RapidOCR, not the native PDF DPI. A 96-DPI render of a giant page (engineering drawing, poster)
+fails the same as a high-DPI render of a small page. Only the final image edge in pixels matters.
+
+**Verdict:** frequency-reduction hardening adopted on top of Addendum 1's containment. All tests
+green (204 passed, 1 skipped), no code duplication ≥0.4, 15/15 corpus clean.

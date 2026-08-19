@@ -44,8 +44,16 @@ class EnrichmentEngine:
             doc = fitz.open(item.src_path)
             try:
                 page = doc[item.page_index]
+                # Bound the rendered Pixmap's longest edge before OCR. RapidOCR
+                # allocates C++ tensors proportional to pixel AREA, so a giant
+                # page (poster / engineering drawing) can blow past process
+                # memory -> `std::bad_alloc`. We downscale the PNG to <=
+                # OCR_MAX_EDGE px longest edge (ADR-013 addendum) so the
+                # allocation is far less likely to fail. Defensive: if any step
+                # errors, fall back to the original render (unchanged behaviour).
                 pix = page.get_pixmap()
                 png = pix.tobytes("png")
+                png = ocr.downscale_for_ocr(png, ocr.OCR_MAX_EDGE)
             finally:
                 doc.close()
         except Exception as e:

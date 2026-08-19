@@ -352,3 +352,43 @@ violates the central "ZERO silent page loss" invariant. The safety net closes it
 
 **Verdict:** hardening closure; preserves the silent-loss guarantee under previously-unhandled
 failure modes. Adopted.
+
+### ADR-013 — Addendum 2: OCR memory guard — bound image area before RapidOCR (2026-08-19)
+
+**Decision (user-requested, "Safe default" + "Hardcoded constants"):** Reduce the
+*frequency* of OCR `std::bad_alloc` (don't just contain them) by bounding the image
+PIXEL AREA handed to RapidOCR on every path, and lowering Docling's fixed OCR upscale.
+Adopted as module-level constants (no CLI flags):
+
+- `OCR_MAX_EDGE = 2000` in `app/parser/ocr.py` + a shared `downscale_for_ocr(data,
+  max_edge)` helper that shrinks any image so its longest edge ≤ 2000 px (PNG
+  round-trip via PIL, `LANCZOS`); returns the original bytes on any error (defensive).
+- **Enrichment path** (`engines/enrichment.py`): the one per-page `page.get_pixmap()`
+  render is passed through `downscale_for_ocr` before `ocr.ocr_bytes(png)`.
+- **Image route** (`loaders/loaders.py` `_image_bytes`): raw image bytes downscaled
+  via `downscale_for_ocr` before `ocr.ocr_bytes` — covers both `Loaders._image` and
+  `ImageEngine`.
+- **Docling path** (`loaders/docling_loader.py`): fixed upscale lowered
+  `images_scale 2.0 → 1.5` and `RapidOcrOptions(scale=2.0) → 1.5`. OCR's C++ tensor
+  is proportional to the *upscaled* AREA (scale²), so 1.5 vs 2.0 is a ~1.8× smaller
+  worst-case allocation.
+
+**Why:** Addendum 1 only *contained* OCR `std::bad_alloc` (per-page retry + dead-letter
+so the run survived and 15/15 still assembled ok). But the allocation still *fires* on
+large rendered pages / scanned images, costing a wasted page attempt + a retry. The
+guard shrinks the trigger (pixel area) so far fewer attempts fail in the first place.
+Trigger is rendered IMAGE SIZE, **not** native PDF DPI — a 96-DPI render of a giant
+page is the same problem as a high-DPI render of a small page; only the final pixel
+dimensions matter. (Natural question resolved: it's not a "DPI setting" — it's the
+largest edge in pixels we hand to the OCR engine.)
+
+**How to apply:**
+- Tune `OCR_MAX_EDGE` in one place (`ocr.py`) if a corpus needs more fidelity vs. more
+  alloc headroom. ~2000 px longest edge ⇒ ≤ 4 Mpx ⇒ comfortably under the 4 GB OOM
+  threshold for normal documents.
+- All three call sites are defensive: a PIL failure falls back to the original bytes, so
+  the existing dead-letter net still catches any residual `std::bad_alloc`.
+- Regression tests: `tests/test_ocr_memory_guard.py` (downscale caps longest edge,
+  passes small images through, falls back on garbage, constant sane).
+
+**Verdict:** frequency-reduction hardening on top of Addendum 1's containment. Adopted.
