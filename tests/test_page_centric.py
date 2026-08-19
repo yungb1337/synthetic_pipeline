@@ -401,6 +401,64 @@ def test_corrupt_pdf_not_reported_parsed(tmp_path):
     assert po.status in ("failed", "unsupported")
 
 
+def test_extract_exception_never_leaves_document_pending(tmp_path):
+    """ZERO-SILENT-PARTIAL-STATE safety net: if anything throws between run_plan
+    and the final emit for a document, the document must NOT be left frozen in the
+    `pending` ledger (planner writes it before execution). It must be marked
+    `failed` in the ledger, every page FAILED (unless already persisted), and a
+    `document.parse_failed` event emitted — never a silent `parsed` outcome."""
+    store, _ = _scan_pdf(tmp_path, pages=2)
+    from app.parser.events import EventPublisher
+    from app.parser.extraction import Extractor
+    from app.parser.config import default_config
+    from app.parser.page_result import PageStatus
+
+    captured = []
+    events = EventPublisher(sink=lambda n, p: captured.append((n, p)))
+
+    # Force the assembler to throw (simulating a DocumentBuilder/store edge case).
+    import app.parser.assembler as asm_mod
+
+    def boom(self, *a, **k):
+        raise RuntimeError("simulated post-run crash")
+
+    mp = __import__("pytest").MonkeyPatch()
+    mp.setattr(asm_mod.Assembler, "assemble", boom)
+
+    ex = Extractor(default_config(), store, events=events)
+
+    # A fresh 2-page PDF so SourceScan re-derives the page set independently.
+    import fitz
+    d = fitz.open()
+    for _ in range(2):
+        d.new_page(width=595, height=842).insert_text((72, 100), "x", fontsize=11)
+    blob = d.tobytes()
+    d.close()
+
+    po = ex.extract(blob, "raw.pdf")
+    mp.undo()
+
+    # The doc must be reported failed, never parsed.
+    assert po.status == "failed"
+    assert po.document_id is not None
+    # No `document.parsed.v1` event may have fired.
+    assert not any(n == "document.parsed.v1" for n, _ in captured)
+    # A `document.parse_failed` event must have fired.
+    assert any(n == "document.parse_failed" for n, _ in captured)
+
+    # Ledger must not be frozen at `pending`: assembly recorded as failed, and
+    # NO page is left in the `pending` limbo state (pages the scheduler already
+    # persisted stay OK; pages it hadn't get marked FAILED by the safety net).
+    ledger = Ledger(str(store.root))
+    lp = ledger.load_plan(po.document_id)
+    assert lp is not None
+    assert lp["assembly"]["status"] == "failed"
+    assert set(lp["pages"].keys()) == {"0", "1"}
+    for p in lp["pages"].values():
+        assert p["status"] != "pending"  # the core invariant: never limbo
+        assert p["status"] in ("ok", "failed")
+
+
 # ---------------------------------------------------------------------------
 # A3 — Retry must NOT downgrade docling -> native
 # ---------------------------------------------------------------------------

@@ -323,3 +323,32 @@ by a pinned version + startup API guard test; GPU term is dormant pending CUDA e
 
 **Verdict:** evidence-backed; eliminates silent `std::bad_alloc` loss and scales by
 hardware. Adopted.
+
+### ADR-013 — Addendum 1: `extract()` safety net — no document frozen in `pending` (2026-08-19)
+
+**Decision:** Wrap `Extractor.extract`'s `run_plan → assemble → emit` sequence in a final
+exception safety net. If anything throws between `run_plan` and the final ledger/emit, the
+document is **never** left frozen in the `pending` ledger that `Planner.plan()` writes *before*
+execution. The net marks every still-`pending` page `FAILED` (without clobbering pages the
+scheduler already persisted as OK), records the assembly as `failed`, emits
+`document.parse_failed`, and returns a `failed` `ParseOutcome` (the exception is contained, not
+propagated). **Fact** (adopted this run).
+
+**Why:** A user `parse_folder.py` run over `test_cases` showed `std::bad_alloc` /
+`ONNXRuntime ... bad allocation` lines. Output-store inspection proved the per-page design
+**contained** them (15/15 docs reached `assembly.status == ok`, zero silent loss). But tracing
+the path revealed a latent hole: because the all-`pending` ledger is written *before* execution,
+an uncaught exception in `assembler.assemble` / `DocumentBuilder.build` / store I/O would leave a
+document frozen at `pending` with no DOM and no failure event — a silent partial-state hole that
+violates the central "ZERO silent page loss" invariant. The safety net closes it.
+
+**How to apply:**
+- `app/parser/extraction.py`: `extract()` wraps the run+assemble+emit block in `try/except`;
+  `Extractor._fail_document()` performs the ledger/event cleanup. `traceback` imported.
+- The net is additive and never changes the happy-path behavior or the `extract()` signature.
+- Regression test `tests/test_page_centric.py::test_extract_exception_never_leaves_document_pending`
+  pins the invariant (no `document.parsed.v1`, a `document.parse_failed` fired, assembly
+  `failed`, and **no page left `pending`**).
+
+**Verdict:** hardening closure; preserves the silent-loss guarantee under previously-unhandled
+failure modes. Adopted.

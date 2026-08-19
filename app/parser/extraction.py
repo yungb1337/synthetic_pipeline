@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -35,6 +36,7 @@ from .planner import Planner
 from .scheduler import Scheduler
 from .source import SourceScan, SourceScanError
 from .storage_pages import Ledger, PageStore
+from .page_result import PageResult, PageStatus
 
 
 @dataclass
@@ -151,75 +153,93 @@ class Extractor:
         plan = self.planner.plan(manifest, route, decision, self.config, resume=resume)
         t_plan1 = time.time()
 
-        # --- execute pages (scheduler persists each result) ------------------
-        t_run0 = time.time()
-        results = self.scheduler.run_plan(plan)
-        t_run1 = time.time()
+        try:
+            # --- execute pages (scheduler persists each result) --------------
+            t_run0 = time.time()
+            results = self.scheduler.run_plan(plan)
+            t_run1 = time.time()
 
-        # --- assemble + validate (hard gate) --------------------------------
-        t_assemble0 = time.time()
-        report = self.assembler.assemble(plan, results, manifest.src_path, sha,
-                                          max_retries=self.config.page_retries)
-        t_assemble1 = time.time()
+            # --- assemble + validate (hard gate) ----------------------------
+            t_assemble0 = time.time()
+            report = self.assembler.assemble(plan, results, manifest.src_path, sha,
+                                            max_retries=self.config.page_retries)
+            t_assemble1 = time.time()
 
-        document = report.document
-        elapsed = (time.time() - t0) * 1000
-        timings = {
-            "detect_ms": round((t_route0 - t_detect) * 1000, 1),
-            "route_ms": round((t_route1 - t_route0) * 1000, 1),
-            "scan_ms": round((t_scan1 - t_scan0) * 1000, 1),
-            "plan_ms": round((t_plan1 - t_plan0) * 1000, 1),
-            "run_ms": round((t_run1 - t_run0) * 1000, 1),
-            "assemble_ms": round((t_assemble1 - t_assemble0) * 1000, 1),
-            "total_ms": round(elapsed, 1),
-        }
-        doc_report = {
-            "elapsed_ms": round(elapsed, 1),
-            "timings": timings,
-            "blocks": document.num_blocks() if document else 0,
-            "tables": document.num_tables() if document else 0,
-            "images": document.num_images() if document else 0,
-            "pages": report.actual_pages,
-            "expected_pages": report.expected_pages,
-            "ocr": document.provenance.ocr_engine if document and document.provenance else None,
-            "route": route,
-            "dom_key": report.dom_key,
-            "raw_key": report.raw_key,
-        }
-
-        # ZERO silent page loss: only report `parsed` when assembled == expected.
-        if report.status == "ok":
-            status = "parsed"
-        elif report.status == "partial":
-            status = "parsed" if report.actual_pages == report.expected_pages else "partial"
-            # a partial with actual==expected (all PARTIAL but complete set) is parsed
-            if report.actual_pages == report.expected_pages:
-                status = "parsed"
-        else:
-            status = "failed"
-
-        self._emit(
-            "document.parsed.v1",
-            doc_id,
-            {
-                "type": detected.slug,
-                "probe": detected.probe,
-                "parser_version": self.config.parser_version,
-                "sha256": sha,
+            document = report.document
+            elapsed = (time.time() - t0) * 1000
+            timings = {
+                "detect_ms": round((t_route0 - t_detect) * 1000, 1),
+                "route_ms": round((t_route1 - t_route0) * 1000, 1),
+                "scan_ms": round((t_scan1 - t_scan0) * 1000, 1),
+                "plan_ms": round((t_plan1 - t_plan0) * 1000, 1),
+                "run_ms": round((t_run1 - t_run0) * 1000, 1),
+                "assemble_ms": round((t_assemble1 - t_assemble0) * 1000, 1),
+                "total_ms": round(elapsed, 1),
+            }
+            doc_report = {
+                "elapsed_ms": round(elapsed, 1),
+                "timings": timings,
+                "blocks": document.num_blocks() if document else 0,
+                "tables": document.num_tables() if document else 0,
+                "images": document.num_images() if document else 0,
+                "pages": report.actual_pages,
                 "expected_pages": report.expected_pages,
-                "actual_pages": report.actual_pages,
-                "assembly_status": report.status,
-                **doc_report,
-            },
-        )
-        if status != "parsed":
-            self._emit("document.parse_failed", doc_id,
-                       {"reason": "incomplete", "expected": report.expected_pages,
-                        "actual": report.actual_pages,
-                        "missing": report.missing_pages,
-                        "failed": report.failed_pages,
-                        "dead": report.dead_pages})
-        return ParseOutcome(doc_id, status, document, detected, doc_report)
+                "ocr": document.provenance.ocr_engine if document and document.provenance else None,
+                "route": route,
+                "dom_key": report.dom_key,
+                "raw_key": report.raw_key,
+            }
+
+            # ZERO silent page loss: only report `parsed` when assembled == expected.
+            if report.status == "ok":
+                status = "parsed"
+            elif report.status == "partial":
+                # a partial with actual==expected (all PARTIAL but complete set) is parsed
+                if report.actual_pages == report.expected_pages:
+                    status = "parsed"
+                else:
+                    status = "partial"
+            else:
+                status = "failed"
+
+            self._emit(
+                "document.parsed.v1",
+                doc_id,
+                {
+                    "type": detected.slug,
+                    "probe": detected.probe,
+                    "parser_version": self.config.parser_version,
+                    "sha256": sha,
+                    "expected_pages": report.expected_pages,
+                    "actual_pages": report.actual_pages,
+                    "assembly_status": report.status,
+                    **doc_report,
+                },
+            )
+            if status != "parsed":
+                self._emit("document.parse_failed", doc_id,
+                           {"reason": "incomplete", "expected": report.expected_pages,
+                            "actual": report.actual_pages,
+                            "missing": report.missing_pages,
+                            "failed": report.failed_pages,
+                            "dead": report.dead_pages})
+            return ParseOutcome(doc_id, status, document, detected, doc_report)
+
+        except Exception as exc:  # SAFETY NET (zero-silent-loss invariant)
+            # Anything between run_plan and the final emit that escapes is a
+            # document-level failure. We must NOT leave the document frozen in the
+            # `pending` ledger (planner wrote it before execution) with no DOM and
+            # no failure event — that would be a silent partial-state hole. So we
+            # mark every still-pending page FAILED (without clobbering pages that
+            # already succeeded), record the assembly as failed, and emit a
+            # `document.parse_failed` event. The document is then reported `failed`
+            # and the run can still prove zero loss by inspecting the ledger.
+            self._fail_document(doc_id, plan, sha, detected, exc)
+            return ParseOutcome(
+                doc_id, "failed", None, detected,
+                {"error": f"{type(exc).__name__}: {exc}",
+                 "expected_pages": len(plan.expected_page_set)},
+            )
 
     # --- small helpers -------------------------------------------------------
     def _fs_store(self):
@@ -229,6 +249,40 @@ class Extractor:
         from .storage import FilesystemStore
 
         return FilesystemStore(str(self.root))
+
+    def _fail_document(self, doc_id, plan, sha, detected, exc) -> None:
+        """Safety net: ensure a document that threw during extract() is never left
+        frozen in the `pending` ledger. Mark any page that was not already
+        persisted as FAILED (so a doc with some OK pages keeps them), record the
+        assembly as failed, and emit `document.parse_failed`."""
+        err = {"page_no": 0, "category": "extract_failed",
+               "message": f"{type(exc).__name__}: {exc}",
+               "traceback": traceback.format_exc()}
+        # Mark unpersisted (still pending) pages FAILED — never clobber OK pages.
+        for p in plan.expected_page_set:
+            if not self.page_store.page_exists(doc_id, p):
+                try:
+                    self.ledger.update_page(doc_id, p, PageStatus.FAILED, "",
+                                            plan.route, 1, [err])
+                except Exception:
+                    pass
+        # Record the assembly outcome so the ledger proves the doc did not
+        # silently vanish; assembled_page_set stays empty because nothing is OK.
+        try:
+            self.ledger.update_assembly(
+                doc_id, PageStatus.FAILED, [],
+                {"expected_pages": len(plan.expected_page_set), "actual_pages": 0,
+                 "missing_pages": list(plan.expected_page_set),
+                 "failed_pages": list(plan.expected_page_set), "dead_pages": []},
+            )
+        except Exception:
+            pass
+        self._emit("document.parse_failed", doc_id,
+                   {"reason": "extract_exception",
+                    "expected": len(plan.expected_page_set), "actual": 0,
+                    "missing": list(plan.expected_page_set),
+                    "failed": list(plan.expected_page_set), "dead": [],
+                    "error": f"{type(exc).__name__}: {exc}"})
 
     def _compute_route(self, data: bytes, detected) -> tuple[str | None, object | None]:
         lb = self.config.layout_backend
