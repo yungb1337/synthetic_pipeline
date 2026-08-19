@@ -1,0 +1,109 @@
+================================================================================
+PARSER RUN COMPARISON — single-file (one-by-one) vs queued (whole directory)
+================================================================================
+Date:        2026-08-19
+Corpus:      C:\Users\Asus\Downloads\test_cases  (15 files: 12 PDF + 3 images)
+Store A:      C:\Users\Asus\Downloads\single_run            (each file parsed in its
+              own fresh process, accumulated into one store)
+Store B:      C:\Users\Asus\Downloads\queued_test_cases     (the whole dir parsed in
+              one `parse_folder.py` invocation)
+Logs saved:   C:\Users\Asus\Downloads\single_run\single_run.log
+              C:\Users\Asus\Downloads\queued_test_cases\queued_run.log
+Comparator:   scripts/compare_runs.py (doc_id = d-<sha256[:16]>, so the same input
+              file maps to the same doc_id in both stores)
+
+--------------------------------------------------------------------------------
+1) HEADLINE: ARE THE RESULTS IDENTICAL?
+--------------------------------------------------------------------------------
+YES on every dimension that matters for correctness, and essentially-identical on
+the DOM artifacts:
+
+  * Document set:        15 == 15  (same 15 doc_ids in both stores)
+  * Assembly status:     15 == 15  (every doc `ok` in BOTH)
+  * Page accounting:     IDENTICAL per document — every doc has the same
+                         expected_pages == actual_pages in both runs
+                         (e.g. 24/24, 18/18, 38/38, 28/28, 2/2, 1/1 ...).
+                         => ZERO silent page loss; the page-set is deterministic.
+  * Recovered CONTENT:   BYTE-IDENTICAL across all 15 docs (all blocks + tables
+                         in every page are equal). The OCR text that actually
+                         lands in the DOM is reproducible.
+
+  * DOM FILE checksum:   12 of 15 differ — BUT only by provenance metadata, not
+                         content. See section 2.
+
+--------------------------------------------------------------------------------
+2) WHAT ACTUALLY DIFFERS (and why it is benign)
+--------------------------------------------------------------------------------
+Pairwise deep-diff of all 15 DOMs found THREE fields differing, all in
+`.provenance` (metadata, never in the recovered data):
+
+  a) .provenance.routing.inspection_time_ms  -> 12 docs
+       A pure wall-clock timing of the router inspection. Non-deterministic by
+       nature; carries no document content.
+
+  b) .provenance.routing.signals[8].value / .evidence  -> 1 doc (d-9265...)
+       The `metric_text_ratio` routing signal: 0.130 (single) vs 0.110 (queued).
+       This is a routing signal derived from OCR-extracted text. OCR (rapid-ocr
+       onnxruntime) is non-deterministic across process invocations, so the
+       ratio wobbles — yet the ROUTE DECISION was identical (both `enrichment`)
+       and the final recovered DOM content is byte-identical.
+
+  c) 3 docs had NO diff at all (d-41bcd..., d-8e9a..., d-fa25...) — fully equal
+     DOM files.
+
+CONCLUSION: the only non-determinism is in (1) a router timing field and
+(2) one OCR-derived routing *signal value* whose downstream decision is stable.
+The actual extracted DOM — headings, paragraphs, tables, OCR text, page count —
+is reproducible between "parse each file alone" and "parse the whole folder at
+once". The OOM-hardening (page-centric) design therefore produces
+run-to-run-equivalent output regardless of whether you queue the directory or
+feed files one at a time.
+
+--------------------------------------------------------------------------------
+3) OOM / CRASH OBSERVATIONS (from the queued run log)
+--------------------------------------------------------------------------------
+The queued (whole-dir) run emitted several `std::bad_alloc` / ONNXRuntime
+"bad allocation" lines (e.g. "Stage preprocess failed for run 22, pages [22]").
+These are per-page C++/OCR warnings that the page-centric design CONTAINS:
+the run still produced 15/15 `ok` documents with expected==actual pages. No
+document was lost and no run crashed — confirming the ADR-013 per-page bounding
+held under the queued (concurrent) workload.
+
+--------------------------------------------------------------------------------
+4) PER-DOCUMENT TABLE (status / page-counts identical; DOM checksum)
+--------------------------------------------------------------------------------
+  doc_id                 | A:ok? B:ok? | A:exp/act | B:exp/act | DOM-identical?
+  -----------------------+------------+-----------+-----------+---------------
+  d-0edc810eb07d15e9     |  y   y    |  24/24    |  24/24    |  no (timing)
+  d-2f315ab8ba3498de     |  y   y    |   2/2     |   2/2     |  no (timing)
+  d-3eda9d015be4f7a5     |  y   y    |   1/1     |   1/1     |  no (timing)
+  d-41bcd61def228a04     |  y   y    |   1/1     |   1/1     |  yes
+  d-4ef3aca37932ba98     |  y   y    |  18/18    |  18/18    |  no (timing)
+  d-868eaa74b8651848     |  y   y    |   2/2     |   2/2     |  no (timing)
+  d-8984dbe978d3654b     |  y   y    |   9/9     |   9/9     |  no (timing)
+  d-8e9a4539c5a1f746     |  y   y    |   1/1     |   1/1     |  yes
+  d-9265316f543cdcf7     |  y   y    |  28/28    |  28/28    |  no (text_ratio signal)
+  d-94145a91ebf87219     |  y   y    |   2/2     |   2/2     |  no (timing)
+  d-a348a0216eb68931     |  y   y    |   1/1     |   1/1     |  no (timing)
+  d-a3c92028437aef7a     |  y   y    |   2/2     |   2/2     |  no (timing)
+  d-c457fc19da15aecf     |  y   y    |  38/38    |  38/38    |  no (timing)
+  d-c4e85b2d77d2126c     |  y   y    |   1/1     |   1/1     |  no (timing)
+  d-fa251fe96db62d9a     |  y   y    |   1/1     |   1/1     |  yes
+
+  RESULT: page-set + content IDENTICAL in both runs; 12/15 DOM artifacts differ
+          only in non-content provenance metadata (router timing / OCR signal).
+
+--------------------------------------------------------------------------------
+5) REPRODUCE
+--------------------------------------------------------------------------------
+  # one-by-one
+  for f in C:\Users\Asus\Downloads\test_cases\*; do
+    python scripts/parse_folder.py "$f" C:\Users\Asus\Downloads\single_run
+  done
+  # queued
+  python scripts/parse_folder.py C:\Users\Asus\Downloads\test_cases `
+        C:\Users\Asus\Downloads\queued_test_cases
+  # compare
+  python scripts/compare_runs.py C:\Users\Asus\Downloads\single_run `
+        C:\Users\Asus\Downloads\queued_test_cases --names single queued
+================================================================================
