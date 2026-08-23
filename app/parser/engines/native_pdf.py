@@ -114,11 +114,22 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
         if isinstance(b, RecoveredBlock) and b.font_size and b.font_size > body_med * config.pdf_heading_threshold_ratio:
             b.kind = "heading"
 
+    # D6: supply this page's geometry keyed 0-based (== `page_index` == the
+    # `page` field on every block/table/image this engine emits). The assembler
+    # merges these per-producer, so a 0-based native key and a 1-based docling key
+    # never collide; the builder fills any remaining gaps with the document median.
+    try:
+        pw, ph = float(page.rect.width), float(page.rect.height)
+    except Exception:
+        pw = ph = None
+    page_sizes = {page_index: (pw, ph)} if pw is not None else {}
+
     return PageResult(
         doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.OK,
         blocks=[b for b in all_blocks if isinstance(b, RecoveredBlock)],
         tables=[t for t in all_blocks if isinstance(t, RecoveredTable)],
         images=images,
+        page_sizes=page_sizes,
     )
 
 

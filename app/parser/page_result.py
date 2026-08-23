@@ -86,6 +86,8 @@ def _table_to_dict(t: RecoveredTable) -> dict:
         "column_starts": t.column_starts,
         "header_bottom": t.header_bottom,
         "body_bottom": t.body_bottom,
+        "cell_bboxes": [[_bbox_to_dict(c) for c in row] for row in t.cell_bboxes],
+        "row_bboxes": [_bbox_to_dict(r) for r in t.row_bboxes],
     }
 
 
@@ -101,6 +103,9 @@ def _table_from_dict(d: dict) -> RecoveredTable:
         column_starts=d.get("column_starts", []),
         header_bottom=d.get("header_bottom", 0.0),
         body_bottom=d.get("body_bottom", 0.0),
+        cell_bboxes=[[_bbox_from_list(c) for c in row]
+                     for row in d.get("cell_bboxes", [])],
+        row_bboxes=[_bbox_from_list(r) for r in d.get("row_bboxes", [])],
     )
 
 

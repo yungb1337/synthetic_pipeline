@@ -47,6 +47,7 @@ class Cell(BaseModel):
 
 class Row(BaseModel):
     cells: list[Cell] = Field(default_factory=list)
+    bbox: Optional[BBox] = None   # row-level geometry, when available (D5)
 
 
 class Table(BaseModel):
@@ -94,6 +95,24 @@ class Reference(BaseModel):
     """A reference/link or citation target captured from source."""
     kind: str = "link"          # "link" | "citation" | "ident"
     target: str = ""
+    # Additive structured fields (extraction-quality run): a reference has a
+    # stable id, a human label (e.g. "[33]"), and full text. Empty by default so
+    # pre-existing DOMs stay valid.
+    id: str = ""
+    label: str = ""
+    text: str = ""
+
+
+class ReadingOrderEntry(BaseModel):
+    """One semantic unit in the canonical reading sequence.
+
+    Extends (does NOT replace) `Document.reading_order` (which keeps the
+    block-id chain for the chunker). `reading_order_full` carries the COMPLETE
+    sequence — blocks, tables, and images in canonical order — so every content
+    unit is represented exactly once (investigation D4). Reuses existing ids.
+    """
+    type: str = "block"         # "block" | "table" | "image"
+    id: str = ""
 
 
 class Metadata(BaseModel):
@@ -137,8 +156,14 @@ class Document(BaseModel):
     metadata: Metadata = Field(default_factory=Metadata)
     provenance: Optional[Provenance] = None
     reading_order: list[str] = Field(default_factory=list)  # chain of block ids
+    # Complete typed reading sequence (blocks + tables + images); additive for
+    # D4. Every semantic content unit appears exactly once. The chunker still
+    # reads `reading_order` (block ids) — this field is the full superset.
+    reading_order_full: list[ReadingOrderEntry] = Field(default_factory=list)
     pages: list[Page] = Field(default_factory=list)
     references: list[Reference] = Field(default_factory=list)
+    # n -> reference id, for body `[n]` markers (D3). Additive.
+    citation_index: dict[str, str] = Field(default_factory=dict)
 
     # aggregate counts for monitoring/validate
     def num_blocks(self) -> int:

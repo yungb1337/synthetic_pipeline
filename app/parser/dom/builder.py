@@ -80,13 +80,27 @@ class DocumentBuilder:
         # tables / images / annotations
         for t in recovered.tables:
             p = pages.setdefault(t.page, Page(index=t.page, blocks=[]))
+            # Forward cell geometry (D5). Docling supplies per-cell TOPLEFT bboxes
+            # aligned to `rows`; native tables leave them empty and we forward
+            # None (never fabricate coordinates). `row_bboxes` carries the row's
+            # union bbox. Both are additive and preserved for downstream use.
+            _rows: list[Row] = []
+            for ri, r in enumerate(t.rows):
+                cb = t.cell_bboxes[ri] if ri < len(t.cell_bboxes) else [None] * len(r)
+                _rows.append(Row(
+                    cells=[Cell(
+                        text=c,
+                        bbox=_bbox(cb[ci] if ci < len(cb) else None),
+                    ) for ci, c in enumerate(r)],
+                    bbox=_bbox(t.row_bboxes[ri] if ri < len(t.row_bboxes) else None),
+                ))
             p.tables.append(
                 Table(
                     id=f"{document_id}/t{len(p.tables)}_{t.page}",
                     page=t.page,
                     bbox=_bbox(t.bbox),
                     header=t.header,
-                    rows=[Row(cells=[Cell(text=c) for c in r]) for r in t.rows],
+                    rows=_rows,
                     source=t.source,
                     confidence=t.confidence,
                     caption=t.caption,
@@ -109,10 +123,38 @@ class DocumentBuilder:
             p = pages.setdefault(ann.page, Page(index=ann.page, blocks=[]))
             p.annotations.append(Annotation(kind=ann.kind, text=ann.text, page=ann.page))
 
-        # page sizes ensure all pages have dims
+        # D9: guarantee a Page object for EVERY page in the expected set, even
+        # when the page carries no content in the folded RecoveredDocument. A
+        # continuation page whose only content was a table fragment gets that
+        # fragment's rows merged into the parent table (normalize_tables), leaving
+        # it content-less here; without an explicit Page it would be SILENTLY
+        # dropped from the canonical DOM even though the assembler counted it as
+        # assembled — exactly the "page 8 missing" defect. Emitting an empty Page
+        # preserves page order/density and makes zero-silent-loss true end-to-end.
+        # Generic: keyed off the source page count and the page-index convention
+        # actually used by the content (native is 0-based, docling 1-based); never
+        # a specific page number.
+        if recovered.page_count:
+            observed = set(pages.keys())
+            base = 0 if observed and min(observed) == 0 else 1
+            for idx in range(base, recovered.page_count + base):
+                pages.setdefault(idx, Page(index=idx, blocks=[]))
+
+        # page sizes: per-producer keys land here exactly (native 0-based,
+        # docling 1-based). For any page still missing dims (e.g. a docling page
+        # absent from `doc.pages`), fall back to the document-wide median size so
+        # no page is emitted with null geometry (D6). No fabricated per-page values.
+        known = [v for v in recovered.page_sizes.values() if v and v[0] and v[1]]
+        med = sorted(known)[len(known) // 2] if known else None
         for idx, pg in pages.items():
-            if idx in recovered.page_sizes:
-                pg.width, pg.height = recovered.page_sizes[idx]
+            if (pg.width is None or pg.height is None) and idx in recovered.page_sizes:
+                w, h = recovered.page_sizes[idx]
+                pg.width = pg.width or w
+                pg.height = pg.height or h
+            if (pg.width is None or pg.height is None) and med is not None:
+                pg.width, pg.height = med
+            # A page with absolutely no known geometry keeps None by design; this
+            # only happens for a structurally-empty page, which is not a parse loss.
 
         metadata = Metadata(
             mime=recovered.mime,
@@ -149,6 +191,11 @@ class DocumentBuilder:
             metadata=metadata,
             provenance=provenance,
             reading_order=chain,
-            pages=list(pages.values()),
+            # D1: deterministic page order. `pages` is an insertion-ordered dict
+            # keyed by page index; a page first touched out of order (e.g. an
+            # annotations-only page mapped before a text page) would otherwise be
+            # serialized in insertion order. Sort by index so the canonical DOM
+            # page sequence is always 1..N regardless of mapping order.
+            pages=sorted(pages.values(), key=lambda p: p.index),
             references=[Reference(kind=k, target=t) for (k, t) in recovered.references],
         )

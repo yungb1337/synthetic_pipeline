@@ -24,6 +24,7 @@ import os
 import re
 import tempfile
 import threading
+from typing import Optional
 
 # Docling's layout model runs through torch.compile, which needs Triton — not
 # available on Windows (and some other environments). Disabling dynamo makes the
@@ -210,6 +211,11 @@ def _make_pipeline_options(cls, ocr: bool = True):
         opts.images_scale = 1.5
     except Exception:
         pass
+    # D2 (extraction-quality run): choose Docling's table-structure mode. FAST
+    # recovers correct logical rows for dense / borderless tables where ACCURATE
+    # collapses them into a single mega-row (root cause of Tables 1/5/6 collapse
+    # in the fixture). ACCURATE remains a documented opt-in via config.
+    _set_table_structure_mode(opts)
     # C4: defensively apply per-page heap-reclaim options on the heavy path
     # (§5). These bound Docling's C++ layout/segmentation heap to one page at a
     # time (the root-cause mitigation for `std::bad_alloc`), trading a little
@@ -223,6 +229,36 @@ def _make_pipeline_options(cls, ocr: bool = True):
     if ocr:
         _set_ocr_options(opts)
     return opts
+
+
+def _set_table_structure_mode(opts) -> None:
+    """D2: choose Docling's TableFormer mode for this run.
+
+    `FAST` recovers correct logical rows for dense / borderless tables (Tables
+    1/5/6 in the fixture) where `ACCURATE` collapses them into a single
+    mega-row — the root cause of the table-fidelity regression. `ACCURATE`
+    remains a documented opt-in via `ParserConfig.docling_table_mode` for rare
+    layouts where FAST over-segments. Guarded so API drift never breaks engine
+    construction (the default falls back to Docling's own default mode)."""
+    try:
+        from ..config import default_config
+
+        mode = (default_config().docling_table_mode or "FAST").upper()
+    except Exception:
+        mode = "FAST"
+    try:
+        from docling.datamodel.pipeline_options import TableFormerMode
+
+        tso = getattr(opts, "table_structure_options", None)
+        if tso is None:
+            return
+        target = TableFormerMode.FAST if mode == "FAST" else TableFormerMode.ACCURATE
+        try:
+            tso.mode = target
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 def _set_ocr_options(opts) -> None:
@@ -570,19 +606,26 @@ def _map_table(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None,
         body_rows = range(1, nrows)
 
     rows = []
+    cell_bboxes: list[list[Optional[tuple[float, float, float, float]]]] = []
     for r in body_rows:
         row = grid[r]
         # A merged body cell may occupy fewer grid positions than ncols (its
         # span covers the rest) — pad with empty cells to keep the rectangular
         # shape the DOM expects, without inventing text.
         cells = [_clean_cell(getattr(row[c], "text", "")) for c in range(min(len(row), ncols))]
+        # Cell/row geometry (D5). Docling's TableCell.bbox is already TOPLEFT
+        # (no origin flip needed); positions absent upstream stay None — we
+        # never fabricate coordinates.
+        cb = [_cell_bbox(getattr(row[c], "bbox", None)) for c in range(min(len(row), ncols))]
         rows.append(cells + [""] * (ncols - len(cells)))
+        cell_bboxes.append(cb + [None] * (ncols - len(cb)))
 
     # Column geometry for the evidence-graph reconstruction, from the REAL
     # header row (a full-width title row has no per-column x-positions).
     col_starts: list[float] = []
     header_bottom = 0.0
     body_bottom = 0.0
+    row_bboxes: list[Optional[tuple[float, float, float, float]]] = []
     hr = header_rows[-1] if header_rows else 0
     for c in grid[hr]:
         bb = getattr(c, "bbox", None)
@@ -600,13 +643,51 @@ def _map_table(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None,
                 (float(c.bbox.b) for c in grid[last] if getattr(c, "bbox", None)), default=0.0)
     except Exception:
         pass
+    # Row-level bbox = union of the row's cells (TOPLEFT, docling space).
+    for r in body_rows:
+        row = grid[r]
+        try:
+            xs: list[float] = []
+            ys: list[float] = []
+            for c in row:
+                bb = getattr(c, "bbox", None)
+                if bb is not None:
+                    xs.extend([float(bb.l), float(bb.r)])
+                    ys.extend([float(bb.t), float(bb.b)])
+            if xs and ys:
+                row_bboxes.append((min(xs), min(ys), max(xs), max(ys)))
+            else:
+                row_bboxes.append(None)
+        except Exception:
+            row_bboxes.append(None)
 
     rec.tables.append(RecoveredTable(
         page=page, bbox=bbox, header=header, rows=rows, source="docling",
         confidence=_table_structural_confidence(header, rows),
         caption=caption,
         column_starts=col_starts,
-        header_bottom=header_bottom, body_bottom=body_bottom))
+        header_bottom=header_bottom, body_bottom=body_bottom,
+        cell_bboxes=cell_bboxes, row_bboxes=row_bboxes))
+
+
+def _cell_bbox(bbox) -> Optional[tuple[float, float, float, float]]:
+    """Return a TOPLEFT bbox tuple from a Docling TableCell bbox (already TOPLEFT).
+
+    Docling's cell bboxes are in the same PDF-point top-left space as our DOM, so
+    no origin flip is needed (unlike floating-item prov boxes). Returns None when
+    the geometry is absent (we never fabricate coordinates)."""
+    if bbox is None:
+        return None
+    try:
+        l = getattr(bbox, "l", None)
+        t = getattr(bbox, "t", getattr(bbox, "y0", None))
+        r = getattr(bbox, "r", getattr(bbox, "x1", None))
+        b = getattr(bbox, "b", getattr(bbox, "y1", None))
+        if None in (l, t, r, b):
+            return None
+        return (float(l), float(t), float(r), float(b))
+    except Exception:
+        return None
 
 
 def _map_table_via_dataframe(item, rec: RecoveredDocument, page: int, bbox,
@@ -693,7 +774,12 @@ def _drop_marker_rows(t: RecoveredTable) -> None:
     a LAST row whose non-empty cells are all the SAME string (e.g. an "End of
     Table" marker repeated across columns). Interior all-identical rows are
     legitimate data (e.g. a diagonal/paired table like "Generation | Generation"),
-    so only the trailing row is treated as a marker. Never text-matched."""
+    so only the trailing row is treated as a marker. Never text-matched.
+
+    W7: also drop a LEADING row that is a duplicate of the table header (a
+    continuation fragment's repeated header retained as row 0, or an upstream
+    artifact). Only the very first row is checked and only when it equals the
+    header — interior data is untouched."""
     while t.rows:
         last = t.rows[-1]
         nonempty = [_clean_cell(c) for c in last if _clean_cell(c)]
@@ -701,6 +787,10 @@ def _drop_marker_rows(t: RecoveredTable) -> None:
             t.rows.pop()
         else:
             break
+    # Leading header-duplicate row (structural, not text-matched beyond header
+    # equality which is already a canonical structural comparison).
+    if t.rows and t.header and _row_equals_header(t.rows[0], t.header):
+        t.rows.pop(0)
 
 
 _SENT_BOUND = re.compile(r"[.!?]\s+(?=[A-Z0-9])")
@@ -729,6 +819,34 @@ def _strip_trailing_marker_cell(value) -> str:
     if re.search(r"[.!?]\s*$", frag):      # sentence-final => real text, keep it
         return cell
     return cell[: m[-1].start()].rstrip()
+
+
+def reconstruct_tables(rec: RecoveredDocument, data: bytes | None = None) -> RecoveredDocument:
+    """Run the full table-reconstruction safety net on a FOLDED RecoveredDocument.
+
+    This is the single call site for the structural recovery that makes the
+    docling route's tables faithful (D2/D8): for tables Docling collapsed into a
+    single concatenated body row, recover logical rows from page geometry
+    (`_evidence_reconstruct`), then re-unify any multi-page continuation
+    fragments into one logical table (`normalize_tables`).
+
+    MUST be called on the folded `rec` (all pages present) — `_is_continuation`
+    in `normalize_tables` can only merge fragments that appear adjacently in the
+    same list, which only holds after the assembler folds every page. Calling it
+    per-page (heavy_docling) would never merge continuations. `data` is the
+    source PDF bytes (needed by the evidence reconstructor); when None, only the
+    continuation normalization runs (faithful: no evidence => no rows invented).
+    Identity for parse() and the assembler; deterministic.
+    """
+    if data is not None:
+        for t in rec.tables:
+            if t.confidence < 1.0 and t.column_starts:
+                try:
+                    _evidence_reconstruct(data, t)
+                except Exception:
+                    pass
+    rec.tables = normalize_tables(rec.tables)
+    return rec
 
 
 def normalize_tables(tables: list[RecoveredTable]) -> list[RecoveredTable]:

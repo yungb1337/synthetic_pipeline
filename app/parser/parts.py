@@ -47,6 +47,14 @@ class RecoveredTable:
     column_starts: list[float] = field(default_factory=list)
     header_bottom: float = 0.0
     body_bottom: float = 0.0
+    # Cell + row geometry (D5). `cell_bboxes` is aligned to `rows`:
+    # cell_bboxes[r][c] holds the cell's bbox tuple or None. `row_bboxes[r]` is
+    # the row's bbox or None. Sourced from Docling (TOPLEFT, no origin flip);
+    # never fabricated — positions absent upstream stay None (faithful).
+    cell_bboxes: list[list[Optional[tuple[float, float, float, float]]]] = field(
+        default_factory=list)
+    row_bboxes: list[Optional[tuple[float, float, float, float]]] = field(
+        default_factory=list)
 
 
 @dataclass

@@ -36,6 +36,12 @@ class ParserConfig:
     # preserved; only the default flipped).
     layout_backend: str = "auto"
     docling_models_dir: str = "models/docling"  # on-prem model cache
+    # Table-structure mode passed to Docling's TableFormer (ADR-013 addendum:
+    # extraction-quality run). "FAST" recovers correct logical rows for dense /
+    # borderless tables (Tables 1/5/6 in the fixture) where "ACCURATE" collapses
+    # them into a single mega-row; "ACCURATE" remains a documented opt-in for
+    # rare layouts where FAST over-segments (see module_status known limitation).
+    docling_table_mode: str = "FAST"
     # When True, the Docling pipeline runs its built-in OCR stage using
     # RapidOCR/onnxruntime (the SAME engine family as app/parser/ocr.py) with
     # on-demand OcrMode.DEFAULT so text-rich pages are NOT OCR'd. This lets a

@@ -91,9 +91,24 @@ class HeavyDoclingEngine:
             if status == PageStatus.PARTIAL and not errors:
                 errors = [{"page_no": target, "category": "docling_empty_page",
                            "message": "docling returned no content for this page"}]
+
+            # Page geometry (D6): Docling's `page_no` is 1-based and matches the
+            # `page` field on every block/table/image this engine emits, so key
+            # `page_sizes` 1-based here. The assembler merges these WITHOUT the
+            # 0-based `plan.page_sizes` seed, so a non-uniform PDF maps each page
+            # to its true dimensions (no off-by-one).
+            page_sizes: dict[int, tuple[float, float]] = {}
+            try:
+                ps = getattr(doc.pages.get(target), "size", None)
+                if ps is not None and getattr(ps, "width", None) is not None:
+                    page_sizes[target] = (float(ps.width), float(ps.height))
+            except Exception:
+                pass
+
             return PageResult(
                 doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
                 status=status, blocks=rec.blocks, tables=rec.tables, images=rec.images,
+                page_sizes=page_sizes,
                 docling_version=rec.docling_version, engine_version=rec.docling_version,
                 errors=errors, source_hash=item.source_hash,
             )
