@@ -49,15 +49,17 @@ class DocumentValidator:
 
     @staticmethod
     def assembled_page_set(results: list[PageResult]) -> set[int]:
-        # §3.13: a page counts as assembled only if it is OK/PARTIAL AND carries
-        # recovered content. A PARTIAL page with zero content must NOT count as
-        # assembled — it falls into missing/failed and dead-letters instead of
-        # being reported as a silent success.
-        ok = {r.page_index for r in results
-              if r.status == PageStatus.OK and r.content_present}
-        partial = {r.page_index for r in results
-                   if r.status == PageStatus.PARTIAL and r.content_present}
-        return ok | partial
+        # A page is assembled if:
+        # (1) status=OK/PARTIAL AND has content, OR
+        # (2) status=OK AND processed without error (even if blank)
+        # This ensures blank pages don't destroy the document (F-01 fix).
+        ok_with_content = {r.page_index for r in results
+                           if r.status == PageStatus.OK and r.content_present}
+        partial_with_content = {r.page_index for r in results
+                                if r.status == PageStatus.PARTIAL and r.content_present}
+        ok_blank = {r.page_index for r in results
+                    if r.status == PageStatus.OK and not r.content_present and not r.errors}
+        return ok_with_content | partial_with_content | ok_blank
 
     @staticmethod
     def is_complete(results: list[PageResult], plan: ExecutionPlan) -> bool:
@@ -68,13 +70,16 @@ class DocumentValidator:
     @staticmethod
     def classify(results: list[PageResult], plan: ExecutionPlan) -> AssemblyReport:
         expected = set(plan.expected_page_set)
-        ok = {r.page_index for r in results
-              if r.status == PageStatus.OK and r.content_present}
-        partial = {r.page_index for r in results
-                   if r.status == PageStatus.PARTIAL and r.content_present}
+        # Use the same logic as assembled_page_set (includes valid blanks)
+        ok_with_content = {r.page_index for r in results
+                           if r.status == PageStatus.OK and r.content_present}
+        partial_with_content = {r.page_index for r in results
+                                if r.status == PageStatus.PARTIAL and r.content_present}
+        ok_blank = {r.page_index for r in results
+                    if r.status == PageStatus.OK and not r.content_present and not r.errors}
         failed = {r.page_index for r in results if r.status == PageStatus.FAILED}
         dead = {r.page_index for r in results if r.status == PageStatus.DEAD}
-        actual = ok | partial
+        actual = ok_with_content | partial_with_content | ok_blank
         missing = sorted(expected - actual)
         status = "ok"
         if missing or failed or dead:
@@ -247,6 +252,17 @@ class Assembler:
         by_page = {r.page_index: r for r in results}
         retry_pages = set(report.failed_pages) | set(report.missing_pages)
         for p in retry_pages:
+            # B2: never retry an engine that is unavailable. `engine_unavailable`
+            # means the docling converter could not be built in THIS process
+            # (e.g. memory-exhaustion cascade); the engine is cached False, so a
+            # retry is guaranteed to hit the same wall and only burns wall-time.
+            # Those pages keep their FAILED result (dead-lettered below) — a
+            # later clean run retries them via the normal scheduler path.
+            existing = by_page.get(p)
+            if existing is not None and any(
+                    (e.get("category") or "") == "engine_unavailable"
+                    for e in (existing.errors or [])):
+                continue
             item = None
             for wi in plan.work_items:
                 if wi.page_index == p:

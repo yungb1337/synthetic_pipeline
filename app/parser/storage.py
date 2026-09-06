@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .dom import Document
 from .parts import RecoveredImage
+from .utils import write_atomic
 
 
 class Store(ABC):
@@ -54,7 +55,7 @@ class FilesystemStore(Store):
         key = f"raw/{sha256}.{suffix}"
         p = self.root / key
         if not p.exists():
-            p.write_bytes(data)
+            write_atomic(p, data)
         return key
 
     def put_dom(self, doc_id: str, doc: Document) -> str:
@@ -72,8 +73,7 @@ class FilesystemStore(Store):
         # given doc_id + version always produces identical bytes.
         key = f"dom/{doc_id}/{prefix}-{version}.docJSON"
         p = self.root / key
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(doc.model_dump_json(indent=2), encoding="utf-8")
+        write_atomic(p, doc.model_dump_json(indent=2), encoding="utf-8")
         return key
 
     def put_image(self, doc_id: str, image: RecoveredImage) -> str:
@@ -85,8 +85,7 @@ class FilesystemStore(Store):
         key = f"images/{doc_id}/{checksum}.{_img_ext(image.mime)}"
         p = self.root / key
         if not p.exists():
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(image.blob)
+            write_atomic(p, image.blob)
         return key
 
     def get(self, key: str) -> bytes | None:

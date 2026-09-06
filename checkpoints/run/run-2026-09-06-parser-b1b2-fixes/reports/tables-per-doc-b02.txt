@@ -1,0 +1,32 @@
+d-5b1a5a60d972337e tt=2 tables=1.0 comp=0.98 fid=0.99 str=0.95 refs=0.98
+d-65dec564990c215a tt=1 tables=1.0 comp=0.98 fid=0.99 str=0.97 refs=0.98
+d-8016ccb90103f182 tt=1 tables=1.0 comp=0.95 fid=0.98 str=0.95 refs=0.95
+d-898e124f48c07668 tt=1 tables=1.0 comp=0.98 fid=0.99 str=0.95 refs=0.95
+d-f82ae969664f6779 tt=3 tables=1.0 comp=0.98 fid=0.99 str=0.95 refs=0.98
+d-deb024f506356880 tt=4 tables=0.96 comp=0.98 fid=0.99 str=0.95 refs=0.95
+d-01272bc468dde238 tt=4 tables=0.95 comp=0.95 fid=0.98 str=0.92 refs=0.95
+d-0d593cded9b34e5e tt=2 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=1.0
+d-19fa5b5f538880f6 tt=4 tables=0.95 comp=0.98 fid=0.99 str=0.97 refs=0.95
+d-23277375c12ede26 tt=6 tables=0.95 comp=0.98 fid=0.98 str=0.95 refs=0.95
+d-3d15df603c9f2c07 tt=3 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=0.98
+d-41e95c65dba59cb1 tt=2 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=1.0
+d-5328036558165998 tt=2 tables=0.95 comp=0.95 fid=0.98 str=0.92 refs=0.95
+d-81d32d5060076de5 tt=2 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=0.95
+d-93e4f0c1bf1293e5 tt=3 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=1.0
+d-9651aee219e987a0 tt=3 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=0.9
+d-97a53bf48ac61d74 tt=5 tables=0.95 comp=0.95 fid=0.96 str=0.94 refs=0.95
+d-a663ef6b1dfca23f tt=2 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=0.95
+d-bc4afbf69958a678 tt=3 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=0.95
+d-bde1f407ac3edfdf tt=1 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=0.95
+d-dbf8ba5d67eb1200 tt=4 tables=0.95 comp=0.95 fid=0.95 str=0.94 refs=0.9
+d-f489514b9e871b69 tt=2 tables=0.95 comp=0.98 fid=0.99 str=0.95 refs=0.98
+d-f976f08627e99710 tt=7 tables=0.95 comp=0.98 fid=0.99 str=0.98 refs=0.96
+d-2a1b0b9494feadb8 tt=4 tables=0.9 comp=0.95 fid=0.95 str=0.9 refs=0.9
+d-8fa5787472936712 tt=1 tables=0.9 comp=0.95 fid=0.98 str=0.92 refs=0.95
+d-937c88acde532484 tt=2 tables=0.9 comp=0.95 fid=0.98 str=0.95 refs=0.95
+d-a8872fc4428e2478 tt=6 tables=0.9 comp=0.95 fid=0.95 str=0.9 refs=0.9
+d-d71a4d86ae8b6392 tt=2 tables=0.9 comp=0.98 fid=0.99 str=0.95 refs=0.95
+
+docs with tables_total>0: 28; mean tables among them: 0.950
+min tables score among table-bearing docs: 0.90
+table-bearing docs still scored 0: 0

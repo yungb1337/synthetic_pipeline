@@ -8,7 +8,7 @@ __pycache__/
 models/
 .huggingface/
 .cache/
-
+key.py
 # Parser runtime output
 parser_out/
 _parser_out/
@@ -29,9 +29,28 @@ _corpus_run.log
 _cli_out_parse.log
 _cli_out_rerun_*.log
 
+# Secrets — never commit (see key.py incident 2026-09-04)
+key.py
+.env
+*.key
+
 # Tooling
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
+
+# Tool-generated agent worktrees (git worktree temp dirs)
+.claude/worktrees/
+
+# Runtime logs
+logs/
+
+# Checkpoint run heavy/regenerable artifacts — repo commits only the .md/.txt docs,
+# never parsed stores, downloaded PDFs, images, or per-doc judge verdict JSONs.
+checkpoints/run/*/parsed/
+checkpoints/run/*/parsed-*/
+checkpoints/run/*/judgment/
+checkpoints/run/*/images/
+checkpoints/run/*/sources/**/*.pdf

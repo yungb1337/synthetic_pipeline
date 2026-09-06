@@ -134,21 +134,70 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
 
 
 class NativePdfEngine:
+    """The cheap native path: PyMuPDF + reading order + find_tables.
+
+    This engine processes EACH PAGE independently (so the per-page persistence
+    model remains), but optimizes document-wide operations: the PDF is opened
+    once per engine instance and the median font size is computed once and
+    cached (F-05/F-06 fix). The handle is cleared only on explicit close or
+    when switching to a different document.
+    """
     route_band = NATIVE
 
     def __init__(self, config: ParserConfig):
         self.config = config
+        # F-05/F-06 fix: cache document handle + median per source path
+        self._doc_cache: dict[str, tuple[object, float]] = {}  # path -> (fitz.Document, median)
+
+    def _open_and_compute_median(self, src_path: str):
+        """Open document once and compute median font size (cached per path).
+
+        F-05/F-06 fix: avoids O(n²) median recomputation and N fitz.open() calls.
+        """
+        import fitz
+
+        if src_path in self._doc_cache:
+            return self._doc_cache[src_path]
+
+        try:
+            doc = fitz.open(src_path)
+        except Exception as e:
+            # Cache the failure so we don't retry on every page
+            self._doc_cache[src_path] = (None, 12.0)
+            raise e
+
+        # Compute document-wide median body size once
+        sizes: list[float] = []
+        for pi in range(doc.page_count):
+            for blk in doc[pi].get_text("dict").get("blocks", []):
+                if blk.get("type") != 0:
+                    continue
+                for line in blk.get("lines", []):
+                    for span in line.get("spans", []):
+                        if span.get("text", "").strip():
+                            sizes.append(float(span.get("size", 0.0)))
+        body_med = sorted(sizes)[len(sizes) // 2] if sizes else 12.0
+
+        self._doc_cache[src_path] = (doc, body_med)
+        return doc, body_med
 
     def extract_page(self, src_path: str, page_index: int) -> PageResult:
         import fitz  # PyMuPDF
 
         try:
-            doc = fitz.open(src_path)
+            doc, body_med = self._open_and_compute_median(src_path)
+            if doc is None:
+                return PageResult(
+                    doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
+                    errors=[{"page_no": page_index + 1, "category": "native_open",
+                             "message": "failed to open document"}],
+                )
         except Exception as e:
             return PageResult(
                 doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
                 errors=[{"page_no": page_index + 1, "category": "native_open", "message": str(e)}],
             )
+
         try:
             if page_index < 0 or page_index >= doc.page_count:
                 return PageResult(
@@ -156,26 +205,13 @@ class NativePdfEngine:
                     errors=[{"page_no": page_index + 1, "category": "native_range",
                              "message": f"page {page_index} out of range (doc has {doc.page_count})"}],
                 )
-            # F1: document-wide median body size for heading classification
-            # (parity with legacy Loaders._pdf), computed once over the whole
-            # document then reused for every page.
-            sizes: list[float] = []
-            for pi in range(doc.page_count):
-                for blk in doc[pi].get_text("dict").get("blocks", []):
-                    if blk.get("type") != 0:
-                        continue
-                    for line in blk.get("lines", []):
-                        for span in line.get("spans", []):
-                            if span.get("text", "").strip():
-                                sizes.append(float(span.get("size", 0.0)))
-            body_med = sorted(sizes)[len(sizes) // 2] if sizes else 12.0
             res = _native_page_from_doc(doc[page_index], page_index, self.config, body_med=body_med)
-        finally:
-            try:
-                doc.close()
-            except Exception:
-                pass
-        return res
+            return res
+        except Exception as e:
+            return PageResult(
+                doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
+                errors=[{"page_no": page_index + 1, "category": "native_extract", "message": str(e)}],
+            )
 
     def process(self, item: PageWorkItem) -> PageResult:
         res = self.extract_page(item.src_path, item.page_index)
@@ -183,3 +219,13 @@ class NativePdfEngine:
         res.route = self.route_band
         res.source_hash = item.source_hash
         return res
+
+    def close(self) -> None:
+        """Close all cached document handles (F-05/F-06 fix cleanup)."""
+        for doc, _ in self._doc_cache.values():
+            if doc is not None:
+                try:
+                    doc.close()
+                except Exception:
+                    pass
+        self._doc_cache.clear()

@@ -1,0 +1,2 @@
+- **b01** (2026-09-06T06:30:35Z): files=36 ok=16 failed=0 dead=0 unparsed=0 wall=504.8s peak=4239MB blocks=2603 tables=27
+- **b02** (2026-09-06T08:04:44Z): files=36 ok=36 failed=0 dead=0 unparsed=0 wall=599.5s peak=4504MB blocks=7287 tables=82

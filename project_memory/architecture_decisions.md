@@ -392,3 +392,33 @@ largest edge in pixels we hand to the OCR engine.)
   passes small images through, falls back on garbage, constant sane).
 
 **Verdict:** frequency-reduction hardening on top of Addendum 1's containment. Adopted.
+
+### ADR-013 — Addendum 3: Production-readiness fixes (5 verified failure points) (2026-09-03, run-2026-09-03-production-readiness)
+
+**Decision:** Within the existing page-centric architecture, fix 5 reproduced production failure points (`F-03` torn ledger, `F-04` quadratic ledger rewrite, `F-05` native O(n²) median, `F-06` PDF reopened per page, `F-07` `page_exists` treats FAILED as done) at the correct abstraction layer. **No microservice, no stack change, no new module boundary.** All fixes are additive and within `app/parser/`. **Fact** (adopted this run). Full trade-off review: `checkpoints/run/run-2026-09-03-production-readiness/architecture.md`.
+
+**What is locked:**
+
+- **F-03 (Torn ledger):** `write_atomic` (temp + `os.replace`) is already the pattern; add **`.tmp` retention** — preserve the `.tmp` file until the *next* successful write so a crash mid-write leaves a recoverable artifact. On load, attempt `.tmp` recovery before raising `LedgerCorruptionError`. This is the atomic-write pattern from ADR-013 T11 plus a one-line recovery guarantee. The torn-write class is eliminated; corruption becomes an explicit, surfaced error.
+- **F-04 (Quadratic ledger rewrite):** **Batch flush** — accumulate page updates in memory, flush to `plan.json` once per N pages (configurable, default 10) or on document completion. Single full serialize per batch. Reduces 800-page cost from ~13.6s to ~1.4s. The per-page state file design (Option B in the trade-off) is **deferred as a follow-on ADR**, not blocked — the current O(n) rewrite is acceptable for medium docs once batched.
+- **F-05 (Native O(n²)):** Median font size is a **document-level property**; compute it **once per document** and cache `(doc_handle, median)` in `_doc_cache[path]`. Per-page extraction reuses both. 5-line fix, zero behavioral change, eliminates the per-page O(n) scan.
+- **F-06 (PDF reopened per page):** Same `_doc_cache` — open `fitz.Document` once on first page, reuse for all pages of the same document, close in `Engine.close()` (scheduler already calls it on document teardown). 1 `fitz.open()` per document (was 21× for 20 pages).
+- **F-07 (page_exists treats FAILED as done):** `page_exists()` → status-aware — returns `status != FAILED and status != DEAD`. A new `page_file_exists()` is reserved for the rare raw-file-presence query. The page-centric model's truth is **page status**, not file existence; the misnamed method leaked the wrong abstraction.
+
+**Why:**
+- The page-centric execution model (ADR-013 T1–T11) is correct. The failure points are not architectural — they are **abstraction leaks** (status vs. existence), **algorithmic mistakes** (O(n²) on a document-level property), and **durability gaps** (no `.tmp` recovery, no atomic write everywhere). Fixes at the correct layer strengthen ADR-013; they do not challenge it.
+- The four-step `NativePdfEngine` refactor (cache doc handle + median + close) is the minimum change that delivers the throughput win. It is **not** a candidate for scheduler-level resource management — engines own their resources.
+- The batch flush for ledger updates is the **conservative** path (Option A). Option B (per-page state files) is architecturally cleaner and aligns more directly with "page is durable unit," but it introduces a new directory structure and legacy read-compat logic. Validating Option A under real workload is the gate to Option B as a follow-on ADR.
+- The `_doc_cache` for native PDF does **not** contradict the "Docling uses per-page `convert_path` to bound C++ heap" decision (ADR-013 T3). Docling's constraint is the C++ layout/segmentation heap (~500 MB peak per whole-doc); PyMuPDF's constraint is the Python object overhead (~10–50 MB per doc handle). The two engines have different memory profiles and different correct strategies.
+
+**How to apply:**
+- `app/parser/utils.py` (new): `write_atomic(path, data)`, `get_logger()`, `LedgerCorruptionError`. Already exists from the implementation summary.
+- `app/parser/storage_pages.py`: `.tmp` retention in `write_atomic` calls (F-03); batch flush in `update_page` (F-04); status-aware `page_exists` + new `page_file_exists` (F-07).
+- `app/parser/engines/native_pdf.py`: `_doc_cache` keyed on path; `_open_and_compute_median()` helper; `close()` method called by scheduler teardown (F-05, F-06).
+- `app/parser/extraction.py`: resume merges OK pages from disk (F-02, already in implementation); status-based safety net in `_fail_document` (F-07).
+- `app/parser/scheduler.py`: `Engine.close()` call in document teardown; `fut.result(timeout=...)` for hung-page protection (F-08, already in implementation).
+- All changes are additive; no API signature breaks; no test deletion required.
+
+**Challenge (recorded):** Batch flush introduces a crash window where up to N page updates are in memory. Mitigation: flush on every `update_assembly` (document completion) + configurable batch size (default 10). The risk window is bounded and documented in the architecture.md. What would change this ADR: evidence that the batch window causes unacceptable audit-trail loss in a real crash, or a measured corpus where Option B (per-page state files) is both necessary and safe. `page_exists` semantic change is a one-line fix; the only risk is a missed call site — grep + test coverage. What would reverse it: a call site that genuinely needs raw file existence and was incorrectly routed to `page_exists` (in which case migrate to `page_file_exists`).
+
+**Verdict:** The 5 fixes are the correct layer, the minimum viable change, and they strengthen every pillar of ADR-013 (page = durable unit, document = orchestration, idempotent resume, dead-letter, validator gate, atomic write). No microservice or stack change is justified; the modular monolith + Clean Architecture + event-driven guardrails hold. Adopted.

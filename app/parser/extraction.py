@@ -159,6 +159,16 @@ class Extractor:
             results = self.scheduler.run_plan(plan)
             t_run1 = time.time()
 
+            # RESUME: reload OK pages from disk that were skipped (F-02 fix)
+            if resume:
+                for page_idx in plan.expected_page_set:
+                    if page_idx not in {r.page_index for r in results}:
+                        prior = self.page_store.get_page(doc_id, page_idx)
+                        if prior and prior.status == PageStatus.OK:
+                            results.append(prior)
+                # Sort by page_index before assembly
+                results.sort(key=lambda r: r.page_index)
+
             # --- assemble + validate (hard gate) ----------------------------
             t_assemble0 = time.time()
             report = self.assembler.assemble(plan, results, manifest.src_path, sha,
@@ -258,9 +268,10 @@ class Extractor:
         err = {"page_no": 0, "category": "extract_failed",
                "message": f"{type(exc).__name__}: {exc}",
                "traceback": traceback.format_exc()}
-        # Mark unpersisted (still pending) pages FAILED — never clobber OK pages.
+        # Mark unpersisted or failed pages FAILED — check actual status (F-07 fix)
         for p in plan.expected_page_set:
-            if not self.page_store.page_exists(doc_id, p):
+            prior = self.page_store.get_page(doc_id, p)
+            if prior is None or prior.status in (PageStatus.FAILED, PageStatus.DEAD, PageStatus.PENDING):
                 try:
                     self.ledger.update_page(doc_id, p, PageStatus.FAILED, "",
                                             plan.route, 1, [err])

@@ -29,8 +29,26 @@ class HeavyDoclingEngine:
         self.config = config
 
     def process(self, item: PageWorkItem) -> PageResult:
-        result = docling_loader.convert_path(item.src_path, item.page_index, item.models_dir)
+        try:
+            result = docling_loader.convert_path(
+                item.src_path, item.page_index, item.models_dir,
+                table_mode=item.docling_table_mode, ocr=item.docling_ocr
+            )
+        except docling_loader.DoclingConvertError as e:
+            # B4: this page's convert() call failed though the engine itself is
+            # available. That is a RETRYABLE per-page failure — the assembler's
+            # B2 skip only ever skips the genuine `engine_unavailable` category,
+            # so this page gets retried on the next pass instead of being
+            # dead-lettered as a dead engine.
+            return PageResult(
+                doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
+                status=PageStatus.FAILED,
+                errors=[{"page_no": item.page_index + 1, "category": "docling_convert",
+                         "message": str(e)}],
+                source_hash=item.source_hash,
+            )
         if result is None:
+            # None now means ONLY "engine unavailable" (convert_path's contract).
             return PageResult(
                 doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
                 status=PageStatus.FAILED,

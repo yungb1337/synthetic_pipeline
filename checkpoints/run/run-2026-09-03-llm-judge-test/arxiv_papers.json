@@ -1,0 +1,110 @@
+[
+  {
+    "id": "2302.04143v2",
+    "title": "Predicting Thrombectomy Recanalization from CT Imaging Using Deep Learning Models",
+    "authors": [
+      "Haoyue Zhang",
+      "Jennifer S. Polson"
+    ],
+    "query": "medical imaging diagnostic deep learning"
+  },
+  {
+    "id": "1803.08691v1",
+    "title": "Deep learning and its application to medical image segmentation",
+    "authors": [
+      "Holger R. Roth",
+      "Chen Shen"
+    ],
+    "query": "medical imaging diagnostic deep learning"
+  },
+  {
+    "id": "2110.10381v1",
+    "title": "Medical Knowledge-Guided Deep Curriculum Learning for Elbow Fracture Diagnosis from X-Ray Images",
+    "authors": [
+      "Jun Luo",
+      "Gene Kitamura"
+    ],
+    "query": "medical imaging diagnostic deep learning"
+  },
+  {
+    "id": "2304.06427v2",
+    "title": "In-Distribution and Out-of-Distribution Self-supervised ECG Representation Learning for Arrhythmia D",
+    "authors": [
+      "Sahar Soltanieh",
+      "Javad Hashemi"
+    ],
+    "query": "cardiology ECG arrhythmia detection"
+  },
+  {
+    "id": "2207.07089v2",
+    "title": "A Personalized Zero-Shot ECG Arrhythmia Monitoring System: From Sparse Representation Based Domain A",
+    "authors": [
+      "Mehmet Yama\u00e7",
+      "Mert Duman"
+    ],
+    "query": "cardiology ECG arrhythmia detection"
+  },
+  {
+    "id": "2501.07555v2",
+    "title": "Dynamic Prototype Rehearsal for Continual ECG Arrhythmia Detection",
+    "authors": [
+      "Sana Rahmani",
+      "Reetam Chatterjee"
+    ],
+    "query": "cardiology ECG arrhythmia detection"
+  },
+  {
+    "id": "2412.01233v1",
+    "title": "Best Practices for Large Language Models in Radiology",
+    "authors": [
+      "Christian Bluethgen",
+      "Dave Van Veen"
+    ],
+    "query": "radiology chest X-ray classification"
+  },
+  {
+    "id": "2407.15621v3",
+    "title": "RadioRAG: Online Retrieval-augmented Generation for Radiology Question Answering",
+    "authors": [
+      "Soroosh Tayebi Arasteh",
+      "Mahshad Lotfinia"
+    ],
+    "query": "radiology chest X-ray classification"
+  },
+  {
+    "id": "1304.1777v1",
+    "title": "High-resolution x-ray analysis with multilayer gratings",
+    "authors": [
+      "Philippe Jonnard",
+      "Karine Le Guen"
+    ],
+    "query": "radiology chest X-ray classification"
+  },
+  {
+    "id": "1910.13334v3",
+    "title": "NCI Workshop on Artificial Intelligence in Radiation Oncology: Training the Next Generation",
+    "authors": [
+      "John Kang",
+      "Reid F. Thompson"
+    ],
+    "query": "oncology pathology histopathology"
+  },
+  {
+    "id": "2304.05482v3",
+    "title": "Computational Pathology: A Survey Review and The Way Forward",
+    "authors": [
+      "Mahdi S. Hosseini",
+      "Babak Ehteshami Bejnordi"
+    ],
+    "query": "oncology pathology histopathology"
+  },
+  {
+    "id": "2401.08699v3",
+    "title": "On Image Search in Histopathology",
+    "authors": [
+      "H. R. Tizhoosh",
+      "Liron Pantanowitz"
+    ],
+    "query": "oncology pathology histopathology"
+  }
+]

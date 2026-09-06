@@ -15,7 +15,7 @@ from __future__ import annotations
 import multiprocessing as mp
 import os
 import traceback
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import BrokenExecutor, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from .config import ParserConfig
@@ -274,10 +274,13 @@ class Scheduler:
         self._mp_f_value = None
 
         self._heavy_pool = None
+        self._pool_is_broken = False
         # Lazily created on first heavy submit (and only if not in-process).
 
     def _get_heavy_pool(self) -> ProcessPoolExecutor:
-        if self._heavy_pool is None:
+        if self._heavy_pool is None or self._pool_is_broken:
+            # Build/rebuild pool (F-09 fix: rebuild after BrokenProcessPool)
+            self._pool_is_broken = False
             ctx = mp.get_context("spawn")
             # C1: create the shared F probe value (worker-published) before the
             # pool starts, so the initializer can write to it.
@@ -350,8 +353,22 @@ class Scheduler:
         return results
 
     def _collect(self, item: PageWorkItem, fut) -> PageResult:
+        from .utils import get_logger
+        logger = get_logger(__name__)
+
         try:
-            res = fut.result()
+            res = fut.result(timeout=600)  # 10min timeout per page
+        except BrokenExecutor as e:
+            # F-09 fix: mark pool broken so next submit rebuilds it
+            logger.error(f"Heavy pool broken on page {item.page_index} of {item.doc_id}: {e}")
+            self._pool_is_broken = True
+            res = PageResult(
+                doc_id=item.doc_id, page_index=item.page_index, route=item.route,
+                status=PageStatus.FAILED,
+                errors=[{"page_no": item.page_index + 1, "category": "scheduler",
+                         "message": f"BrokenExecutor: {e} (pool will rebuild)", "traceback": traceback.format_exc()}],
+                source_hash=item.source_hash,
+            )
         except Exception as e:  # unhandled in worker -> contained FAILED
             res = PageResult(
                 doc_id=item.doc_id, page_index=item.page_index, route=item.route,
@@ -362,6 +379,20 @@ class Scheduler:
             )
         if self.page_store is not None and self.ledger is not None:
             try:
+                # B1 (append, never destroy): a transient/engine failure must NOT
+                # clobber a durable OK page. When the fresh result is FAILED/DEAD
+                # but a prior OK page is persisted, restore the prior result so
+                # the good artifact AND its ledger status survive a re-parse or
+                # resume under degraded conditions (e.g. docling engine down after
+                # a memory-exhaustion cascade). Retries still happen on a clean
+                # run; this only preserves already-achieved quality.
+                if res.status in (PageStatus.FAILED, PageStatus.DEAD):
+                    prior = self.page_store.get_page(item.doc_id, item.page_index)
+                    if prior is not None and prior.status == PageStatus.OK:
+                        logger.info(
+                            f"Restored prior OK page {item.doc_id}/p{item.page_index} "
+                            f"over transient failure (kept good artifact)")
+                        res = prior
                 self.page_store.put_page(item.doc_id, item.page_index, res)
                 self.ledger.update_page(
                     item.doc_id, item.page_index, res.status, res.checksum,

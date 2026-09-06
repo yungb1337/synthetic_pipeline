@@ -11,82 +11,96 @@ metadata:
 > reads this file at the start of a run. Replace the contents for a new run; keep this file.
 
 ## Run id
-`run-2026-08-20-extraction-quality`
+`run-2026-09-06-parser-b1b2-fixes` (reliability+accuracy campaign — B1–B4 mechanics + LLM-judge leg). Prior: `run-2026-09-04-parser-reliability` (mass-engine-unavailable root-caused, first-corpus seed).
 
 ## Objective
-Determine why the current canonical DOM loses or weakens document structure even though ordinary text extraction is strong, and fix the underlying pipeline so the DOM is a faithful, loss-minimizing representation suitable for downstream GenAI, RAG, chunking, retrieval, and knowledge extraction.
+Make the parser **production-ready**: reliable, accurate, and stable across a **wide, diverse corpus of 500–1000 real public documents** (medical/academic/complex PDFs). Goal = the user can trust the parser on unseen production data. Expand the prior ad-hoc "fix 5 points" into a **measured reliability program**: every run is benchmarked, every error is preserved, every improvement is verified against the corpus (no single-document hardcoding).
 
-The test case is:
-* Source PDF: "C:\Users\Asus\Downloads\test_cases_output\raw\0edc810eb07d15e917ae69d6324e6407e81e0f962c741c8176110246de59691e.pdf"
-* Generated DOM: `dom-v0.1.0.docJSON` at "C:\Users\Asus\Downloads\test_cases_output\dom\d-0edc810eb07d15e9\dom-v0.1.0.docJSON"
-* Parser version: `parser-v0.1.0`
-* DOM schema: `dom-schema-v0.1.0`
-* Docling version: `2.118.0`
+Prompt source: user expanded reliability request (2026-09-04) — curated corpus, configurable benchmarks via scripts, LLM-judged accuracy, reliability/perf testing, production-level fixes only.
 
-The document was routed to the Docling path with complexity score `83`. Inspection signals include:
-* multi-column probability: `1.00`
-* layout complexity: `0.925`
-* reading-order ambiguity: `0.827`
-* font diversity: `1.00`
+## Scope (modular, additive, no project rewrite)
 
-This is a high-complexity document and should be treated as an important structural extraction test case.
+### Step 0 — Secure secrets
+- `key.py` removed (was untracked, never committed — verified); `.gitignore` now excludes `key.py`, `.env`, `*.key`.
+- LLM judge reads `GEMINI_API_KEY` from environment only (caller-supplied; never logged/echoed/committed).
 
-## Critical Constraint
-Docling is the table extractor/layout engine responsible for the table structures in this case. When investigating table failures, trace the complete path:
-PDF → Docling → extracted table structure → parser adapter/normalization → canonical DOM
+### Step 1 — Corpus curation (500–1000 files, local, versioned, reusable)
+- Sources: **public, no PHI** — open-access medical/academic PDFs (e.g., PMC/NIH, CDC, CMS synthetic samples, Synthea synthetic, arXiv medical reviews) — avoids real hospital EHR/PHI.
+- Deliverables:
+  - `checkpoints/run/<run_id>/sources/manifest.json` — pinned URLs + expected filenames + SHA-256 (append-only, auditable).
+  - `checkpoints/run/<run_id>/reports/corpus-plan.md` — selection rationale, diversity coverage (multi-column, tables, scans, lab-style, mixed image+text).
+  - `scripts/download_curated_corpus.py` — deterministic downloader (retries, SHA check, progress, resumable), reusable for corpus refresh; concise docstring + `--help`.
+  - Corpus stored locally (e.g., `checkpoints/run/<run_id>/sources/*.pdf`) with a retained copy for continuous testing; script supports re-running to keep corpus fresh.
 
-Determine exactly where the structural degradation happens.
+### Step 2 — Reliability harness (scripts = product, not throwaway)
+All scripts in `scripts/` with concise docstrings and `--help`:
+- `scripts/download_curated_corpus.py` — download + verify corpus.
+- `scripts/run_parser_benchmark.py` — batch parse via `app.parser` page-centric path (`scripts/parse_folder.py` seam), emitting per-doc and aggregate metrics.
+- `scripts/llm_judge_parser.py` — LLM judge (Gemini `gemini-2.5-flash-lite`, `GEMINI_API_KEY` from env) comparing source PDF text (fitz extract) vs DOM; per-doc JSON + summary.
+- `scripts/monitor_parser_logs.py` — log monitor (tail + error/memory spike detection; unseen error capture).
 
-## Investigation Scope (per user directive)
-1. **Source-vs-DOM ground truth** — systematic comparison at document/page/text/block/heading/list/table/image/reading-order/reference/metadata levels
-2. **Text extraction fidelity** — quantitative metrics: char/token recall, missing/duplicated/reordered/modified classification
-3. **Page ordering** — verify whether page 8 appears after page 24 in serialized DOM
-4. **Reading order** — verify every content-bearing block appears exactly once; tables/images/captions/footnotes/references in reading order; multi-column handling; determinism
-5. **Table extraction (highest priority)** — trace Table 1, Table 5, Table 6 through Docling → adapter → DOM; determine where rows collapse
-6. **Docling raw output inspection** — compare PDF visual table → Docling table → adapter → canonical DOM at all four stages
-7. **Table structural recoverability** — downstream consumer must reconstruct row/column semantics, not concatenated mega-cells
-8. **References/bibliography** — currently `references: []` but citations like [33], [37] present in body; investigate extraction, numbering, schema support
-9. **Image handling** — detection, asset preservation, caption association, reading-order placement
-10. **Metadata consistency** — page with missing/null dimensions (page 24)
-11. **Duplication/omission accounting** — document-level content accounting
-12. **Content vs structural fidelity** — separate dimensions
+Each step has its own knowledge artifact:
+- `checkpoints/run/<run_id>/knowledge/step{1..N}.md` — what was learned, not just what ran.
+- `checkpoints/run/<run_id>/reports/benchmark.json` + `benchmark.md` — latency, throughput, success/failure, per-doc timings.
+- `checkpoints/run/<run_id>/reports/errors.md` — all errors, memory spikes, unseen situations (never dropped).
+- `checkpoints/run/<run_id>/judgment/` — per-doc judge verdicts + `judgment/summary.json` + `judgment/summary.md` (multi-metric: faithfulness, structure, tables, reading order, OCR).
 
-## Deliverable
-Before implementation, produce an investigation report containing:
-1. Executive summary
-2. Source document characteristics
-3. Text fidelity metrics
-4. Page-order analysis
-5. Reading-order analysis
-6. Table-by-table analysis
-7. Docling raw-output analysis
-8. Adapter/normalization analysis
-9. Reference/bibliography analysis
-10. Image analysis
-11. Metadata analysis
-12. Root-cause matrix
-13. Severity classification (P0/P1/P2/P3)
-14. Recommended fixes
-15. Validation plan
+### Step 3 — Testing matrix (reliability · performance · accuracy)
+- **Reliability**: `status == parsed` rate, `assembled_set == expected_set` gate, dead-letter rate, crash/memory/OOM count, idempotent `rerun_test_cases.py` check, `scripts/verify_failure_points.py` (F-01..F-11) stays green.
+- **Performance**: per-doc `p50/p95` latency, throughput (docs/min), memory envelope (RSS / process), concurrency behavior, OCR-vs-native cost split.
+- **Accuracy (LLM judge)**: multi-metric rubric (implemented in `llm_judge_parser.py`) — text faithfulness, block/heading fidelity, table recovery, reading-order correctness, OCR quality, metadata/provenance completeness; aggregated `judgment/summary.md` with Critical/Major/Minor triage.
 
-## Implementation Requirements (after investigation)
-- Fix root causes, keep existing architecture where sound
-- No document-specific hardcoding (no `if document_id == ...`, `if page == 8`, `if table == Table 5`)
-- Generic structural reconstruction
-- Preserve backward compatibility where practical
-- Keep provenance intact
-- Regression tests required
+### Step 4 — Findings → fixes (production-level only)
+- Fixes only inside `app/parser/` (and minimal `app/processing` if scheduler-bound), preserving ADR-013 page-centric model, `DocumentValidator` gate, and idempotent resume.
+- **No hardcoding**: no document-name/page-number/table-id special cases; normalize anything that is invariant across documents.
+
+## Definition of Done (gate-level)
+1. Corpus of 500–1000 files locally present, manifest versioned, downloader script reusable.
+2. At least one full benchmark run completes: `reports/benchmark.json` + `benchmark.md` + `reports/errors.md` + `judgment/summary.md` present and reviewed.
+3. Reliability/perf/accuracy metrics reported and baselined; regressions have a documented next step.
+4. Any Critical/Major finding either fixed (with bounded fix loop ≤3, re-benchmarked) or triaged with a deferred ADR/question.
+5. `scripts/verify_failure_points.py` stays green; `pytest -q` stays green; no silent loss.
+6. Knowledge per step written; final `checkpoint.md` + `final-report.md` close the run.
+7. Every artifact is append-only / versioned; logs are continuously monitored (error + memory spikes captured).
 
 ## Validation Requirements
-After implementation, rerun exact source PDF through real production pipeline:
-A. Regression validation (page count, ordering, block/table/image counts, captions, references, reading order)
-B. Source-vs-DOM comparison (recompute fidelity metrics)
-C. Table validation (source rows = Docling rows = canonical DOM rows)
-D. Reading-order validation (every semantic unit exactly once)
-E. Reference validation (bibliography entries preserve labels, structurally addressable)
-F. No-regression validation (ordinary prose quality maintained)
+- `scripts/verify_failure_points.py` — all checks PASS (not reproduced).
+- `.venv/Scripts/python.exe -m pytest tests/ -q` — green.
+- Full corpus parse + `judgment/summary.md` — no untriaged Critical.
+- Benchmarks recorded per run; script `--help` documented.
 
 ## Constraints
-- Follow `docs/org-gate-protocol.md` hard gates
-- Do not modify source PDF
-- Tests are part of done: `.venv/Scripts/python.exe -m pytest tests/ -q`
+- Follow `docs/org-gate-protocol.md` hard gates (reviews: `VERDICT: PASS` before merge).
+- Modular monolith, Clean Architecture; event-driven + idempotent.
+- Secrets via env only; no keys in code/chat/logs.
+- Public, no-PHI corpus; no arbitrary hospital EHR scraping.
+
+## Run-specific notes
+- **This run (09-06) CLOSED the reliability + accuracy gates.** Full handoff for a fresh instance:
+  `checkpoints/run/run-2026-09-06-parser-b1b2-fixes/HANDOFF.md` (read first).
+- **Reliability:** B4 split the mislabeled `engine_unavailable` (per-page convert failure was being
+  labeled an engine outage) → b02 benchmark 36/36 ok vs b01 16/36 on the same snapshot; 0 dead
+  pages; full `pytest tests/ -q` GREEN. B1 (durability), B2 (retry-skip), B3 (covered).
+- **Accuracy:** LLM judge `gemini-3.5-flash-lite` judged 36/36: 0 FAIL, 29 PASS / 7
+  PASS_WITH_ISSUES, all issues minor. Fidelity 0.982, completeness 0.972. The one red metric
+  (tables 0.631) was a **judge-input artifact** (`summarize_dom` sent only table dims) — fixed
+  with a real-content `tables_preview` + note; table-bearing-doc mean now 0.950 (min 0.90, 0
+  below). Judge tooling also hardened against the Gemini free-tier quota (retry-on-429, exit-4
+  skip, --pacing).
+- **Key/secret standing facts:** Gemini key lives in gitignored `key.py` (lowercase attr `key`).
+  Judge resolver: `--api-key` > `$GEMINI_API_KEY` > `key.py`. **NEVER echo/log the key value.**
+  Prefer the LIGHT model **`gemini-3.5-flash-lite`** (never the expensive one); free tier =
+  15 req/min.
+- **Hardware constraint (binding):** ~16.5 GB RAM, ~95% disk. WinError 1455 / `std::bad_alloc`
+  under paging-file exhaustion. Run parse + judge + download SEQUENTIALLY, NEVER concurrently;
+  use `--heavy-concurrency 1` (single Docling worker). Docling heavy worker RSS 2.7–4.2 GB.
+- **Corpus state:** 70/184 manifest PDFs downloaded (`run-2026-09-04/.../sources/pdf/`); b02
+  benchmark ran on the 36-file snapshot `pdf_snapshot_b01/` (subset `.gitignore`'d architectures).
+  Toward the 500–1000 target: MORE downloading needed — **user must approve new URL sets first**
+  (already-manifested entries are pre-authorized).
+- Judge tooling is additive; parsing/Judging code changes live in the working tree (uncommitted) —
+  do not revert blindly.
+
+## Expanded prompt (this run tracks)
+Goal: **Reliable, Accurate, Stable Parser** — measured on 500–1000 diverse public documents; every run produces benchmarks + error/bench reports; every error (including memory/unseen) is documented; every fix is wide-corpus, not single-doc. Scripts are kept and reusable. Logs are continuously monitored.
+Each step has its own knowledge. Fixes are production-level (no hardcoding, wide coverage).

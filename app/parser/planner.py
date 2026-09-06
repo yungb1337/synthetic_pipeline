@@ -147,6 +147,8 @@ class Planner:
                 models_dir=config.docling_models_dir,
                 ocr_enabled=config.ocr_enabled,
                 attempt=(prior_attempt.get(p, 0) + (1 if resume and p in prior_attempt else 0)),
+                docling_table_mode=config.docling_table_mode,
+                docling_ocr=config.docling_ocr,
             ))
 
         self.ledger.write_plan(manifest.doc_id, base.to_ledger())

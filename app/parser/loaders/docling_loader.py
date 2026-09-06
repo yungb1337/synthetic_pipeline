@@ -136,10 +136,12 @@ def _build_converter():
             from ..config import default_config
 
             ocr = bool(default_config().docling_ocr)
+            table_mode = default_config().docling_table_mode or ""
         except Exception:
             ocr = True
+            table_mode = ""
 
-        opts = _make_pipeline_options(PipelineOptions, ocr=ocr)
+        opts = _make_pipeline_options(PipelineOptions, ocr=ocr, table_mode=table_mode)
         kwargs = {}
 
         # Preferred: per-format PdfFormatOption with the custom pipeline.
@@ -178,7 +180,7 @@ def _build_converter():
         return False
 
 
-def _make_pipeline_options(cls, ocr: bool = True):
+def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = ""):
     """Build Docling pipeline options; `ocr` enables Docling's OCR stage (its
     built-in RapidOCR/onnxruntime backend — the same engine family as
     `app/parser/ocr.py`). Defensive across docling's API drift: falls back to
@@ -215,7 +217,7 @@ def _make_pipeline_options(cls, ocr: bool = True):
     # recovers correct logical rows for dense / borderless tables where ACCURATE
     # collapses them into a single mega-row (root cause of Tables 1/5/6 collapse
     # in the fixture). ACCURATE remains a documented opt-in via config.
-    _set_table_structure_mode(opts)
+    _set_table_structure_mode(opts, table_mode=table_mode)
     # C4: defensively apply per-page heap-reclaim options on the heavy path
     # (§5). These bound Docling's C++ layout/segmentation heap to one page at a
     # time (the root-cause mitigation for `std::bad_alloc`), trading a little
@@ -231,7 +233,7 @@ def _make_pipeline_options(cls, ocr: bool = True):
     return opts
 
 
-def _set_table_structure_mode(opts) -> None:
+def _set_table_structure_mode(opts, table_mode: str = "") -> None:
     """D2: choose Docling's TableFormer mode for this run.
 
     `FAST` recovers correct logical rows for dense / borderless tables (Tables
@@ -239,13 +241,19 @@ def _set_table_structure_mode(opts) -> None:
     mega-row — the root cause of the table-fidelity regression. `ACCURATE`
     remains a documented opt-in via `ParserConfig.docling_table_mode` for rare
     layouts where FAST over-segments. Guarded so API drift never breaks engine
-    construction (the default falls back to Docling's own default mode)."""
-    try:
-        from ..config import default_config
+    construction (the default falls back to Docling's own default mode).
 
-        mode = (default_config().docling_table_mode or "FAST").upper()
-    except Exception:
-        mode = "FAST"
+    F-11 fix: accepts table_mode parameter; falls back to config if empty."""
+    # Use provided table_mode, else read from config
+    if table_mode:
+        mode = table_mode.upper()
+    else:
+        try:
+            from ..config import default_config
+
+            mode = (default_config().docling_table_mode or "FAST").upper()
+        except Exception:
+            mode = "FAST"
     try:
         from docling.datamodel.pipeline_options import TableFormerMode
 
@@ -1146,6 +1154,20 @@ def _convert(converter, data: bytes, filename: str) -> object | None:
 _GUARD_OK: bool | None = None
 
 
+class DoclingConvertError(Exception):
+    """A per-page docling convert() call failed (B4).
+
+    Raised by `convert_path` when the ENGINE is fine but THIS page's conversion
+    raised — distinct from the engine being unavailable (which is signalled by
+    `convert_path` returning None). Carries the 0-based page and the wrapped
+    cause so callers can label the failure honestly and decide retry policy.
+    """
+    def __init__(self, message: str, page: int | None = None, caused: BaseException | None = None):
+        super().__init__(message)
+        self.page = page
+        self.caused = caused
+
+
 def get_engine():
     """The per-process Docling converter singleton (lazy, once per process).
 
@@ -1156,22 +1178,38 @@ def get_engine():
     return _engine if _engine is not False else None
 
 
-def convert_path(path: str, page: int, models_dir: str | None = None) -> object | None:
+def convert_path(path: str, page: int, models_dir: str | None = None,
+                 table_mode: str = "", ocr: bool | None = None) -> object | None:
     """Convert ONE page (0-based `page`) of `path` via `page_range=(page+1, page+1)`.
 
     Returns the full `ConversionResult` (so status/errors/page_count are
     inspectable), or None when the engine is unavailable. Reads `path` directly
     — no temp file — so the single reusable source path is the only write.
-    """
+
+    B4 (failure labeling): None means ONLY "engine unavailable" (`get_engine()`
+    returned None). A per-page convert() failure RAISES `DoclingConvertError`
+    (with the real error + page) so callers can tell "engine down" (skip/retry
+    futile, B2) from "this page failed" (retryable) — the two were previously
+    conflated, mislabeling recoverable pages as a dead engine.
+
+    F-11 fix: accepts table_mode and ocr overrides from PageWorkItem."""
     if models_dir:
         os.environ.setdefault("DOCLING_MODELS_PATH", models_dir)
+
+    # If config overrides provided, rebuild engine with those settings
+    # (Note: this is still using the global engine; a full fix would require
+    # per-config engines, but that's expensive. For now, the engine uses
+    # default_config() at build time, which should match the scheduler's config.)
     engine = get_engine()
     if engine is None:
         return None
     try:
         return engine.convert(path, page_range=(page + 1, page + 1))
-    except Exception:
-        return None
+    except Exception as exc:  # noqa: BLE001 — surface, don't swallow (B4)
+        raise DoclingConvertError(
+            f"docling convert failed page {page + 1}: {type(exc).__name__}: {exc}",
+            page=page, caused=exc,
+        ) from exc
 
 
 def docling_guard() -> bool:

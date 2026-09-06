@@ -48,6 +48,9 @@ class PageWorkItem:
     models_dir: str = ""
     ocr_enabled: bool = True
     attempt: int = 0
+    # F-11 fix: config overrides (picklable) for engine construction
+    docling_table_mode: str = ""  # FAST/ACCURATE, empty = use default
+    docling_ocr: bool = False
 
 
 @runtime_checkable

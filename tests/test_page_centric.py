@@ -373,6 +373,95 @@ def test_heavy_run_worker_convert_none_returns_failed(monkeypatch):
     assert r.errors
 
 
+def test_heavy_docling_convert_error_is_retryable_category(monkeypatch):
+    """B4: a per-page convert() raise must surface as `docling_convert`, NOT the
+    dead-engine `engine_unavailable` label (which the B2 retry-skip uses)."""
+    docling = pytest.importorskip("docling")
+    from app.parser.loaders import docling_loader
+
+    def _boom(*a, **k):
+        raise docling_loader.DoclingConvertError("boom on page", page=0)
+
+    _monkeypatch_convert_path(monkeypatch, _boom)
+    from app.parser.engines.heavy_docling import HeavyDoclingEngine
+
+    item = PageWorkItem(doc_id="d-x", source_hash="s", src_path="x.pdf",
+                        page_index=0, route="docling", models_dir="")
+    r = HeavyDoclingEngine(ParserConfig()).process(item)
+    assert r.status == PageStatus.FAILED
+    assert r.errors and r.errors[0]["category"] == "docling_convert"
+    assert "boom on page" in r.errors[0]["message"]
+
+
+def _plan_with_docling_page(src_path: str = "x.pdf") -> "tuple":
+    """Minimal ExecutionPlan carrying one page-0 docling work item."""
+    from app.parser.planner import ExecutionPlan
+
+    item = PageWorkItem(doc_id="d-x", source_hash="s", src_path=src_path,
+                        page_index=0, route="docling", models_dir="")
+    plan = ExecutionPlan(
+        doc_id="d-x", source_hash="s", sha="s", route="docling", decision=None,
+        detected_type="pdf", mime="application/pdf", declared_extension=".pdf",
+        probe="fitz", expected_page_set=[0], page_count=1,
+        page_sizes={0: (595.0, 842.0)}, metadata={}, config_snapshot={},
+        work_items=[item],
+    )
+    return plan, item
+
+
+def test_retry_pages_retries_docling_convert_but_skips_engine_unavailable(monkeypatch, tmp_path):
+    """B4∩B2: `docling_convert` pages are retried on the next pass; only the
+    genuine `engine_unavailable` (dead engine) is skipped."""
+    docling = pytest.importorskip("docling")
+    from app.parser.assembler import Assembler, AssemblyReport
+    from app.parser.page_result import PageResult, PageStatus
+    from app.parser.storage import FilesystemStore
+
+    plan, item = _plan_with_docling_page()
+    called = {"n": 0}
+
+    # Exchange the HeavyDoclingEngine.process for a stub recording the retry.
+    import app.parser.engines.heavy_docling as hd
+
+    orig = hd.HeavyDoclingEngine.process
+
+    def stubbed_process(self, it):
+        called["n"] += 1
+        return PageResult(doc_id=it.doc_id, page_index=it.page_index, route="docling",
+                          status=PageStatus.OK, source_hash=it.source_hash)
+
+    monkeypatch.setattr(hd.HeavyDoclingEngine, "process", stubbed_process)
+
+    store = FilesystemStore(str(tmp_path / "store"))
+    assembler = Assembler(ParserConfig(), store)
+
+    src = {"fail": PageResult(
+        doc_id=plan.doc_id, page_index=0, route="docling", status=PageStatus.FAILED,
+        errors=[{"page_no": 1, "category": "docling_convert", "message": "transient"}],
+        source_hash=plan.source_hash)}
+
+    try:
+        # (a) docling_convert page: retried, engine actually re-invoked.
+        report = AssemblyReport(doc_id=plan.doc_id, status="partial", failed_pages=[0])
+        out = assembler._retry_pages(plan, list(src.values()), report)
+        assert called["n"] == 1, "docling_convert page must be retried, not skipped"
+        assert any(r.status == PageStatus.OK for r in out)
+    finally:
+        monkeypatch.setattr(hd.HeavyDoclingEngine, "process", orig)
+
+    # (b) engine_unavailable page: skipped (B2) — no engine call, result kept.
+    called["n"] = 0
+    unavail = PageResult(
+        doc_id=plan.doc_id, page_index=0, route="docling", status=PageStatus.FAILED,
+        errors=[{"page_no": 1, "category": "engine_unavailable",
+                 "message": "docling engine unavailable"}],
+        source_hash=plan.source_hash)
+    report2 = AssemblyReport(doc_id=plan.doc_id, status="partial", failed_pages=[0])
+    out2 = assembler._retry_pages(plan, [unavail], report2)
+    assert called["n"] == 0, "engine_unavailable page must be skipped (B2)"
+    assert out2[0].errors and out2[0].errors[0]["category"] == "engine_unavailable"
+
+
 # ---------------------------------------------------------------------------
 # A2 — Corrupt / unreadable PDF must NOT report `parsed` with 0 pages
 # ---------------------------------------------------------------------------

@@ -14,9 +14,10 @@ import threading
 import time
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from ..parser import ocr as parser_ocr
-from ..parser.events import EventPublisher, silent_sink
+from ..parser.events import EventPublisher, file_sink
 from ..parser.extraction import Extractor, set_shared_scheduler
 from ..parser.scheduler import Scheduler
 from ..parser.storage import FilesystemStore, Store
@@ -79,9 +80,10 @@ class ParseNormalizePipeline:
                 heavy_concurrency=proc_cfg.heavy_concurrency,
                 page_store=page_store, ledger=ledger,
             )
-        # batch pipelines emit to a broker, not stdout (see silent_sink)
+        # batch pipelines emit to a file sink (events.jsonl), not stdout
+        events_path = str(Path(root) / "events.jsonl")
         self.extractor = Extractor(
-            parser_config, store, events=EventPublisher(sink=silent_sink()),
+            parser_config, store, events=EventPublisher(sink=file_sink(events_path)),
             scheduler=ParseNormalizePipeline._scheduler,
             page_store=page_store, ledger=ledger,
         )
