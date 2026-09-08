@@ -109,6 +109,37 @@ class Extractor:
                  resume: bool = False) -> ParseOutcome:
         t0 = time.time()
         sha = sha256 or hashlib.sha256(data).hexdigest()
+        doc_id = f"d-{sha[:16]}"
+
+        # Fast resumption check: if document was already assembled OK and DOM exists, return instantly
+        if resume:
+            ledger_plan = self.ledger.load_plan(doc_id)
+            if ledger_plan and ledger_plan.get("assembly", {}).get("status") == "ok":
+                dom_dir = self.root / "dom" / doc_id
+                dom_files = sorted(dom_dir.glob("dom-*.docJSON")) if dom_dir.exists() else []
+                if dom_files:
+                    try:
+                        from .dom import Document
+                        doc = Document.model_validate_json(dom_files[-1].read_text(encoding="utf-8"))
+                        detected = detection.detect(data, filename)
+                        elapsed = (time.time() - t0) * 1000
+                        rep = ledger_plan.get("assembly", {}).get("report") or {}
+                        doc_report = {
+                            "elapsed_ms": round(elapsed, 1),
+                            "timings": {"total_ms": round(elapsed, 1), "resumed": True},
+                            "blocks": doc.num_blocks(),
+                            "tables": doc.num_tables(),
+                            "images": doc.num_images(),
+                            "pages": len(doc.pages),
+                            "expected_pages": rep.get("expected_pages", len(doc.pages)),
+                            "ocr": doc.provenance.ocr_engine if doc.provenance else None,
+                            "route": ledger_plan.get("route"),
+                            "dom_key": f"dom/{doc_id}/{dom_files[-1].name}",
+                            "raw_key": None,
+                        }
+                        return ParseOutcome(doc_id, "parsed", doc, detected, doc_report)
+                    except Exception:
+                        pass
 
         t_detect = time.time()
         detected = detection.detect(data, filename)

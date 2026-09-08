@@ -46,16 +46,36 @@ STRATA_QUERIES: dict[str, list[str]] = {
     "S1": [  # multi-column academic reviews
         'JOURNAL:"BMJ Open" OPEN_ACCESS:y AND PUB_TYPE:"Review"',
         'JOURNAL:"PLoS ONE" OPEN_ACCESS:y AND PUB_TYPE:"Review" AND (TITLE:"cardiovascular" OR TITLE:"oncology")',
+        'JOURNAL:"Scientific Reports" OPEN_ACCESS:y AND PUB_TYPE:"Review" AND TITLE:"medicine"',
+        'JOURNAL:"Frontiers in Medicine" OPEN_ACCESS:y AND PUB_TYPE:"Review"',
+        'JOURNAL:"BMC Medicine" OPEN_ACCESS:y AND PUB_TYPE:"Review"',
+        'JOURNAL:"eLife" OPEN_ACCESS:y AND (PUB_TYPE:"Review" OR TITLE:"review") AND TITLE:"health"',
+        'OPEN_ACCESS:y AND PUB_TYPE:"Systematic Review" AND (TITLE:"meta-analysis" OR TITLE:"epidemiology")',
     ],
     "S2": [  # table-dense / clinical-trial reports
         'OPEN_ACCESS:y AND PUB_TYPE:"Clinical Trial" AND (TITLE:"randomized controlled trial" OR TITLE:"double-blind" OR TITLE:"surveillance")',
+        'OPEN_ACCESS:y AND PUB_TYPE:"Clinical Trial" AND (TITLE:"phase 3" OR TITLE:"efficacy" OR TITLE:"placebo")',
+        'JOURNAL:"Trials" OPEN_ACCESS:y AND (TITLE:"randomised" OR TITLE:"protocol" OR TITLE:"trial")',
+        'OPEN_ACCESS:y AND (TITLE:"cohort study" OR TITLE:"multicenter study" OR TITLE:"registry")',
+        'OPEN_ACCESS:y AND PUB_TYPE:"Clinical Trial" AND (TITLE:"safety" OR TITLE:"tolerability" OR TITLE:"pharmacokinetics")',
     ],
     "S3": [  # clinical guidelines
         'OPEN_ACCESS:y AND PUB_TYPE:"Practice Guideline"',
         'OPEN_ACCESS:y AND (TITLE:"consensus statement" OR TITLE:"clinical guideline") AND hasPDF:y',
+        'OPEN_ACCESS:y AND (TITLE:"management guideline" OR TITLE:"clinical practice recommendations")',
+        'JOURNAL:"BMJ" OPEN_ACCESS:y AND (TITLE:"guideline" OR TITLE:"recommendations")',
+        'OPEN_ACCESS:y AND (TITLE:"diagnostic criteria" OR TITLE:"screening recommendations" OR TITLE:"treatment guidelines")',
+    ],
+    "S4": [  # forms, scans, lab reports, pathology case studies
+        'OPEN_ACCESS:y AND (PUB_TYPE:"Case Reports" OR TITLE:"case report") AND (TITLE:"pathology" OR TITLE:"clinical presentation")',
+        'OPEN_ACCESS:y AND (TITLE:"laboratory findings" OR TITLE:"biomarker panel" OR TITLE:"histological")',
+        'JOURNAL:"BMJ Case Reports" OPEN_ACCESS:y',
     ],
     "S5": [  # mixed / edge — image-heavy medical imaging
         'OPEN_ACCESS:y AND (JOURNAL:"Medical image analysis" OR TITLE:"CT imaging" OR TITLE:"MRI") AND PUB_TYPE:"Journal Article"',
+        'OPEN_ACCESS:y AND (TITLE:"ultrasound" OR TITLE:"histopathology" OR TITLE:"PET scan" OR TITLE:"endoscopy")',
+        'JOURNAL:"Radiology: Artificial Intelligence" OPEN_ACCESS:y',
+        'JOURNAL:"Frontiers in Oncology" OPEN_ACCESS:y AND (TITLE:"imaging" OR TITLE:"segmentation" OR TITLE:"biomarker")',
     ],
 }
 
@@ -149,7 +169,7 @@ def search_arxiv(max_results: int = 60) -> list[dict]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", required=True, help="path to corpus manifest.json (append-only)")
-    ap.add_argument("--limit", type=int, default=150, help="max new entries added this run")
+    ap.add_argument("--limit", type=int, default=800, help="max new entries added this run")
     ap.add_argument("--strata", default="S1,S2,S3,S4,S5", help="comma-separated strata subset to seed")
     ap.add_argument("--no-arxiv", action="store_true", help="skip the arXiv query (S5)")
     ap.add_argument("--dry-run", action="store_true", help="print candidates without touching manifest")
@@ -163,33 +183,40 @@ def main() -> int:
 
     strata = {s.strip() for s in args.strata.split(",") if s.strip()}
     added: list[dict] = []
+    strata_added: dict[str, int] = {s: 0 for s in strata}
+    per_stratum_cap = max(20, (args.limit // max(1, len(strata))))
 
     # 1) Curated .gov/.int seeds (S4 forms/scans + few S2/S3)
     if "S4" in strata:
         for rec in CURATED_SEED:
             if _norm_key(rec) not in existing:
                 added.append(rec)
+                strata_added["S4"] = strata_added.get("S4", 0) + 1
 
     # 2) Europe PMC per-stratum queries
     for stratum in sorted(strata):
-        for q in STRATA_QUERIES.get(stratum, []):
-            if len(added) >= args.limit:
+        if stratum not in STRATA_QUERIES:
+            continue
+        for q in STRATA_QUERIES[stratum]:
+            if strata_added.get(stratum, 0) >= per_stratum_cap or len(added) >= args.limit:
                 break
-            recs = search_europepmc(q)
+            recs = search_europepmc(q, page_size=100)
             for rec in pmc_to_manifest(recs, stratum):
-                if len(added) >= args.limit:
+                if strata_added.get(stratum, 0) >= per_stratum_cap or len(added) >= args.limit:
                     break
                 if _norm_key(rec) not in existing:
                     added.append(rec)
+                    strata_added[stratum] = strata_added.get(stratum, 0) + 1
             time.sleep(0.8)  # polite rate limit
 
     # 3) arXiv edge/mixed (S5)
     if "S5" in strata and not args.no_arxiv and len(added) < args.limit:
-        for rec in search_arxiv(max_results=60):
+        for rec in search_arxiv(max_results=80):
             if len(added) >= args.limit:
                 break
             if _norm_key(rec) not in existing:
                 added.append(rec)
+                strata_added["S5"] = strata_added.get("S5", 0) + 1
 
     if args.dry_run:
         for rec in added:

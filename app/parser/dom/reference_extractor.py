@@ -115,11 +115,12 @@ def _recover_labels_from_source(pages, src_bytes: bytes) -> dict[int, dict[int, 
             nums: set[str] = set()
             for w in words:
                 wx0, wy0, wx1, wy1, wtxt = w[0], w[1], w[2], w[3], w[4]
-                # Within the block's vertical span (allow a small line-height slack).
-                if not (y0 - 8 <= wy0 <= y1 + 8):
+                w_mid_y = (wy0 + wy1) / 2.0
+                # Within the block's vertical span
+                if not (y0 - 2.0 <= w_mid_y <= y1 + 2.0):
                     continue
-                # At/before the entry text start (inline citations sit further right).
-                if wx0 > x0 + 6:
+                # At the entry text start (must align with the block's left margin)
+                if not (x0 - 6.0 <= wx0 <= x0 + 6.0):
                     continue
                 m = re.fullmatch(r"\[(\d{1,4})\]", wtxt.strip())
                 if m:
@@ -223,10 +224,16 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
         if existing is None or len(text) > len(existing.text):
             best[num] = Reference(kind="citation", target=rid, id=rid, label=label, text=text)
 
+    last_num: str | None = None
+
     for i in range(scan_from, len(blocks) if stop_at is None else stop_at):
         b = blocks[i]
         text = (b.text or "").strip()
         if not text:
+            continue
+
+        if getattr(b, "kind", "") in ("heading", "title"):
+            last_num = None
             continue
 
         # Primary split: does the block START with [n]?
@@ -239,19 +246,39 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
             all_nums = {leading_num} | geo_nums
             if len(all_nums) > 1:
                 # Merged block: segment by ALL markers found in the text.
-                for num, _label, entry_text in _split_merged_block(text, leading_num, geo_nums):
+                splits = _split_merged_block(text, leading_num, geo_nums)
+                for num, _label, entry_text in splits:
                     _keep(num, entry_text)
+                if splits:
+                    last_num = splits[-1][0]
             else:
                 # Single entry in this block.
                 entry_text = (m.group(2) or "").strip()
                 _keep(leading_num, entry_text)
+                last_num = leading_num
         elif geo_nums:
-            # Block has NO leading [n] but geo found markers (marker dropped in
-            # mapping). Emit one entry per confirmed number, each carrying the
-            # block's full text (downstream consumers get the complete entry).
-            for num in sorted(geo_nums, key=int):
+            # Block has NO leading [n] but geo found markers (marker dropped in mapping).
+            splits = _split_merged_block(text, next(iter(sorted(geo_nums, key=int))), geo_nums)
+            if splits:
+                for num, _label, entry_text in splits:
+                    _keep(num, entry_text)
+                last_num = splits[-1][0]
+            else:
+                # Assign to the first geo marker for this block (never duplicate text across multiple labels)
+                num = sorted(geo_nums, key=int)[0]
                 _keep(num, text)
-        # else: not a bibliography entry (continuation handled by next block's detection)
+                last_num = num
+        elif last_num is not None and last_num in best:
+            # Wrap-around continuation line for the previous reference entry
+            prev_ref = best[last_num]
+            merged_text = f"{prev_ref.text} {text}".strip()
+            best[last_num] = Reference(
+                kind=prev_ref.kind,
+                target=prev_ref.target,
+                id=prev_ref.id,
+                label=prev_ref.label,
+                text=merged_text,
+            )
 
     ordered = sorted(best.values(), key=lambda r: int(r.label[1:-1]))
     refs = ordered

@@ -210,7 +210,14 @@ def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = ""):
         # so each 0.5 reduction is a 4x smaller OCR tensor and a much lower
         # `std::bad_alloc` risk. 1.5 still preserves legible text for normal
         # documents while cutting the worst-case OCR heap meaningfully.
-        opts.images_scale = 1.5
+        #
+        # Fast-getout: PARSER_IMAGES_SCALE env override (default 1.5, unchanged
+        # behaviour). Heavy-image corpus pages can still blow the preprocess heap
+        # (`std::bad_alloc` is a native allocation failure -- NOT recoverable
+        # from Python); scale^2 area scaling means 1.0 cuts the worst-case raster
+        # + picture-crop heap ~2.25x. Documented in ADR-013 addendum 3.
+        _scale = float(os.environ.get("PARSER_IMAGES_SCALE", "1.5"))
+        opts.images_scale = _scale
     except Exception:
         pass
     # D2 (extraction-quality run): choose Docling's table-structure mode. FAST
@@ -404,10 +411,10 @@ def _map_item(item, rec: RecoveredDocument, doc=None) -> None:
     bbox = _bbox(prov, page_h)
 
     label = _label_name(item)
-    if label == "table":
+    if label in ("table", "document_index") or type(item).__name__ == "TableItem" or hasattr(item, "table"):
         _map_table(item, rec, doc, page, bbox, page_h)
         return
-    if label == "picture":
+    if label == "picture" or type(item).__name__ == "PictureItem" or hasattr(item, "image"):
         _map_image(item, rec, doc, page, bbox)
         return
 
@@ -487,7 +494,7 @@ def _table_structural_confidence(header: list[str], rows: list[list[str]]) -> fl
     surface the uncertainty via `Table.confidence` so downstream consumers do
     not over-trust the row/column mapping.
     """
-    if len(rows) >= 2 or len(header) <= 1:
+    if len(rows) != 1 or len(header) <= 1:
         return 1.0
     body = rows[0]
     if len(body) != len(header):

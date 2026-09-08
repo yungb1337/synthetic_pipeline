@@ -1,0 +1,282 @@
+Total judged files: 121
+Verdict counts: {'PASS_WITH_ISSUES': 34, 'PASS': 87}
+
+=== ALL ISSUES BY SURFACE ===
+
+======================================================================
+Surface: reference (3 issues)
+======================================================================
+[d-01e3f03d79f6cd59] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some reference entries (e.g. trailing references on page 8) are partially truncated or split across pages in the source text capture.
+  Suggestion: Ensure reference blocks fully capture multi-line or split citations without dropping trailing characters.
+  Notes: The document parser accurately extracts the scientific article's main text, complex section headers, and multi-column tables. Text fidelity and structure preservation are high, with only minor formatting splits observed in reference sections.
+
+[d-1406cf01ce601541] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: The parser's canonical sample references preview shows text truncation or minor duplication in reference labels (e.g., repeating reference [1] text for [2]).
+  Suggestion: Verify reference extraction mapping to ensure distinct reference strings are correctly associated with their proper indices.
+  Notes: The parser successfully extracted text, section headings, and figure captions across all three multi-column pages. No significant content loss or fabrication was observed in the main body text. Tables were absent or treated as figures/images by this layout, making table metrics non-evaluable.
+
+[d-ca62026bc241a805] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: The references section is truncated at the end of the preview text ('Use of telemedicine in pediatric services for 4 represe').
+  Suggestion: Ensure the complete text of final reference entries is parsed if present in the source PDF.
+  Notes: The document is successfully parsed with high fidelity and completeness for the main text, author affiliations, and metadata. Minor truncation occurs at the very end of the text block in the references section, likely due to page boundary limits. No tables were present in the source document.
+
+======================================================================
+Surface: structure (19 issues)
+======================================================================
+[d-0c77389834b669fb] [minor] Verdict: PASS
+  Detail: Minor line-break or hyphenation differences inherent to automated layout parsing across multi-column boundaries.
+  Suggestion: Refine multi-column layout reassembly heuristics to reduce fragmented line wraps.
+  Notes: The DOM successfully captures the core text, structure, tables, and references of the source PDF. Minor layout artifacts do not significantly impair readability or data fidelity.
+
+[d-23277375c12ede26] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some multi-column layout artifacts present in section breaks.
+  Suggestion: Improve multi-column reading order assembly.
+  Notes: The document is parsed with high accuracy, preserving complex multi-column structures and tabular data. Minor reading order ambiguities are noted across page transitions.
+
+[d-2db83de84e3ddb15] [minor] Verdict: PASS
+  Detail: Minor spacing and hyphenation differences across multi-column layout boundaries (e.g. 'AI- assisted' vs 'AI-­assisted').
+  Suggestion: Improve soft-hyphen and multi-column flow handling during parsing.
+  Notes: The parser demonstrates exceptional fidelity in recovering complex multi-column academic text, including proper tabular structure representation. All sampled sections align closely with the source document. Only minor layout and hyphenation artifacts were observed.
+
+[d-5d103c30bc65b555] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Minor multi-column flow interleaving observed in complex layout pages.
+  Suggestion: Refine column separation heuristics in the parser routing.
+  Notes: The document text is parsed with high fidelity, maintaining correct institutional affiliations, medical terminology, and layout tables. Minor reading order interleave issues occur in multi-column sections, but overall structure and completeness remain robust.
+
+[d-5d86970d4b7f879b] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Minor flow interleaving in multi-column layout sections across pages 2-6.
+  Suggestion: Adjust column reconstruction logic to prevent minor reading-order drift.
+  Notes: The document parser accurately extracted the core text, tables, and scientific content from the multi-column layout. Completeness and fidelity are high, with only minor multi-column reading-order artifacts observed.
+
+[d-72ce20c042271860] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Minor reading order interleaving across multi-column boundaries on page 1 and 2.
+  Suggestion: Refine multi-column layout sorting heuristics.
+  Notes: The parser successfully extracts the academic text, tables, and structured layout with high fidelity. Minor reading order fluctuations across columns were observed but do not significantly impact the usability of the document.
+
+[d-747472a36ea2ff61] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some hyphenation and soft hyphens in multi-column layout are retained as characters (e.g. data-driven vs data‑driven).
+  Suggestion: Normalize soft hyphens and line-break hyphens during extraction.
+  Notes: The automated parser successfully extracted text, structure, tables, and reference entries from the multi-column source document with high fidelity. Only minor spacing and hyphenation artifacts were observed. Overall, the parsing quality is strong and reliable.
+
+[d-8441a0d134f547d2] [minor] Verdict: PASS
+  Detail: Reading order across multi-column complex sections occasionally interleaves column content in tables or footnotes.
+  Suggestion: Refine column-segregation heuristics during layout analysis.
+  Notes: The parser demonstrates exceptional extraction quality across complex multi-column academic layouts containing dense tabular data and intricate citations. Text fidelity and structural preservation remain robust throughout the sampled pages.
+
+[d-8b19694041452d8d] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some multi-column layout headings and editorial meta-information show minor interleavings in reading order.
+  Suggestion: Improve multi-column flow sorting algorithms for editorial and review metadata blocks.
+  Notes: The DOM successfully parses the multi-column medical review text, complex clinical score tables, and extensive references with high fidelity. Minor reading order ambiguities are typical for complex multi-column layouts like Front. Surg. articles but do not impair core content usability.
+
+[d-971fa4f56ea80868] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some multi-column layout headings and author affiliations are slightly interspersed across reading blocks.
+  Suggestion: Refine reading-order heuristics for multi-column medical journal layouts.
+  Notes: The automated parser successfully extracted complex multi-column text, medical guidelines, and structured tables from the American Venous Forum guideline document with high fidelity and completeness. Only minor multi-column reading order interspersions were noted.
+
+[d-a5e5abf2b9bb442d] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Complex multi-column layouts like Table 1 and Table 2 required careful reconstruction where column headers and split cell text might be slightly dispersed.
+  Suggestion: Ensure robust multi-column reading order detection for wide comparison tables.
+  Notes: The parser successfully extracted text, section headers, and tabular data across multiple complex pages. Minor layout parsing ambiguities in dense comparative tables represent the only deviation.
+
+[d-afc2a97455d76530] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Multi-column layout flow contains slight reading-order interleave between author affiliations and running headers across sampled pages.
+  Suggestion: Refine column-reconstruction heuristics for dense academic author lists and multi-column body text.
+  Notes: The parser successfully extracted the complex multi-author metadata, structured clinical recommendation tables, and detailed reference sections. Minor reading-order interleavings occur in dense multi-column sections, but overall fidelity and text preservation are exceptionally high.
+
+[d-b70dc08bcdd1671b] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some multi-column text fragments and author affiliations across pages 1-3 exhibit slight reading order interleave issues typical of automated layout parsers.
+  Suggestion: Refine multi-column reading order heuristics for academic author affiliation blocks.
+  Notes: The parser successfully captures the entire source document content, including complex author blocks, structured text, and tables with high fidelity. Minor reading order ambiguities occur in multi-column layouts but do not significantly affect document comprehension.
+
+[d-c2af528aa64421d8] [minor] Verdict: PASS
+  Detail: Minor reading order interleaving across multi-column layout boundaries in complex sections.
+  Suggestion: Refine column-splittng heuristics for dense academic two-column layouts.
+  Notes: The parser successfully extracted text, structure, and complex tabular data across all previewed pages. Fidelity to the source PDF is exceptionally high with minimal artifacts. Overall, the parsing quality is robust.
+
+[d-d0d46d67427a16fe] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some multi-column layout reading order nuances cause text interleavings between sections in complex pages.
+  Suggestion: Refine multi-column block sorting algorithm to better preserve natural reading flow across columns.
+  Notes: The parser successfully extracts the vast majority of the text, dense metadata, and complex table rows across multiple pages. Fidelity to the source text is high with negligible character corruption. Minor reading order adjustments for multi-column sections would make the DOM even more robust.
+
+[d-d7be340551eeb6bc] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Multi-column layout of the tables and references introduces minor interleaving in reading order.
+  Suggestion: Refine column-aware reading order extraction for complex grid layouts.
+  Notes: The parser successfully extracts the dense multi-column medical guidelines, handling complex structured tables and multi-author metadata cleanly. Minor structural artifacts are present due to multi-column text flow interleaving, but overall fidelity and completeness are high.
+
+[d-e365d53cc3cf9a9a] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Multi-column layout reading order occasionally interlaces sections across columns rather than proceeding strictly column-by-column.
+  Suggestion: Refine the multi-column reading order heuristics for academic two-column formats.
+  Notes: The document was successfully parsed with high fidelity across text blocks and structure. Minor imperfections are noted in multi-column reading order traversal and table cell character encoding. Overall, the parsing quality is strong and reliable for academic literature.
+
+[d-e6794f331ef652a1] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Reading order occasionally interleaves header/footer metadata lines with running paragraph text.
+  Suggestion: Improve header/footer classification filter to strip recurring running titles cleanly from main text blocks.
+  Notes: The document is successfully parsed with high fidelity and completeness. Minor structural and table alignment issues exist due to complex multi-column layouts and dense academic tabular data, but core text content and metadata are accurately recovered.
+
+[d-f6640f746094da45] [minor] Verdict: PASS
+  Detail: Figure captions and body text in multi-column sections show slight reading order interleaving typical of complex layouts.
+  Suggestion: Adjust multi-column block segmentation and reading order heuristics for tighter boundary grouping.
+  Notes: The document parser accurately captures text, table data (Table 1), and image captions across the sampled pages. Fidelity against the source text is extremely high, with no major omissions or hallucinations detected.
+
+======================================================================
+Surface: table (24 issues)
+======================================================================
+[d-1032d5500a6ed113] [minor] Verdict: PASS
+  Detail: Some table headers or cells in Table 1 have slight truncation in preview representation, though core content is parsed.
+  Suggestion: Verify cell bounding boxes and text extraction for multi-line table headers.
+  Notes: The document was successfully parsed with high fidelity and completeness. Standard multi-column layout and complex table structure were preserved correctly by the Docling routing engine.
+
+[d-1db6e78f0476265f] [minor] Verdict: PASS
+  Detail: Table cell text contains slight formatting overlaps in preview samples for complex multi-column trials data.
+  Suggestion: Refine table column boundary detection for dense multi-line cells.
+  Notes: The automated parser successfully extracted text, structure, tables, and references from the 26-page multi-column document with very high fidelity and completeness. Minor formatting fragmentation in dense tables is present but does not affect data legibility. Overall, the parsing quality is excellent.
+
+[d-241e2e117ff72fc9] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some table headers and cell text in the parsed DOM preview show minor truncation or split representations.
+  Suggestion: Verify table column boundaries and cell extraction logic to prevent text fragmentation.
+  Notes: The automated parser successfully extracted the text, metadata, and structured elements with high fidelity. Minor issues are restricted to table cell boundary recognition and layout reading order in multi-column sections. Overall, the parsing quality is robust and suitable for downstream usage.
+
+[d-3ed45cb7c80225c0] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Table preview structure is detected in the DOM summary, but complex table alignment and formatting require close verification during multi-column layout parsing.
+  Suggestion: Ensure column headers and row alignments match the exact source layout for Demographics and Baseline Characteristics.
+  Notes: The DOM successfully captures the multi-column layout, headings, and textual content of the clinical trial report across the sampled pages. Minor structural complexities in multi-column sections and table positioning are noted but do not significantly impair document readability or completeness.
+
+[d-410c06ede77fb6c4] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Complex multi-column and multi-row headers in Table 2 and Table 3 show slight alignment interleaving in the DOM preview structure.
+  Suggestion: Refine table structure parsing for multi-tier header spanning.
+  Notes: The automated parser successfully extracted the dense medical article text, headings, and complex tabular data across multiple columns with high fidelity. Minor structural noise is visible in multi-row table cell mappings, but overall text and content correspondence remain excellent.
+
+[d-46693f453db84eaf] [minor] Verdict: PASS
+  Detail: Some multi-line table headers or sub-columns in complex medical recommendation tables are slightly fragmented across column breaks.
+  Suggestion: Improve table cell span detection for multi-row complex headers.
+  Notes: The automated parser successfully extracted the dense medical consensus document with high fidelity across multi-column layouts and complex tables. Minor structural fragmentation occurs in extensive guideline tables, but core clinical information, terminology, and formatting remain well-preserved.
+
+[d-47dfd943560f641b] [minor] Verdict: PASS
+  Detail: Some complex table headers (e.g., in Table A2 and A4) have minor column alignment shifts in the automated DOM extraction.
+  Suggestion: Refine table parsing templates to properly align multi-level header spans.
+  Notes: The automated parser successfully extracted the text, metadata, and complex tables with high fidelity. Minor structural artifacts in deeply nested table headers are noted but do not impede document understanding. Overall, the parsing quality is excellent.
+
+[d-54291d94837a9de5] [minor] Verdict: PASS
+  Detail: Some table headers and cell values in the parsed DOM tables show minor boundary misalignment or row/column overflow.
+  Suggestion: Refine table structure extraction to cleanly map column headers to corresponding data cells.
+  Notes: The parser successfully extracted the text, metadata, and structured tables from the multi-column layout with high fidelity. Minor imperfections exist in complex table grid alignments, but overall document content and reading order are well preserved.
+
+[d-69467b6b781ea449] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Complex multi-column grid layouts in Table 1 exhibit minor cell alignment or text splitting across parsed blocks.
+  Suggestion: Improve table cell boundary detection for wide epidemiological summary tables.
+  Notes: The parser successfully extracts the vast majority of the text, structure, and tabular data across the multi-column document layout. Minor issues are confined to complex table cell representations and column span alignments in wide scientific tables. Overall correspondence between the source PDF and DOM is strong.
+
+[d-720fdc00ea191545] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Minor character encoding artifact observed in table previews (e.g., 'RecommendationEstrength' instead of 'Recommendation strength').
+  Suggestion: Improve word spacing and symbol clean-up during table extraction.
+  Notes: The DOM successfully captures the document text, layout, and structured tables with high fidelity. Minor spacing artifacts and encoding issues appear in some table headers but do not hinder overall readability or data recovery.
+
+[d-777a11ad3a36d215] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Complex multi-page table structures (Table 1 continued) show minor cell misalignment and truncation markers in preview summaries.
+  Suggestion: Improve multi-page table continuation cell boundary detection and merging.
+  Notes: The document is parsed with high fidelity, successfully capturing the academic text, metadata, and complex table layouts across multiple pages. Minor structural issues involve multi-page table cell splits, but overall text and section ordering remain very solid.
+
+[d-8b19694041452d8d] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Complex multi-row/column guideline tables contain slight cell truncation or wrapping artifacts in the preview boundaries.
+  Suggestion: Refine grid border detection for complex clinical scoring tables.
+  Notes: The DOM successfully parses the multi-column medical review text, complex clinical score tables, and extensive references with high fidelity. Minor reading order ambiguities are typical for complex multi-column layouts like Front. Surg. articles but do not impair core content usability.
+
+[d-929b92abf461b1b6] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: The complex comparative table on page 5 features some cell fragmentation and multi-column alignment overlap in the automated DOM representation.
+  Suggestion: Refine table structure detection for multi-column comparison grids to keep rows and columns strictly aligned.
+  Notes: The parser successfully captures the entire text, metadata, and figures across the sampled pages. Minor structural complexity is noted in the tabular comparison layout on page 5, but overall fidelity and completeness are very high.
+
+[d-97b717427b6bf503] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Table preview characters show some garbled text artifacts in header cells (e.g., '<eÜommenÖütionf[trength' instead of recommendation strength).
+  Suggestion: Improve character encoding mapping for special unicode symbols or icons in table headers during parsing.
+  Notes: The document parser successfully extracts the vast majority of text, structure, and table data from the multi-column layout. Minor encoding artifacts occur in special recommendation strength symbols within table cells. Overall correspondence between the source PDF and parsed DOM is high.
+
+[d-9a3f89e46c2d261e] [minor] Verdict: PASS
+  Detail: Some complex table headers and multi-row alignments are slightly flattened in the DOM text representation.
+  Suggestion: Improve multi-line cell header grouping and column alignment parsing for complex biostatistical tables.
+  Notes: The automated parser successfully extracted the complex medical study text, tables, and references with high fidelity. Minor formatting normalization occurred in complex multi-column tables, but overall correspondence is excellent.
+
+[d-adb767407decae73] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some complex multi-column table cells (e.g. Table 2) show minor wrapping artifacts and spacing anomalies in cell extraction.
+  Suggestion: Improve multi-column grid alignment and column boundary detection during table parsing.
+  Notes: The document parser successfully captured nearly all textual content, layout sections, and bibliographic references from the source PDF. Minor imperfections were observed in table cell formatting and column alignment for complex dense layouts, but overall fidelity and completeness remain exceptionally high.
+
+[d-b91658b49d30e297] [minor] Verdict: PASS
+  Detail: Some minor character alignment and cell wrapping issues are noticeable in the table previews.
+  Suggestion: Refine table cell boundary detection to ensure cleaner text extraction.
+  Notes: The DOM successfully parses all the primary text, metadata, figures, and structural elements of the source PDF. Minor layout fragmentation in complex multi-column sections and table structures was observed but remains well within acceptable tolerance levels for automated extraction.
+
+[d-c194fde6a271afb9] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Table preview summary indicates table extraction handles complex multi-row structures but minor formatting truncations occur in table cell representations.
+  Suggestion: Ensure full string content of table cells is retained without abbreviation in canonical JSON outputs.
+  Notes: The parser successfully captures multi-column layouts, metadata, tables, and complex medical terminology with high fidelity. Reading order and structural elements are well-preserved across the sampled pages. Minor issues are limited to standard table cell length previews and structural complexity handling.
+
+[d-c9be82fef18ecc63] [minor] Verdict: PASS
+  Detail: Some table headers or cells in the SPIRIT checklist show minor cell wrapping/boundary shifts in preview representation.
+  Suggestion: Adjust cell parsing boundaries to align multi-line row descriptions cleanly.
+  Notes: The PARSED DOM matches the source PDF with high fidelity. Text content, headers, and structural flow are robustly maintained. Minor table and reference list nuances do not detract from overall document parse quality.
+
+[d-e365d53cc3cf9a9a] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some table headers and cell values in the parsed table previews (e.g., T1, T2) show slight truncation or symbol artifacts such as unmapped bullet or checkbox characters ().
+  Suggestion: Improve table cell extraction logic to accurately capture full strings and special characters.
+  Notes: The document was successfully parsed with high fidelity across text blocks and structure. Minor imperfections are noted in multi-column reading order traversal and table cell character encoding. Overall, the parsing quality is strong and reliable for academic literature.
+
+[d-e6794f331ef652a1] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Complex multi-column table data in page 3 exhibits cell alignment fragmentation across rows in the DOM preview.
+  Suggestion: Refine table grid detection heuristics to preserve cell boundaries for multi-line table headers.
+  Notes: The document is successfully parsed with high fidelity and completeness. Minor structural and table alignment issues exist due to complex multi-column layouts and dense academic tabular data, but core text content and metadata are accurately recovered.
+
+[d-ef2a44cbf01d7063] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Table 1 columns and contents from complex multi-column layout show minor boundary or text alignment fragmentation in preview mapping.
+  Suggestion: Refine table column-span detection for multi-page study characteristics tables.
+  Notes: The parser extracts text, tables, and multi-column academic layout with high fidelity. Minor structural noise is observed around complex grid lines and table cell boundaries. Overall, the parsing quality is strong and reliable.
+
+[d-f976f08627e99710] [minor] Verdict: PASS
+  Detail: Some table headers or cells in complex multi-column matrices show minor layout rearrangement.
+  Suggestion: Refine table parsing boundary detection for complex multi-column grids.
+  Notes: The parser demonstrates exceptional fidelity and completeness on a complex academic realist review document containing intricate multi-column layouts and structured tables. Minor imperfections are isolated to table cell mapping and layout structuring without impacting data integrity.
+
+[d-ffae5e192586c330] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Table truncation in the preview indicates some long cell text was shortened.
+  Suggestion: Ensure full table cell text is preserved without truncation in future parsing iterations.
+  Notes: The parser successfully extracted the text, layout, and table structures across all sampled pages with high fidelity. Minor structure and reading order ambiguities typical of multi-column scientific documents were handled reasonably well. Overall correspondence between source PDF and parsed DOM is strong.
+
+======================================================================
+Surface: text (7 issues)
+======================================================================
+[d-730339a6f12064a3] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Ligatures or special character encodings (e.g. 'Cite' in source) occasionally result in minor spacing or non-standard characters in the parsed DOM text.
+  Suggestion: Improve character normalization and ligature decoding during PDF text extraction.
+  Notes: The automated parser successfully extracted the medical study text, preserving complex multi-column layouts, tables, and references with high fidelity. Completeness and accuracy are excellent across all sampled pages, with only very minor encoding artifacts observed.
+
+[d-97ac6def3514a7ba] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some multi-column author affiliation blocks and layout boundaries caused slight interleaving or minor hyphenation issues in the parsed text.
+  Suggestion: Tune multi-column reading order heuristics to better group affiliation blocks by institution.
+  Notes: The document is successfully parsed with high completeness and fidelity. Minor layout complexity involving multi-column author lists and affiliations caused slight reading-order interleaving, but overall text content and metadata are accurately extracted.
+
+[d-a20716ef76da2ddc] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Minor spacing anomalies present in parsed text such as 'c omprehensive' and 'fr amework'.
+  Suggestion: Adjust tokenization and whitespace normalization post-processing.
+  Notes: The DOM successfully parses all complex multi-column layouts, tables, and dense academic text with high fidelity. Minor whitespace artifacts are present but do not impair readability or semantic integrity. Overall extraction quality is robust.
+
+[d-a444502a23b3815c] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some special characters or unicode entities (such as  or math symbols like >=) may have slight encoding variations during extraction.
+  Suggestion: Verify symbol normalization for mathematical operators and inequality signs.
+  Notes: The automated parser successfully extracted complex multi-column layouts, structured headings, and detailed tables. Minor formatting discrepancies in symbols and references are present but do not detract significantly from overall document fidelity.
+
+[d-ab4b1ccab153353b] [minor] Verdict: PASS
+  Detail: Minor diacritic rendering discrepancies on author names (e.g., Martı´nez-Garcı´a instead of standard combining characters).
+  Suggestion: Ensure unicode normalization for author names and accented characters.
+  Notes: The DOM successfully captures the multi-column layout, complex academic text, and references of the source PDF. Tables and section headers are accurately extracted with very high completeness and fidelity.
+
+[d-c5016352d93d71a8] [minor] Verdict: PASS
+  Detail: Title in metadata contains an encoded hyphen entity '18F&#x02010;Florbetaben' rather than the standard Unicode hyphen.
+  Suggestion: Normalize HTML/XML character entities in metadata field generation.
+  Notes: The automated parser successfully extracted all text blocks, headings, author lists, and abstract sections across both pages with high fidelity. There are no tables in the source document, and the overall structure is preserved accurately.
+
+[d-e546a005ed1bb895] [minor] Verdict: PASS_WITH_ISSUES
+  Detail: Some special characters and accent ligatures (such as 'Eÿcacy' or 'dierence') show minor encoding or rendering artifacts in both source and DOM.
+  Suggestion: Verify font encoding mappings during PDF parsing to ensure clean ligature extraction.
+  Notes: The parser successfully extracts the dense multi-column layout, complex medical tables, and detailed references with high fidelity. Minor character anomalies present in the PDF source text are appropriately handled, resulting in a robust document representation.
+

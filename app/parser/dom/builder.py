@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from ..parts import RecoveredDocument
 from ..config import ParserConfig
+from .._pdfmeta import clean_meta_string
 from . import reading_order
 from .models import (
     Annotation,
@@ -161,14 +162,14 @@ class DocumentBuilder:
             detected_type=recovered.detected_type,
             declared_extension=recovered.declared_extension,
             probe=recovered.probe,
-            title=recovered.title or "",
-            author=recovered.author or "",
-            creator=recovered.creator or "",
-            producer=recovered.producer or "",
-            subject=recovered.subject or "",
-            created=recovered.created or "",
-            modified=recovered.modified or "",
-            language=recovered.language or "",
+            title=clean_meta_string(recovered.title or ""),
+            author=clean_meta_string(recovered.author or ""),
+            creator=clean_meta_string(recovered.creator or ""),
+            producer=clean_meta_string(recovered.producer or ""),
+            subject=clean_meta_string(recovered.subject or ""),
+            created=clean_meta_string(recovered.created or ""),
+            modified=clean_meta_string(recovered.modified or ""),
+            language=clean_meta_string(recovered.language or ""),
             page_count=len(pages) or recovered.page_count or 0,
         )
 

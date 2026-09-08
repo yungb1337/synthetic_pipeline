@@ -94,6 +94,7 @@ def main() -> int:
     ap.add_argument("--force", action="store_true", help="re-download even ok entries")
     ap.add_argument("--no-verify-sha", action="store_true", help="skip the magic-byte PDF check")
     ap.add_argument("--delay", type=float, default=0.0, help="sleep between downloads (rate limit)")
+    ap.add_argument("--retry-errors", action="store_true", help="retry previously failed status:error entries")
     args = ap.parse_args()
 
     mpath = Path(args.manifest)
@@ -104,11 +105,22 @@ def main() -> int:
     outdir.mkdir(parents=True, exist_ok=True)
 
     manifest = json.loads(mpath.read_text(encoding="utf-8"))
-    only = set(s.strip() for s in args.only.split(",") if s.strip())
+    only = set(s.strip() for s in args.strata.split(",") if s.strip()) if hasattr(args, "strata") else set(s.strip() for s in args.only.split(",") if s.strip())
 
-    todo = [r for r in manifest
-            if (not only or r.get("stratum") in only)
-            and (args.force or r.get("status") != "ok")]
+    todo = []
+    for r in manifest:
+        if only and r.get("stratum") not in only:
+            continue
+        status = r.get("status")
+        if args.force:
+            todo.append(r)
+        elif status == "ok":
+            continue
+        elif status == "error" and not args.retry_errors:
+            continue
+        else:
+            todo.append(r)
+
     if args.limit > 0:
         todo = todo[: args.limit]
 
@@ -123,6 +135,26 @@ def main() -> int:
         pid = rec["id"]
         dest = outdir / f"{pid}.pdf"
         url = rec["url"]
+
+        # Fast path: already on disk and valid PDF
+        if dest.is_file() and not args.force:
+            try:
+                data = dest.read_bytes()
+                if (args.no_verify_sha or data.startswith(MAGIC)) and len(data) > 0:
+                    sha = hashlib.sha256(data).hexdigest()
+                    rec.update({
+                        "status": "ok",
+                        "sha256": sha,
+                        "size_bytes": len(data),
+                        "retrieved_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "error": None,
+                    })
+                    okn += 1
+                    _log(f"[download] OK (disk) {i}/{len(todo)} {pid} {len(data)}B")
+                    continue
+            except OSError:
+                pass
+
         res = fetch(url, dest, delay=args.delay)
         if res["ok"] and (args.no_verify_sha or is_pdf(dest)):
             rec.update({"status": "ok", "sha256": res["sha256"],

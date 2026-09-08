@@ -13,10 +13,17 @@ mean one crashing heavy page becomes `FAILED`, never a whole-run crash.
 from __future__ import annotations
 
 import multiprocessing as mp
+import multiprocessing.spawn as mpsp
 import os
+import sys
 import traceback
 from concurrent.futures import BrokenExecutor, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+
+try:
+    mpsp.set_executable(sys.executable)
+except Exception:
+    pass
 
 from .config import ParserConfig
 from .engines.base import (
@@ -44,24 +51,12 @@ def _heavy_initializer(models_dir: str):
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
     os.environ["TORCHDYNAMO_DISABLE"] = "1"
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     if models_dir:
         os.environ.setdefault("DOCLING_MODELS_PATH", models_dir)
     # Warm the engine + mark available (defensive; never crash the pool).
     try:
         from .loaders import docling_loader
-
-        if docling_loader.engine_available():
-            # Run the F probe once per worker and publish it to the shared Value
-            # so the governor can re-derive a tighter concurrency.
-            if _heavy_f_value is not None:
-                try:
-                    f = ResourceGovernor().measure_footprint()
-                    if f:
-                        with _heavy_f_value.get_lock():
-                            _heavy_f_value.value = f
-                except Exception:
-                    pass
+        docling_loader.engine_available()
     except Exception:
         pass
 
@@ -273,14 +268,32 @@ class Scheduler:
         # Shared probe handle (worker-published F). None until first docling job.
         self._mp_f_value = None
 
+        self._in_process_heavy_pool = None
         self._heavy_pool = None
         self._pool_is_broken = False
         # Lazily created on first heavy submit (and only if not in-process).
+
+    def _get_in_process_heavy_pool(self) -> ThreadPoolExecutor:
+        if self._in_process_heavy_pool is None:
+            # Single-thread executor for in-process heavy jobs to ensure
+            # Docling never runs concurrent page conversions in the same process
+            # (which causes massive RAM spikes, ONNX race conditions, and std::bad_alloc).
+            self._in_process_heavy_pool = ThreadPoolExecutor(max_workers=1)
+        return self._in_process_heavy_pool
 
     def _get_heavy_pool(self) -> ProcessPoolExecutor:
         if self._heavy_pool is None or self._pool_is_broken:
             # Build/rebuild pool (F-09 fix: rebuild after BrokenProcessPool)
             self._pool_is_broken = False
+            try:
+                mpsp.set_executable(sys.executable)
+            except Exception:
+                pass
+            if hasattr(mp, "set_executable"):
+                try:
+                    mp.set_executable(sys.executable)
+                except Exception:
+                    pass
             ctx = mp.get_context("spawn")
             # C1: create the shared F probe value (worker-published) before the
             # pool starts, so the initializer can write to it.
@@ -292,6 +305,7 @@ class Scheduler:
                 mp_context=ctx,
                 initializer=_heavy_initializer,
                 initargs=(self.config.docling_models_dir,),
+                max_tasks_per_child=20,
             )
         return self._heavy_pool
 
@@ -315,7 +329,7 @@ class Scheduler:
                 # bounded heavy pool. Never fall through to _run_native (which only
                 # handles native/enrichment/image/simple).
                 if in_process:
-                    fut = self.native_pool.submit(_run_heavy, item, self.config)
+                    fut = self._get_in_process_heavy_pool().submit(_run_heavy, item, self.config)
                 else:
                     fut = self._get_heavy_pool().submit(_run_heavy, item, self.config)
             else:
@@ -407,6 +421,12 @@ class Scheduler:
             self.native_pool.shutdown(wait=True)
         except Exception:
             pass
+        if self._in_process_heavy_pool is not None:
+            try:
+                self._in_process_heavy_pool.shutdown(wait=True)
+            except Exception:
+                pass
+            self._in_process_heavy_pool = None
         if self._heavy_pool is not None:
             try:
                 self._heavy_pool.shutdown(wait=True)

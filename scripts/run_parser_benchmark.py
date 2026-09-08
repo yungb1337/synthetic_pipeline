@@ -133,6 +133,7 @@ def main() -> int:
     ap.add_argument("--batch", required=True, help="batch id, e.g. b01")
     ap.add_argument("--reports", required=True, help="reports dir (writes benchmark-<batch>.md)")
     ap.add_argument("--limit", type=int, default=0, help="max files parsed this batch (0=all)")
+    ap.add_argument("--offset", type=int, default=0, help="starting file index (0=first)")
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
     ap.add_argument("--heavy-concurrency", type=int, default=None,
                     help="bound the Docling heavy pool (default: RAM-derived). "
@@ -152,7 +153,11 @@ def main() -> int:
         print(f"ERROR: sources dir not found: {src}", file=sys.stderr)
         return 2
 
-    pdfs = sorted(src.glob("*.pdf"))[: args.limit or None]
+    pdfs = sorted(src.glob("*.pdf"))
+    if args.offset:
+        pdfs = pdfs[args.offset:]
+    if args.limit:
+        pdfs = pdfs[:args.limit]
     if not pdfs:
         print(f"ERROR: no PDFs under {src}", file=sys.stderr)
         return 2
@@ -169,11 +174,16 @@ def main() -> int:
             cmd.append("--no-ocr")
         if args.heavy_concurrency is not None:
             cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
+        if args.limit:
+            cmd += ["--limit", str(args.limit)]
+        if args.offset:
+            cmd += ["--offset", str(args.offset)]
         t0 = time.monotonic()
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, encoding="utf-8", errors="replace")
         assert proc.stdout is not None
         for line in proc.stdout:
+            print(line.rstrip(), flush=True)
             log_lines.append(line.rstrip())
             if any(sig in line for sig in ERROR_SIGNALS):
                 _append(reports / "errors.md", f"[{_now()}] [{args.batch}] {line.strip()}")

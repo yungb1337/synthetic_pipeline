@@ -33,20 +33,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
     ap.add_argument("--native-concurrency", type=int, default=None)
     ap.add_argument("--heavy-concurrency", type=int, default=None)
+    ap.add_argument("--in-process", action="store_true", default=True,
+                    help="run heavy engine in-process (single thread, stable)")
+    ap.add_argument("--no-in-process", action="store_false", dest="in_process",
+                    help="run heavy engine in subprocess pool")
+    ap.add_argument("--limit", type=int, default=0, help="max files parsed (0=all)")
+    ap.add_argument("--offset", type=int, default=0, help="starting file index (0=first)")
     args = ap.parse_args(argv)
 
     cfg = default_config()
     if args.no_ocr:
         cfg = replace(cfg, ocr_enabled=False)
     store = FilesystemStore(args.out)
-    # Single-doc/interactive CLI: run heavy pages IN-PROCESS (no ProcessPool per
-    # file) for simplicity; the batch CLI uses the bounded ProcessPool.
+    # CLI: run heavy pages via bounded in-process single thread (or ProcessPool if requested)
     page_store = PageStore(str(store.root))
     ledger = Ledger(str(store.root))
     scheduler = Scheduler(
         cfg, native_concurrency=args.native_concurrency,
         heavy_concurrency=args.heavy_concurrency,
-        page_store=page_store, ledger=ledger, prefer_in_process_heavy=True,
+        page_store=page_store, ledger=ledger, prefer_in_process_heavy=args.in_process,
     )
     set_shared_scheduler(scheduler)
     try:
@@ -55,6 +60,10 @@ def main(argv: list[str] | None = None) -> int:
 
         path = Path(args.input)
         files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.suffix.lower() in _file_types())
+        if args.offset:
+            files = files[args.offset:]
+        if args.limit:
+            files = files[:args.limit]
 
         if not files:
             print("no supported files found", file=sys.stderr)
@@ -62,20 +71,23 @@ def main(argv: list[str] | None = None) -> int:
 
         ok = 0
         for f in files:
-            data = f.read_bytes()
-            outcome = extractor.extract(data, filename=f.name)
-            if outcome.ok:
-                ok += 1
-                print(f"OK   {f.name:28} {outcome.detected.slug:10} pages={len(outcome.document.pages):<3} "
-                      f"blocks={outcome.report['blocks']:<4} tables={outcome.report['tables']:<3} "
-                      f"route={outcome.report.get('route') or '-'}")
-                t = outcome.report.get("timings") or {}
-                parts = "  ".join(f"{k}={v}ms" for k, v in t.items())
-                print(f"      timings: {parts}  total={outcome.report['elapsed_ms']}ms")
-            else:
-                print(f"SKIP {f.name:28} {outcome.status}")
+            try:
+                data = f.read_bytes()
+                outcome = extractor.extract(data, filename=f.name, resume=True)
+                if outcome.ok:
+                    ok += 1
+                    print(f"OK   {f.name:28} {outcome.detected.slug:10} pages={len(outcome.document.pages):<3} "
+                          f"blocks={outcome.report['blocks']:<4} tables={outcome.report['tables']:<3} "
+                          f"route={outcome.report.get('route') or '-'}", flush=True)
+                    t = outcome.report.get("timings") or {}
+                    parts = "  ".join(f"{k}={v}ms" for k, v in t.items())
+                    print(f"      timings: {parts}  total={outcome.report['elapsed_ms']}ms", flush=True)
+                else:
+                    print(f"SKIP {f.name:28} {outcome.status}", flush=True)
+            except Exception as exc:  # noqa: BLE001 - containment across batch files
+                print(f"FAIL {f.name:28} {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
 
-        print(f"\nparsed {ok}/{len(files)} documents -> store under {args.out}")
+        print(f"\nparsed {ok}/{len(files)} documents -> store under {args.out}", flush=True)
         return 0
     finally:
         set_shared_scheduler(None)

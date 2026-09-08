@@ -40,11 +40,14 @@ class ExecutionPlan:
     config_snapshot: dict
     work_items: list[PageWorkItem] = field(default_factory=list)
 
-    def to_ledger(self) -> dict:
+    def to_ledger(self, prior_pages: dict | None = None, prior_assembly: dict | None = None) -> dict:
         pages = {}
         for p in self.expected_page_set:
-            pages[str(p)] = {"status": "pending", "checksum": "", "engine": None,
-                             "attempts": 0, "errors": []}
+            if prior_pages and str(p) in prior_pages:
+                pages[str(p)] = prior_pages[str(p)]
+            else:
+                pages[str(p)] = {"status": "pending", "checksum": "", "engine": None,
+                                 "attempts": 0, "errors": []}
         return {
             "doc_id": self.doc_id,
             "source_hash": self.source_hash,
@@ -54,7 +57,7 @@ class ExecutionPlan:
             "created_at": "",
             "config_snapshot": self.config_snapshot,
             "pages": pages,
-            "assembly": {"status": "pending", "assembled_page_set": [], "report": None},
+            "assembly": prior_assembly or {"status": "pending", "assembled_page_set": [], "report": None},
         }
 
     def to_dict(self) -> dict:
@@ -151,5 +154,8 @@ class Planner:
                 docling_ocr=config.docling_ocr,
             ))
 
-        self.ledger.write_plan(manifest.doc_id, base.to_ledger())
+        self.ledger.write_plan(manifest.doc_id, base.to_ledger(
+            prior_pages=ledger_plan.get("pages") if resume and ledger_plan else None,
+            prior_assembly=ledger_plan.get("assembly") if resume and ledger_plan else None,
+        ))
         return base

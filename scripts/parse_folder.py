@@ -58,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
     ap.add_argument("--native-concurrency", type=int, default=None)
     ap.add_argument("--heavy-concurrency", type=int, default=None)
+    ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--offset", type=int, default=None)
     args = ap.parse_args(argv)
 
     # Accept either positional or --in/--out forms.
@@ -96,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
         cmd += ["--native-concurrency", str(args.native_concurrency)]
     if args.heavy_concurrency is not None:
         cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
+    if args.limit is not None:
+        cmd += ["--limit", str(args.limit)]
+    if args.offset is not None:
+        cmd += ["--offset", str(args.offset)]
 
     # Pass through so the user sees the parser's own progress/summary.
     return subprocess.call(cmd)

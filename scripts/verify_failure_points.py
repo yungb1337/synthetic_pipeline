@@ -147,7 +147,10 @@ def check_F03_torn_ledger_erases_audit_trail() -> None:
     except Exception as exc:  # noqa: BLE001
         raised = exc
     print(f"      exception raised by subsequent updates: {raised!r}")
-    final = ledger.load_plan(doc_id)
+    try:
+        final = ledger.load_plan(doc_id)
+    except Exception as exc:  # noqa: BLE001
+        final = {"error": str(exc)}
     print(f"      load_plan -> {final}")
 
     reproduced = raised is None and not (final or {}).get("pages")

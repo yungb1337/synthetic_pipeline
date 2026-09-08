@@ -1,0 +1,1007 @@
+
+[2026-09-07T04:40:07Z] === Starting 5-wave corpus run ===
+[2026-09-07T04:43:42Z] [pipeline] b03 finished in 215.2s with exit code 0
+[2026-09-07T04:45:15Z] [pipeline] b04 finished in 92.1s with exit code 0
+[2026-09-07T04:46:44Z] [pipeline] b05 finished in 89.9s with exit code 0
+[2026-09-07T04:48:14Z] [pipeline] b06 finished in 89.8s with exit code 0
+[2026-09-07T04:49:43Z] [pipeline] b07 finished in 88.9s with exit code 0
+[2026-09-07T04:49:43Z] [pipeline] All 5 waves completed in 0.16 hours
+
+[2026-09-07T04:52:27Z] === Starting resilient 5-wave corpus run (945 total) ===
+[2026-09-07T04:52:28Z] [b03] Pass 1: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T04:54:11Z] [b03] Child process exited (rc=3221225622) after 103.1s | Progress: +0 newly finished
+[2026-09-07T04:54:14Z] [b03] Pass 2: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T04:55:41Z] [b03] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T04:55:43Z] [b03] Pass 3: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T04:57:11Z] [b03] Child process exited (rc=3221225477) after 87.1s | Progress: +0 newly finished
+[2026-09-07T04:57:13Z] [b03] Pass 4: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T04:58:41Z] [b03] Child process exited (rc=3221225477) after 87.1s | Progress: +0 newly finished
+[2026-09-07T04:58:43Z] [b03] Pass 5: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T05:00:11Z] [b03] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T05:00:12Z] [pipeline] Wave b03 fully analyzed in 7.8 mins
+[2026-09-07T05:00:13Z] [b04] Pass 1: ok=1, in-flight/pending=1, unparsed=198 (total=200)
+[2026-09-07T05:01:41Z] [b04] Child process exited (rc=3221225477) after 87.7s | Progress: +2 newly finished
+[2026-09-07T05:01:41Z] [b04] Pass 2: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T05:03:11Z] [b04] Child process exited (rc=3221225477) after 89.3s | Progress: +0 newly finished
+[2026-09-07T05:03:14Z] [b04] Pass 3: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T05:04:41Z] [b04] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T05:04:44Z] [b04] Pass 4: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T05:06:16Z] [b04] Child process exited (rc=3221225622) after 92.0s | Progress: +0 newly finished
+[2026-09-07T05:06:18Z] [b04] Pass 5: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T05:08:15Z] [b04] Child process exited (rc=3221225622) after 115.8s | Progress: +0 newly finished
+[2026-09-07T05:08:17Z] [b04] Pass 6: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T05:10:10Z] [b04] Child process exited (rc=3221225622) after 112.9s | Progress: +0 newly finished
+[2026-09-07T05:10:11Z] [pipeline] Wave b04 fully analyzed in 10.0 mins
+[2026-09-07T05:10:12Z] [b05] Pass 1: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T05:11:44Z] [b05] Child process exited (rc=3221225477) after 88.0s | Progress: +0 newly finished
+[2026-09-07T05:11:46Z] [b05] Pass 2: ok=4, in-flight/pending=0, unparsed=196 (total=200)
+[2026-09-07T05:13:10Z] [b05] Child process exited (rc=3221225477) after 83.8s | Progress: +0 newly finished
+[2026-09-07T05:13:13Z] [b05] Pass 3: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T05:14:40Z] [b05] Child process exited (rc=3221225477) after 87.1s | Progress: +3 newly finished
+[2026-09-07T05:14:41Z] [b05] Pass 4: ok=6, in-flight/pending=1, unparsed=193 (total=200)
+[2026-09-07T05:16:10Z] [b05] Child process exited (rc=3221225477) after 89.1s | Progress: +0 newly finished
+[2026-09-07T05:16:13Z] [b05] Pass 5: ok=5, in-flight/pending=2, unparsed=193 (total=200)
+[2026-09-07T05:17:40Z] [b05] Child process exited (rc=3221225477) after 87.1s | Progress: +3 newly finished
+[2026-09-07T05:17:41Z] [b05] Pass 6: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T05:19:10Z] [b05] Child process exited (rc=3221225477) after 89.1s | Progress: +0 newly finished
+[2026-09-07T05:19:13Z] [b05] Pass 7: ok=8, in-flight/pending=2, unparsed=190 (total=200)
+[2026-09-07T05:20:40Z] [b05] Child process exited (rc=3221225477) after 87.1s | Progress: +0 newly finished
+[2026-09-07T05:20:43Z] [b05] Pass 8: ok=8, in-flight/pending=2, unparsed=190 (total=200)
+[2026-09-07T05:22:10Z] [b05] Child process exited (rc=3221225477) after 87.1s | Progress: +0 newly finished
+[2026-09-07T05:22:13Z] [b05] Pass 9: ok=8, in-flight/pending=2, unparsed=190 (total=200)
+[2026-09-07T05:23:40Z] [b05] Child process exited (rc=3221225477) after 87.0s | Progress: +0 newly finished
+[2026-09-07T05:23:43Z] [b05] Pass 10: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T05:25:10Z] [b05] Child process exited (rc=3221225477) after 87.1s | Progress: +0 newly finished
+[2026-09-07T05:25:12Z] [pipeline] Wave b05 fully analyzed in 15.0 mins
+[2026-09-07T05:25:15Z] [b06] Pass 1: ok=2, in-flight/pending=1, unparsed=197 (total=200)
+[2026-09-07T05:26:40Z] [b06] Child process exited (rc=3221225477) after 85.1s | Progress: +2 newly finished
+[2026-09-07T05:26:41Z] [b06] Pass 2: ok=4, in-flight/pending=1, unparsed=195 (total=200)
+[2026-09-07T05:28:10Z] [b06] Child process exited (rc=3221225477) after 89.1s | Progress: +0 newly finished
+[2026-09-07T05:28:13Z] [b06] Pass 3: ok=4, in-flight/pending=1, unparsed=195 (total=200)
+[2026-09-07T05:29:40Z] [b06] Child process exited (rc=3221225477) after 87.2s | Progress: +0 newly finished
+[2026-09-07T05:29:43Z] [b06] Pass 4: ok=4, in-flight/pending=1, unparsed=195 (total=200)
+[2026-09-07T05:31:10Z] [b06] Child process exited (rc=3221225477) after 87.2s | Progress: +0 newly finished
+[2026-09-07T05:31:13Z] [b06] Pass 5: ok=4, in-flight/pending=1, unparsed=195 (total=200)
+[2026-09-07T05:32:40Z] [b06] Child process exited (rc=3221225477) after 87.2s | Progress: +0 newly finished
+[2026-09-07T05:32:43Z] [b06] Pass 6: ok=4, in-flight/pending=1, unparsed=195 (total=200)
+[2026-09-07T05:34:10Z] [b06] Child process exited (rc=3221225477) after 87.2s | Progress: +0 newly finished
+[2026-09-07T05:34:11Z] [pipeline] Wave b06 fully analyzed in 9.0 mins
+[2026-09-07T05:34:14Z] [b07] Pass 1: ok=2, in-flight/pending=0, unparsed=143 (total=145)
+[2026-09-07T05:35:40Z] [b07] Child process exited (rc=3221225477) after 86.4s | Progress: +2 newly finished
+[2026-09-07T05:35:41Z] [b07] Pass 2: ok=3, in-flight/pending=1, unparsed=141 (total=145)
+[2026-09-07T05:37:10Z] [b07] Child process exited (rc=3221225477) after 89.3s | Progress: +0 newly finished
+[2026-09-07T05:37:13Z] [b07] Pass 3: ok=3, in-flight/pending=1, unparsed=141 (total=145)
+[2026-09-07T05:38:41Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +0 newly finished
+[2026-09-07T05:38:43Z] [b07] Pass 4: ok=3, in-flight/pending=1, unparsed=141 (total=145)
+[2026-09-07T05:40:10Z] [b07] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T05:40:13Z] [b07] Pass 5: ok=3, in-flight/pending=1, unparsed=141 (total=145)
+[2026-09-07T05:41:40Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +0 newly finished
+[2026-09-07T05:41:43Z] [b07] Pass 6: ok=3, in-flight/pending=1, unparsed=141 (total=145)
+[2026-09-07T05:43:10Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +0 newly finished
+[2026-09-07T05:43:11Z] [pipeline] Wave b07 fully analyzed in 9.0 mins
+[2026-09-07T05:43:11Z] [pipeline] All 5 waves completed in 0.85 hours
+
+[2026-09-07T05:53:45Z] === Starting resilient 5-wave corpus run (945 total) ===
+[2026-09-07T05:53:46Z] [b03] Pass 1: ok=15, in-flight/pending=0, unparsed=185 (total=200)
+[2026-09-07T05:54:57Z] [b03] Child process exited (rc=3221225622) after 70.5s | Progress: +3 newly finished
+[2026-09-07T05:54:57Z] [b03] Pass 2: ok=16, in-flight/pending=1, unparsed=183 (total=200)
+[2026-09-07T05:56:27Z] [b03] Child process exited (rc=3221225622) after 88.8s | Progress: +4 newly finished
+[2026-09-07T05:56:27Z] [b03] Pass 3: ok=18, in-flight/pending=1, unparsed=181 (total=200)
+[2026-09-07T05:57:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T05:57:57Z] [b03] Pass 4: ok=20, in-flight/pending=1, unparsed=179 (total=200)
+[2026-09-07T05:59:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T05:59:27Z] [b03] Pass 5: ok=22, in-flight/pending=1, unparsed=177 (total=200)
+[2026-09-07T06:00:57Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T06:00:57Z] [b03] Pass 6: ok=24, in-flight/pending=1, unparsed=175 (total=200)
+[2026-09-07T06:02:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T06:02:27Z] [b03] Pass 7: ok=26, in-flight/pending=1, unparsed=173 (total=200)
+[2026-09-07T06:03:57Z] [b03] Child process exited (rc=3221225477) after 89.1s | Progress: +0 newly finished
+[2026-09-07T06:03:59Z] [b03] Pass 8: ok=26, in-flight/pending=1, unparsed=173 (total=200)
+[2026-09-07T06:05:27Z] [b03] Child process exited (rc=3221225622) after 87.2s | Progress: +4 newly finished
+[2026-09-07T06:05:27Z] [b03] Pass 9: ok=28, in-flight/pending=1, unparsed=171 (total=200)
+[2026-09-07T06:06:57Z] [b03] Child process exited (rc=3221225477) after 89.1s | Progress: +4 newly finished
+[2026-09-07T06:06:57Z] [b03] Pass 10: ok=30, in-flight/pending=1, unparsed=169 (total=200)
+[2026-09-07T06:08:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +8 newly finished
+[2026-09-07T06:08:27Z] [b03] Pass 11: ok=34, in-flight/pending=1, unparsed=165 (total=200)
+[2026-09-07T06:09:57Z] [b03] Child process exited (rc=3221225501) after 89.2s | Progress: +4 newly finished
+[2026-09-07T06:09:57Z] [b03] Pass 12: ok=36, in-flight/pending=1, unparsed=163 (total=200)
+[2026-09-07T06:11:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T06:11:27Z] [b03] Pass 13: ok=38, in-flight/pending=1, unparsed=161 (total=200)
+[2026-09-07T06:12:57Z] [b03] Child process exited (rc=3221225477) after 89.2s | Progress: +0 newly finished
+[2026-09-07T06:12:59Z] [b03] Pass 14: ok=38, in-flight/pending=1, unparsed=161 (total=200)
+[2026-09-07T06:14:27Z] [b03] Child process exited (rc=3221225622) after 87.1s | Progress: +8 newly finished
+[2026-09-07T06:14:27Z] [b03] Pass 15: ok=42, in-flight/pending=1, unparsed=157 (total=200)
+[2026-09-07T06:15:57Z] [b03] Child process exited (rc=3221225477) after 89.1s | Progress: +4 newly finished
+[2026-09-07T06:15:57Z] [b03] Pass 16: ok=44, in-flight/pending=1, unparsed=155 (total=200)
+[2026-09-07T06:17:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +6 newly finished
+[2026-09-07T06:17:27Z] [b03] Pass 17: ok=47, in-flight/pending=1, unparsed=152 (total=200)
+[2026-09-07T06:18:57Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +6 newly finished
+[2026-09-07T06:18:57Z] [b03] Pass 18: ok=50, in-flight/pending=1, unparsed=149 (total=200)
+[2026-09-07T06:20:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T06:20:27Z] [b03] Pass 19: ok=52, in-flight/pending=1, unparsed=147 (total=200)
+[2026-09-07T06:21:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T06:21:57Z] [b03] Pass 20: ok=55, in-flight/pending=1, unparsed=144 (total=200)
+[2026-09-07T06:23:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T06:23:27Z] [b03] Pass 21: ok=57, in-flight/pending=1, unparsed=142 (total=200)
+[2026-09-07T06:24:57Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +8 newly finished
+[2026-09-07T06:24:57Z] [b03] Pass 22: ok=61, in-flight/pending=1, unparsed=138 (total=200)
+[2026-09-07T06:26:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T06:26:27Z] [b03] Pass 23: ok=64, in-flight/pending=1, unparsed=135 (total=200)
+[2026-09-07T06:27:57Z] [b03] Child process exited (rc=3221225622) after 88.9s | Progress: +4 newly finished
+[2026-09-07T06:27:57Z] [b03] Pass 24: ok=66, in-flight/pending=1, unparsed=133 (total=200)
+[2026-09-07T06:29:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +10 newly finished
+[2026-09-07T06:29:27Z] [b03] Pass 25: ok=71, in-flight/pending=1, unparsed=128 (total=200)
+[2026-09-07T06:30:57Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +8 newly finished
+[2026-09-07T06:30:57Z] [b03] Pass 26: ok=75, in-flight/pending=1, unparsed=124 (total=200)
+[2026-09-07T06:32:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T06:32:27Z] [b03] Pass 27: ok=78, in-flight/pending=1, unparsed=121 (total=200)
+[2026-09-07T06:33:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T06:33:57Z] [b03] Pass 28: ok=80, in-flight/pending=1, unparsed=119 (total=200)
+[2026-09-07T06:35:27Z] [b03] Child process exited (rc=3221225477) after 89.2s | Progress: +4 newly finished
+[2026-09-07T06:35:27Z] [b03] Pass 29: ok=82, in-flight/pending=1, unparsed=117 (total=200)
+[2026-09-07T06:36:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +10 newly finished
+[2026-09-07T06:36:57Z] [b03] Pass 30: ok=87, in-flight/pending=1, unparsed=112 (total=200)
+[2026-09-07T06:38:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +6 newly finished
+[2026-09-07T06:38:27Z] [b03] Pass 31: ok=90, in-flight/pending=1, unparsed=109 (total=200)
+[2026-09-07T06:39:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T06:39:57Z] [b03] Pass 32: ok=93, in-flight/pending=1, unparsed=106 (total=200)
+[2026-09-07T06:41:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +12 newly finished
+[2026-09-07T06:41:27Z] [b03] Pass 33: ok=99, in-flight/pending=1, unparsed=100 (total=200)
+[2026-09-07T06:42:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T06:42:57Z] [b03] Pass 34: ok=102, in-flight/pending=1, unparsed=97 (total=200)
+[2026-09-07T06:44:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T06:44:27Z] [b03] Pass 35: ok=106, in-flight/pending=1, unparsed=93 (total=200)
+[2026-09-07T06:45:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T06:45:57Z] [b03] Pass 36: ok=110, in-flight/pending=1, unparsed=89 (total=200)
+[2026-09-07T06:47:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +10 newly finished
+[2026-09-07T06:47:27Z] [b03] Pass 37: ok=115, in-flight/pending=1, unparsed=84 (total=200)
+[2026-09-07T06:48:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +11 newly finished
+[2026-09-07T06:48:57Z] [b03] Pass 38: ok=121, in-flight/pending=0, unparsed=79 (total=200)
+[2026-09-07T06:50:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +5 newly finished
+[2026-09-07T06:50:27Z] [b03] Pass 39: ok=123, in-flight/pending=1, unparsed=76 (total=200)
+[2026-09-07T06:51:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +0 newly finished
+[2026-09-07T06:51:59Z] [b03] Pass 40: ok=123, in-flight/pending=1, unparsed=76 (total=200)
+[2026-09-07T06:53:27Z] [b03] Child process exited (rc=3221225622) after 87.1s | Progress: +4 newly finished
+[2026-09-07T06:53:27Z] [b03] Pass 41: ok=125, in-flight/pending=1, unparsed=74 (total=200)
+[2026-09-07T06:54:57Z] [b03] Child process exited (rc=3221225477) after 89.1s | Progress: +6 newly finished
+[2026-09-07T06:54:57Z] [b03] Pass 42: ok=128, in-flight/pending=1, unparsed=71 (total=200)
+[2026-09-07T06:56:27Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +8 newly finished
+[2026-09-07T06:56:27Z] [b03] Pass 43: ok=132, in-flight/pending=1, unparsed=67 (total=200)
+[2026-09-07T06:57:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T06:57:57Z] [b03] Pass 44: ok=136, in-flight/pending=1, unparsed=63 (total=200)
+[2026-09-07T06:59:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T06:59:27Z] [b03] Pass 45: ok=137, in-flight/pending=1, unparsed=62 (total=200)
+[2026-09-07T07:00:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T07:00:57Z] [b03] Pass 46: ok=141, in-flight/pending=1, unparsed=58 (total=200)
+[2026-09-07T07:02:27Z] [b03] Child process exited (rc=3221225477) after 89.1s | Progress: +8 newly finished
+[2026-09-07T07:02:27Z] [b03] Pass 47: ok=145, in-flight/pending=1, unparsed=54 (total=200)
+[2026-09-07T07:03:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T07:03:57Z] [b03] Pass 48: ok=149, in-flight/pending=1, unparsed=50 (total=200)
+[2026-09-07T07:05:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:05:27Z] [b03] Pass 49: ok=151, in-flight/pending=1, unparsed=48 (total=200)
+[2026-09-07T07:06:57Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T07:06:57Z] [b03] Pass 50: ok=153, in-flight/pending=1, unparsed=46 (total=200)
+[2026-09-07T07:08:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:08:27Z] [b03] Pass 51: ok=155, in-flight/pending=1, unparsed=44 (total=200)
+[2026-09-07T07:09:57Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T07:09:57Z] [b03] Pass 52: ok=156, in-flight/pending=1, unparsed=43 (total=200)
+[2026-09-07T07:11:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +12 newly finished
+[2026-09-07T07:11:27Z] [b03] Pass 53: ok=162, in-flight/pending=1, unparsed=37 (total=200)
+[2026-09-07T07:12:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:12:57Z] [b03] Pass 54: ok=164, in-flight/pending=1, unparsed=35 (total=200)
+[2026-09-07T07:14:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T07:14:27Z] [b03] Pass 55: ok=167, in-flight/pending=1, unparsed=32 (total=200)
+[2026-09-07T07:15:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T07:15:57Z] [b03] Pass 56: ok=171, in-flight/pending=1, unparsed=28 (total=200)
+[2026-09-07T07:17:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:17:27Z] [b03] Pass 57: ok=173, in-flight/pending=1, unparsed=26 (total=200)
+[2026-09-07T07:18:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +11 newly finished
+[2026-09-07T07:18:57Z] [b03] Pass 58: ok=179, in-flight/pending=0, unparsed=21 (total=200)
+[2026-09-07T07:20:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +5 newly finished
+[2026-09-07T07:20:27Z] [b03] Pass 59: ok=181, in-flight/pending=1, unparsed=18 (total=200)
+[2026-09-07T07:21:57Z] [b03] Child process exited (rc=3221225622) after 89.2s | Progress: +10 newly finished
+[2026-09-07T07:21:57Z] [b03] Pass 60: ok=186, in-flight/pending=1, unparsed=13 (total=200)
+[2026-09-07T07:23:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:23:27Z] [b03] Pass 61: ok=188, in-flight/pending=1, unparsed=11 (total=200)
+[2026-09-07T07:24:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:24:57Z] [b03] Pass 62: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T07:26:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:26:27Z] [b03] Pass 63: ok=192, in-flight/pending=1, unparsed=7 (total=200)
+[2026-09-07T07:27:57Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +10 newly finished
+[2026-09-07T07:27:57Z] [b03] Pass 64: ok=197, in-flight/pending=1, unparsed=2 (total=200)
+[2026-09-07T07:29:27Z] [b03] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T07:29:27Z] [b03] Pass 65: ok=198, in-flight/pending=1, unparsed=1 (total=200)
+[2026-09-07T07:30:23Z] [b03] Child process exited (rc=0) after 55.3s | Progress: +3 newly finished
+[2026-09-07T07:30:24Z] [b03] Pass 66: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T07:30:28Z] [pipeline] Wave b03 fully analyzed in 96.7 mins
+[2026-09-07T07:30:29Z] [b04] Pass 1: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T07:30:57Z] [b04] Child process exited (rc=3221225622) after 27.4s | Progress: +0 newly finished
+[2026-09-07T07:30:59Z] [b04] Pass 2: ok=3, in-flight/pending=1, unparsed=196 (total=200)
+[2026-09-07T07:32:27Z] [b04] Child process exited (rc=3221225622) after 87.3s | Progress: +7 newly finished
+[2026-09-07T07:32:27Z] [b04] Pass 3: ok=7, in-flight/pending=0, unparsed=193 (total=200)
+[2026-09-07T07:33:57Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +11 newly finished
+[2026-09-07T07:33:57Z] [b04] Pass 4: ok=12, in-flight/pending=1, unparsed=187 (total=200)
+[2026-09-07T07:35:27Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T07:35:27Z] [b04] Pass 5: ok=14, in-flight/pending=1, unparsed=185 (total=200)
+[2026-09-07T07:36:57Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +8 newly finished
+[2026-09-07T07:36:57Z] [b04] Pass 6: ok=18, in-flight/pending=1, unparsed=181 (total=200)
+[2026-09-07T07:38:27Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T07:38:27Z] [b04] Pass 7: ok=21, in-flight/pending=1, unparsed=178 (total=200)
+[2026-09-07T07:39:57Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T07:39:57Z] [b04] Pass 8: ok=23, in-flight/pending=1, unparsed=176 (total=200)
+[2026-09-07T07:41:27Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +6 newly finished
+[2026-09-07T07:41:27Z] [b04] Pass 9: ok=26, in-flight/pending=1, unparsed=173 (total=200)
+[2026-09-07T07:42:57Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T07:42:57Z] [b04] Pass 10: ok=29, in-flight/pending=1, unparsed=170 (total=200)
+[2026-09-07T07:44:27Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T07:44:27Z] [b04] Pass 11: ok=33, in-flight/pending=1, unparsed=166 (total=200)
+[2026-09-07T07:45:57Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T07:45:57Z] [b04] Pass 12: ok=34, in-flight/pending=1, unparsed=165 (total=200)
+[2026-09-07T07:47:27Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +6 newly finished
+[2026-09-07T07:47:27Z] [b04] Pass 13: ok=37, in-flight/pending=1, unparsed=162 (total=200)
+[2026-09-07T07:48:57Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +9 newly finished
+[2026-09-07T07:48:57Z] [b04] Pass 14: ok=42, in-flight/pending=0, unparsed=158 (total=200)
+[2026-09-07T07:50:27Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +5 newly finished
+[2026-09-07T07:50:27Z] [b04] Pass 15: ok=44, in-flight/pending=1, unparsed=155 (total=200)
+[2026-09-07T07:51:57Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +6 newly finished
+[2026-09-07T07:51:57Z] [b04] Pass 16: ok=47, in-flight/pending=1, unparsed=152 (total=200)
+[2026-09-07T07:53:27Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +6 newly finished
+[2026-09-07T07:53:27Z] [b04] Pass 17: ok=50, in-flight/pending=1, unparsed=149 (total=200)
+[2026-09-07T07:54:57Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +10 newly finished
+[2026-09-07T07:54:58Z] [b04] Pass 18: ok=55, in-flight/pending=1, unparsed=144 (total=200)
+[2026-09-07T07:56:27Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +6 newly finished
+[2026-09-07T07:56:27Z] [b04] Pass 19: ok=58, in-flight/pending=1, unparsed=141 (total=200)
+[2026-09-07T07:57:57Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +2 newly finished
+[2026-09-07T07:57:57Z] [b04] Pass 20: ok=59, in-flight/pending=1, unparsed=140 (total=200)
+[2026-09-07T07:59:27Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +4 newly finished
+[2026-09-07T07:59:28Z] [b04] Pass 21: ok=61, in-flight/pending=1, unparsed=138 (total=200)
+[2026-09-07T08:00:57Z] [b04] Child process exited (rc=3221225477) after 89.1s | Progress: +0 newly finished
+[2026-09-07T08:00:59Z] [b04] Pass 22: ok=61, in-flight/pending=1, unparsed=138 (total=200)
+[2026-09-07T08:02:51Z] [b04] Child process exited (rc=3221225477) after 110.8s | Progress: +8 newly finished
+[2026-09-07T08:02:51Z] [b04] Pass 23: ok=65, in-flight/pending=1, unparsed=134 (total=200)
+[2026-09-07T08:04:43Z] [b04] Child process exited (rc=3221225477) after 111.6s | Progress: +10 newly finished
+[2026-09-07T08:04:44Z] [b04] Pass 24: ok=70, in-flight/pending=1, unparsed=129 (total=200)
+[2026-09-07T08:06:39Z] [b04] Child process exited (rc=3221225477) after 114.9s | Progress: +7 newly finished
+[2026-09-07T08:06:39Z] [b04] Pass 25: ok=74, in-flight/pending=0, unparsed=126 (total=200)
+[2026-09-07T08:08:30Z] [b04] Child process exited (rc=3221225477) after 109.9s | Progress: +9 newly finished
+[2026-09-07T08:08:30Z] [b04] Pass 26: ok=78, in-flight/pending=1, unparsed=121 (total=200)
+[2026-09-07T08:10:04Z] [b04] Child process exited (rc=3221225477) after 93.8s | Progress: +4 newly finished
+[2026-09-07T08:10:05Z] [b04] Pass 27: ok=80, in-flight/pending=1, unparsed=119 (total=200)
+[2026-09-07T08:11:51Z] [b04] Child process exited (rc=3221225477) after 105.7s | Progress: +4 newly finished
+[2026-09-07T08:11:51Z] [b04] Pass 28: ok=82, in-flight/pending=1, unparsed=117 (total=200)
+[2026-09-07T08:13:21Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +6 newly finished
+[2026-09-07T08:13:21Z] [b04] Pass 29: ok=85, in-flight/pending=1, unparsed=114 (total=200)
+[2026-09-07T08:15:08Z] [b04] Child process exited (rc=3221225477) after 106.0s | Progress: +4 newly finished
+[2026-09-07T08:15:08Z] [b04] Pass 30: ok=87, in-flight/pending=1, unparsed=112 (total=200)
+[2026-09-07T08:17:04Z] [b04] Child process exited (rc=3221225622) after 115.0s | Progress: +4 newly finished
+[2026-09-07T08:17:04Z] [b04] Pass 31: ok=89, in-flight/pending=1, unparsed=110 (total=200)
+[2026-09-07T08:18:49Z] [b04] Child process exited (rc=3221225622) after 104.5s | Progress: +2 newly finished
+[2026-09-07T08:18:49Z] [b04] Pass 32: ok=90, in-flight/pending=1, unparsed=109 (total=200)
+[2026-09-07T08:20:50Z] [b04] Child process exited (rc=3221225622) after 120.2s | Progress: +0 newly finished
+[2026-09-07T08:20:53Z] [b04] Pass 33: ok=90, in-flight/pending=1, unparsed=109 (total=200)
+[2026-09-07T08:22:46Z] [b04] Child process exited (rc=3221225622) after 113.4s | Progress: +6 newly finished
+[2026-09-07T08:22:47Z] [b04] Pass 34: ok=93, in-flight/pending=1, unparsed=106 (total=200)
+[2026-09-07T08:24:16Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T08:24:17Z] [b04] Pass 35: ok=96, in-flight/pending=1, unparsed=103 (total=200)
+[2026-09-07T08:25:46Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T08:25:47Z] [b04] Pass 36: ok=98, in-flight/pending=1, unparsed=101 (total=200)
+[2026-09-07T08:28:28Z] [b04] Child process exited (rc=3221225477) after 160.9s | Progress: +5 newly finished
+[2026-09-07T08:28:28Z] [b04] Pass 37: ok=101, in-flight/pending=0, unparsed=99 (total=200)
+[2026-09-07T08:30:24Z] [b04] Child process exited (rc=3221225622) after 115.0s | Progress: +5 newly finished
+[2026-09-07T08:30:24Z] [b04] Pass 38: ok=103, in-flight/pending=1, unparsed=96 (total=200)
+[2026-09-07T08:32:20Z] [b04] Child process exited (rc=3221225622) after 115.0s | Progress: +10 newly finished
+[2026-09-07T08:32:20Z] [b04] Pass 39: ok=108, in-flight/pending=1, unparsed=91 (total=200)
+[2026-09-07T08:34:09Z] [b04] Child process exited (rc=3221225622) after 108.2s | Progress: +4 newly finished
+[2026-09-07T08:34:09Z] [b04] Pass 40: ok=110, in-flight/pending=1, unparsed=89 (total=200)
+[2026-09-07T08:36:11Z] [b04] Child process exited (rc=3221225622) after 121.8s | Progress: +10 newly finished
+[2026-09-07T08:36:12Z] [b04] Pass 41: ok=115, in-flight/pending=1, unparsed=84 (total=200)
+[2026-09-07T08:38:02Z] [b04] Child process exited (rc=3221225622) after 109.7s | Progress: +4 newly finished
+[2026-09-07T08:38:02Z] [b04] Pass 42: ok=117, in-flight/pending=1, unparsed=82 (total=200)
+[2026-09-07T08:39:32Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +0 newly finished
+[2026-09-07T08:39:35Z] [b04] Pass 43: ok=117, in-flight/pending=1, unparsed=82 (total=200)
+[2026-09-07T08:41:05Z] [b04] Child process exited (rc=3221225622) after 86.9s | Progress: +1 newly finished
+[2026-09-07T08:41:06Z] [b04] Pass 44: ok=118, in-flight/pending=0, unparsed=82 (total=200)
+[2026-09-07T08:42:49Z] [b04] Child process exited (rc=3221225622) after 103.0s | Progress: +1 newly finished
+[2026-09-07T08:42:49Z] [b04] Pass 45: ok=118, in-flight/pending=1, unparsed=81 (total=200)
+[2026-09-07T08:44:25Z] [b04] Child process exited (rc=3221225622) after 94.8s | Progress: +6 newly finished
+[2026-09-07T08:44:25Z] [b04] Pass 46: ok=121, in-flight/pending=1, unparsed=78 (total=200)
+[2026-09-07T08:45:55Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T08:45:55Z] [b04] Pass 47: ok=122, in-flight/pending=1, unparsed=77 (total=200)
+[2026-09-07T08:47:36Z] [b04] Child process exited (rc=3221225622) after 100.6s | Progress: +2 newly finished
+[2026-09-07T08:47:37Z] [b04] Pass 48: ok=123, in-flight/pending=1, unparsed=76 (total=200)
+[2026-09-07T08:49:32Z] [b04] Child process exited (rc=3221225622) after 115.0s | Progress: +4 newly finished
+[2026-09-07T08:49:32Z] [b04] Pass 49: ok=125, in-flight/pending=1, unparsed=74 (total=200)
+[2026-09-07T08:51:32Z] [b04] Child process exited (rc=3221225622) after 114.9s | Progress: +8 newly finished
+[2026-09-07T08:51:32Z] [b04] Pass 50: ok=129, in-flight/pending=1, unparsed=70 (total=200)
+[2026-09-07T08:52:58Z] [b04] Child process exited (rc=3221225622) after 85.6s | Progress: +2 newly finished
+[2026-09-07T08:52:59Z] [b04] Pass 51: ok=130, in-flight/pending=1, unparsed=69 (total=200)
+[2026-09-07T08:54:28Z] [b04] Child process exited (rc=3221225622) after 88.7s | Progress: +2 newly finished
+[2026-09-07T08:54:29Z] [b04] Pass 52: ok=131, in-flight/pending=1, unparsed=68 (total=200)
+[2026-09-07T08:55:58Z] [b04] Child process exited (rc=3221225622) after 88.9s | Progress: +4 newly finished
+[2026-09-07T08:55:59Z] [b04] Pass 53: ok=133, in-flight/pending=1, unparsed=66 (total=200)
+[2026-09-07T08:57:28Z] [b04] Child process exited (rc=3221225622) after 88.9s | Progress: +3 newly finished
+[2026-09-07T08:57:29Z] [b04] Pass 54: ok=135, in-flight/pending=0, unparsed=65 (total=200)
+[2026-09-07T08:58:58Z] [b04] Child process exited (rc=3221225477) after 89.0s | Progress: +2 newly finished
+[2026-09-07T08:58:59Z] [b04] Pass 55: ok=136, in-flight/pending=0, unparsed=64 (total=200)
+[2026-09-07T09:00:57Z] [b04] Child process exited (rc=3221225622) after 118.2s | Progress: +9 newly finished
+[2026-09-07T09:00:58Z] [b04] Pass 56: ok=140, in-flight/pending=1, unparsed=59 (total=200)
+[2026-09-07T09:02:53Z] [b04] Child process exited (rc=3221225477) after 114.9s | Progress: +5 newly finished
+[2026-09-07T09:02:53Z] [b04] Pass 57: ok=143, in-flight/pending=0, unparsed=57 (total=200)
+[2026-09-07T09:04:44Z] [b04] Child process exited (rc=3221225622) after 109.9s | Progress: +5 newly finished
+[2026-09-07T09:04:44Z] [b04] Pass 58: ok=145, in-flight/pending=1, unparsed=54 (total=200)
+[2026-09-07T09:07:40Z] [b04] Child process exited (rc=3221225622) after 175.6s | Progress: +14 newly finished
+[2026-09-07T09:07:40Z] [b04] Pass 59: ok=152, in-flight/pending=1, unparsed=47 (total=200)
+[2026-09-07T09:09:30Z] [b04] Child process exited (rc=3221225622) after 109.5s | Progress: +10 newly finished
+[2026-09-07T09:09:31Z] [b04] Pass 60: ok=157, in-flight/pending=1, unparsed=42 (total=200)
+[2026-09-07T09:11:26Z] [b04] Child process exited (rc=3221225622) after 114.9s | Progress: +10 newly finished
+[2026-09-07T09:11:27Z] [b04] Pass 61: ok=162, in-flight/pending=1, unparsed=37 (total=200)
+[2026-09-07T09:13:22Z] [b04] Child process exited (rc=3221225622) after 115.0s | Progress: +8 newly finished
+[2026-09-07T09:13:23Z] [b04] Pass 62: ok=166, in-flight/pending=1, unparsed=33 (total=200)
+[2026-09-07T09:15:18Z] [b04] Child process exited (rc=3221225622) after 115.0s | Progress: +4 newly finished
+[2026-09-07T09:15:18Z] [b04] Pass 63: ok=168, in-flight/pending=1, unparsed=31 (total=200)
+[2026-09-07T09:17:14Z] [b04] Child process exited (rc=3221225622) after 114.9s | Progress: +8 newly finished
+[2026-09-07T09:17:14Z] [b04] Pass 64: ok=172, in-flight/pending=1, unparsed=27 (total=200)
+[2026-09-07T09:18:49Z] [b04] Child process exited (rc=3221225622) after 94.6s | Progress: +2 newly finished
+[2026-09-07T09:18:50Z] [b04] Pass 65: ok=173, in-flight/pending=1, unparsed=26 (total=200)
+[2026-09-07T09:20:19Z] [b04] Child process exited (rc=3221225477) after 89.2s | Progress: +2 newly finished
+[2026-09-07T09:20:20Z] [b04] Pass 66: ok=174, in-flight/pending=1, unparsed=25 (total=200)
+[2026-09-07T09:22:01Z] [b04] Child process exited (rc=3221225622) after 100.9s | Progress: +4 newly finished
+[2026-09-07T09:22:01Z] [b04] Pass 67: ok=176, in-flight/pending=1, unparsed=23 (total=200)
+[2026-09-07T09:23:57Z] [b04] Child process exited (rc=3221225622) after 115.0s | Progress: +12 newly finished
+[2026-09-07T09:23:57Z] [b04] Pass 68: ok=182, in-flight/pending=1, unparsed=17 (total=200)
+[2026-09-07T09:25:47Z] [b04] Child process exited (rc=3221225622) after 109.7s | Progress: +2 newly finished
+[2026-09-07T09:25:48Z] [b04] Pass 69: ok=183, in-flight/pending=1, unparsed=16 (total=200)
+[2026-09-07T09:27:20Z] [b04] Child process exited (rc=3221225622) after 88.9s | Progress: +1 newly finished
+[2026-09-07T09:27:21Z] [b04] Pass 70: ok=184, in-flight/pending=0, unparsed=16 (total=200)
+[2026-09-07T09:28:47Z] [b04] Child process exited (rc=3221225622) after 85.9s | Progress: +5 newly finished
+[2026-09-07T09:28:48Z] [b04] Pass 71: ok=186, in-flight/pending=1, unparsed=13 (total=200)
+[2026-09-07T09:30:17Z] [b04] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T09:30:18Z] [b04] Pass 72: ok=188, in-flight/pending=1, unparsed=11 (total=200)
+[2026-09-07T09:31:47Z] [b04] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T09:31:48Z] [b04] Pass 73: ok=189, in-flight/pending=1, unparsed=10 (total=200)
+[2026-09-07T09:33:17Z] [b04] Child process exited (rc=3221225622) after 89.0s | Progress: +0 newly finished
+[2026-09-07T09:33:20Z] [b04] Pass 74: ok=189, in-flight/pending=1, unparsed=10 (total=200)
+[2026-09-07T09:34:47Z] [b04] Child process exited (rc=3221225622) after 87.2s | Progress: +2 newly finished
+[2026-09-07T09:34:48Z] [b04] Pass 75: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:36:22Z] [b04] Child process exited (rc=3221225622) after 94.2s | Progress: +0 newly finished
+[2026-09-07T09:36:25Z] [b04] Pass 76: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:37:55Z] [b04] Child process exited (rc=3221225622) after 89.9s | Progress: +0 newly finished
+[2026-09-07T09:37:58Z] [b04] Pass 77: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:40:15Z] [b04] Child process exited (rc=3221225622) after 136.8s | Progress: +0 newly finished
+[2026-09-07T09:40:17Z] [b04] Pass 78: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:42:05Z] [b04] Child process exited (rc=3221225622) after 107.7s | Progress: +0 newly finished
+[2026-09-07T09:42:08Z] [b04] Pass 79: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:44:01Z] [b04] Child process exited (rc=3221225622) after 113.0s | Progress: +0 newly finished
+[2026-09-07T09:44:04Z] [b04] Pass 80: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:45:52Z] [b04] Child process exited (rc=3221225622) after 107.8s | Progress: +0 newly finished
+[2026-09-07T09:45:54Z] [b04] Pass 81: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:47:34Z] [b04] Child process exited (rc=3221225622) after 99.4s | Progress: +0 newly finished
+[2026-09-07T09:47:37Z] [b04] Pass 82: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T09:49:04Z] [b04] Child process exited (rc=3221225622) after 86.5s | Progress: +2 newly finished
+[2026-09-07T09:49:04Z] [b04] Pass 83: ok=191, in-flight/pending=1, unparsed=8 (total=200)
+[2026-09-07T09:50:34Z] [b04] Child process exited (rc=3221225477) after 89.1s | Progress: +0 newly finished
+[2026-09-07T09:50:36Z] [b04] Pass 84: ok=191, in-flight/pending=1, unparsed=8 (total=200)
+[2026-09-07T09:52:04Z] [b04] Child process exited (rc=3221225477) after 87.1s | Progress: +0 newly finished
+[2026-09-07T09:52:06Z] [b04] Pass 85: ok=191, in-flight/pending=1, unparsed=8 (total=200)
+[2026-09-07T09:53:34Z] [b04] Child process exited (rc=3221225477) after 87.1s | Progress: +4 newly finished
+[2026-09-07T09:53:34Z] [b04] Pass 86: ok=193, in-flight/pending=1, unparsed=6 (total=200)
+[2026-09-07T09:55:04Z] [b04] Child process exited (rc=3221225477) after 88.9s | Progress: +4 newly finished
+[2026-09-07T09:55:04Z] [b04] Pass 87: ok=195, in-flight/pending=1, unparsed=4 (total=200)
+[2026-09-07T09:56:34Z] [b04] Child process exited (rc=3221225477) after 89.0s | Progress: +6 newly finished
+[2026-09-07T09:56:34Z] [b04] Pass 88: ok=198, in-flight/pending=1, unparsed=1 (total=200)
+[2026-09-07T09:57:35Z] [b04] Child process exited (rc=0) after 60.1s | Progress: +3 newly finished
+[2026-09-07T09:57:35Z] [b04] Pass 89: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T09:57:40Z] [pipeline] Wave b04 fully analyzed in 147.2 mins
+[2026-09-07T09:57:44Z] [b05] Pass 1: ok=8, in-flight/pending=2, unparsed=190 (total=200)
+[2026-09-07T09:58:04Z] [b05] Child process exited (rc=3221225622) after 19.6s | Progress: +0 newly finished
+[2026-09-07T09:58:06Z] [b05] Pass 2: ok=8, in-flight/pending=2, unparsed=190 (total=200)
+[2026-09-07T09:59:34Z] [b05] Child process exited (rc=3221225501) after 87.1s | Progress: +5 newly finished
+[2026-09-07T09:59:34Z] [b05] Pass 3: ok=11, in-flight/pending=1, unparsed=188 (total=200)
+[2026-09-07T10:01:04Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T10:01:04Z] [b05] Pass 4: ok=15, in-flight/pending=1, unparsed=184 (total=200)
+[2026-09-07T10:02:34Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T10:02:34Z] [b05] Pass 5: ok=18, in-flight/pending=1, unparsed=181 (total=200)
+[2026-09-07T10:04:04Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +6 newly finished
+[2026-09-07T10:04:04Z] [b05] Pass 6: ok=21, in-flight/pending=1, unparsed=178 (total=200)
+[2026-09-07T10:05:34Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T10:05:34Z] [b05] Pass 7: ok=25, in-flight/pending=1, unparsed=174 (total=200)
+[2026-09-07T10:07:04Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T10:07:04Z] [b05] Pass 8: ok=27, in-flight/pending=1, unparsed=172 (total=200)
+[2026-09-07T10:08:34Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T10:08:34Z] [b05] Pass 9: ok=29, in-flight/pending=1, unparsed=170 (total=200)
+[2026-09-07T10:10:04Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T10:10:04Z] [b05] Pass 10: ok=32, in-flight/pending=1, unparsed=167 (total=200)
+[2026-09-07T10:11:34Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T10:11:34Z] [b05] Pass 11: ok=35, in-flight/pending=1, unparsed=164 (total=200)
+[2026-09-07T10:13:04Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T10:13:04Z] [b05] Pass 12: ok=38, in-flight/pending=1, unparsed=161 (total=200)
+[2026-09-07T10:14:34Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T10:14:34Z] [b05] Pass 13: ok=40, in-flight/pending=1, unparsed=159 (total=200)
+[2026-09-07T10:16:04Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T10:16:04Z] [b05] Pass 14: ok=43, in-flight/pending=1, unparsed=156 (total=200)
+[2026-09-07T10:17:34Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T10:17:34Z] [b05] Pass 15: ok=46, in-flight/pending=1, unparsed=153 (total=200)
+[2026-09-07T10:19:21Z] [b05] Child process exited (rc=3221225622) after 106.1s | Progress: +2 newly finished
+[2026-09-07T10:19:21Z] [b05] Pass 16: ok=47, in-flight/pending=1, unparsed=152 (total=200)
+[2026-09-07T10:21:17Z] [b05] Child process exited (rc=3221225622) after 114.9s | Progress: +4 newly finished
+[2026-09-07T10:21:17Z] [b05] Pass 17: ok=49, in-flight/pending=1, unparsed=150 (total=200)
+[2026-09-07T10:23:07Z] [b05] Child process exited (rc=3221225622) after 109.7s | Progress: +6 newly finished
+[2026-09-07T10:23:08Z] [b05] Pass 18: ok=52, in-flight/pending=1, unparsed=147 (total=200)
+[2026-09-07T10:25:03Z] [b05] Child process exited (rc=3221225622) after 114.8s | Progress: +4 newly finished
+[2026-09-07T10:25:04Z] [b05] Pass 19: ok=54, in-flight/pending=1, unparsed=145 (total=200)
+[2026-09-07T10:27:00Z] [b05] Child process exited (rc=3221225622) after 116.1s | Progress: +8 newly finished
+[2026-09-07T10:27:01Z] [b05] Pass 20: ok=58, in-flight/pending=1, unparsed=141 (total=200)
+[2026-09-07T10:28:49Z] [b05] Child process exited (rc=3221225622) after 108.1s | Progress: +2 newly finished
+[2026-09-07T10:28:50Z] [b05] Pass 21: ok=59, in-flight/pending=1, unparsed=140 (total=200)
+[2026-09-07T10:30:46Z] [b05] Child process exited (rc=3221225622) after 116.1s | Progress: +4 newly finished
+[2026-09-07T10:30:47Z] [b05] Pass 22: ok=61, in-flight/pending=1, unparsed=138 (total=200)
+[2026-09-07T10:32:44Z] [b05] Child process exited (rc=3221225622) after 116.3s | Progress: +8 newly finished
+[2026-09-07T10:32:44Z] [b05] Pass 23: ok=65, in-flight/pending=1, unparsed=134 (total=200)
+[2026-09-07T10:34:39Z] [b05] Child process exited (rc=3221225477) after 114.9s | Progress: +10 newly finished
+[2026-09-07T10:34:40Z] [b05] Pass 24: ok=70, in-flight/pending=1, unparsed=129 (total=200)
+[2026-09-07T10:36:35Z] [b05] Child process exited (rc=3221225477) after 114.8s | Progress: +10 newly finished
+[2026-09-07T10:36:36Z] [b05] Pass 25: ok=75, in-flight/pending=1, unparsed=124 (total=200)
+[2026-09-07T10:38:31Z] [b05] Child process exited (rc=3221225622) after 115.0s | Progress: +10 newly finished
+[2026-09-07T10:38:32Z] [b05] Pass 26: ok=80, in-flight/pending=1, unparsed=119 (total=200)
+[2026-09-07T10:40:08Z] [b05] Child process exited (rc=3221225477) after 96.0s | Progress: +4 newly finished
+[2026-09-07T10:40:08Z] [b05] Pass 27: ok=82, in-flight/pending=1, unparsed=117 (total=200)
+[2026-09-07T10:42:18Z] [b05] Child process exited (rc=3221225477) after 128.5s | Progress: +10 newly finished
+[2026-09-07T10:42:18Z] [b05] Pass 28: ok=87, in-flight/pending=1, unparsed=112 (total=200)
+[2026-09-07T10:44:13Z] [b05] Child process exited (rc=3221225622) after 115.0s | Progress: +4 newly finished
+[2026-09-07T10:44:14Z] [b05] Pass 29: ok=89, in-flight/pending=1, unparsed=110 (total=200)
+[2026-09-07T10:46:09Z] [b05] Child process exited (rc=3221225622) after 114.8s | Progress: +5 newly finished
+[2026-09-07T10:46:10Z] [b05] Pass 30: ok=92, in-flight/pending=0, unparsed=108 (total=200)
+[2026-09-07T10:48:05Z] [b05] Child process exited (rc=3221225622) after 114.8s | Progress: +11 newly finished
+[2026-09-07T10:48:05Z] [b05] Pass 31: ok=97, in-flight/pending=1, unparsed=102 (total=200)
+[2026-09-07T10:50:01Z] [b05] Child process exited (rc=3221225477) after 114.8s | Progress: +12 newly finished
+[2026-09-07T10:50:01Z] [b05] Pass 32: ok=103, in-flight/pending=1, unparsed=96 (total=200)
+[2026-09-07T10:51:37Z] [b05] Child process exited (rc=3221225477) after 95.6s | Progress: +6 newly finished
+[2026-09-07T10:51:38Z] [b05] Pass 33: ok=106, in-flight/pending=1, unparsed=93 (total=200)
+[2026-09-07T10:53:47Z] [b05] Child process exited (rc=3221225477) after 129.2s | Progress: +10 newly finished
+[2026-09-07T10:53:48Z] [b05] Pass 34: ok=111, in-flight/pending=1, unparsed=88 (total=200)
+[2026-09-07T10:55:43Z] [b05] Child process exited (rc=3221225622) after 114.7s | Progress: +6 newly finished
+[2026-09-07T10:55:43Z] [b05] Pass 35: ok=114, in-flight/pending=1, unparsed=85 (total=200)
+[2026-09-07T10:57:39Z] [b05] Child process exited (rc=3221225622) after 114.9s | Progress: +4 newly finished
+[2026-09-07T10:57:39Z] [b05] Pass 36: ok=116, in-flight/pending=1, unparsed=83 (total=200)
+[2026-09-07T10:59:30Z] [b05] Child process exited (rc=3221225477) after 109.7s | Progress: +4 newly finished
+[2026-09-07T10:59:30Z] [b05] Pass 37: ok=118, in-flight/pending=1, unparsed=81 (total=200)
+[2026-09-07T11:01:25Z] [b05] Child process exited (rc=3221225622) after 114.7s | Progress: +6 newly finished
+[2026-09-07T11:01:26Z] [b05] Pass 38: ok=121, in-flight/pending=1, unparsed=78 (total=200)
+[2026-09-07T11:03:21Z] [b05] Child process exited (rc=3221225622) after 114.8s | Progress: +2 newly finished
+[2026-09-07T11:03:21Z] [b05] Pass 39: ok=122, in-flight/pending=1, unparsed=77 (total=200)
+[2026-09-07T11:05:18Z] [b05] Child process exited (rc=3221225622) after 115.4s | Progress: +4 newly finished
+[2026-09-07T11:05:18Z] [b05] Pass 40: ok=124, in-flight/pending=1, unparsed=75 (total=200)
+[2026-09-07T11:06:47Z] [b05] Child process exited (rc=3221225477) after 88.2s | Progress: +4 newly finished
+[2026-09-07T11:06:47Z] [b05] Pass 41: ok=126, in-flight/pending=1, unparsed=73 (total=200)
+[2026-09-07T11:08:17Z] [b05] Child process exited (rc=3221225477) after 89.1s | Progress: +4 newly finished
+[2026-09-07T11:08:18Z] [b05] Pass 42: ok=128, in-flight/pending=1, unparsed=71 (total=200)
+[2026-09-07T11:09:47Z] [b05] Child process exited (rc=3221225477) after 88.8s | Progress: +6 newly finished
+[2026-09-07T11:09:47Z] [b05] Pass 43: ok=131, in-flight/pending=1, unparsed=68 (total=200)
+[2026-09-07T11:11:17Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T11:11:17Z] [b05] Pass 44: ok=134, in-flight/pending=1, unparsed=65 (total=200)
+[2026-09-07T11:12:47Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +6 newly finished
+[2026-09-07T11:12:47Z] [b05] Pass 45: ok=137, in-flight/pending=1, unparsed=62 (total=200)
+[2026-09-07T11:14:17Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +4 newly finished
+[2026-09-07T11:14:17Z] [b05] Pass 46: ok=139, in-flight/pending=1, unparsed=60 (total=200)
+[2026-09-07T11:15:47Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T11:15:47Z] [b05] Pass 47: ok=142, in-flight/pending=1, unparsed=57 (total=200)
+[2026-09-07T11:17:17Z] [b05] Child process exited (rc=3221225477) after 89.1s | Progress: +4 newly finished
+[2026-09-07T11:17:17Z] [b05] Pass 48: ok=144, in-flight/pending=1, unparsed=55 (total=200)
+[2026-09-07T11:18:47Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +0 newly finished
+[2026-09-07T11:18:49Z] [b05] Pass 49: ok=144, in-flight/pending=1, unparsed=55 (total=200)
+[2026-09-07T11:20:17Z] [b05] Child process exited (rc=3221225622) after 87.0s | Progress: +2 newly finished
+[2026-09-07T11:20:17Z] [b05] Pass 50: ok=145, in-flight/pending=1, unparsed=54 (total=200)
+[2026-09-07T11:21:47Z] [b05] Child process exited (rc=3221225477) after 89.0s | Progress: +2 newly finished
+[2026-09-07T11:21:47Z] [b05] Pass 51: ok=146, in-flight/pending=1, unparsed=53 (total=200)
+[2026-09-07T11:23:17Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +2 newly finished
+[2026-09-07T11:23:17Z] [b05] Pass 52: ok=147, in-flight/pending=1, unparsed=52 (total=200)
+[2026-09-07T11:24:47Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +6 newly finished
+[2026-09-07T11:24:47Z] [b05] Pass 53: ok=150, in-flight/pending=1, unparsed=49 (total=200)
+[2026-09-07T11:26:17Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +4 newly finished
+[2026-09-07T11:26:17Z] [b05] Pass 54: ok=152, in-flight/pending=1, unparsed=47 (total=200)
+[2026-09-07T11:27:47Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T11:27:47Z] [b05] Pass 55: ok=155, in-flight/pending=1, unparsed=44 (total=200)
+[2026-09-07T11:29:17Z] [b05] Child process exited (rc=3221225477) after 89.0s | Progress: +4 newly finished
+[2026-09-07T11:29:17Z] [b05] Pass 56: ok=157, in-flight/pending=1, unparsed=42 (total=200)
+[2026-09-07T11:30:47Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T11:30:47Z] [b05] Pass 57: ok=159, in-flight/pending=1, unparsed=40 (total=200)
+[2026-09-07T11:32:17Z] [b05] Child process exited (rc=3221225477) after 89.0s | Progress: +6 newly finished
+[2026-09-07T11:32:17Z] [b05] Pass 58: ok=162, in-flight/pending=1, unparsed=37 (total=200)
+[2026-09-07T11:33:47Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +4 newly finished
+[2026-09-07T11:33:47Z] [b05] Pass 59: ok=164, in-flight/pending=1, unparsed=35 (total=200)
+[2026-09-07T11:35:17Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +6 newly finished
+[2026-09-07T11:35:17Z] [b05] Pass 60: ok=167, in-flight/pending=1, unparsed=32 (total=200)
+[2026-09-07T11:36:47Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +0 newly finished
+[2026-09-07T11:36:50Z] [b05] Pass 61: ok=167, in-flight/pending=1, unparsed=32 (total=200)
+[2026-09-07T11:38:17Z] [b05] Child process exited (rc=3221225622) after 87.0s | Progress: +6 newly finished
+[2026-09-07T11:38:17Z] [b05] Pass 62: ok=170, in-flight/pending=1, unparsed=29 (total=200)
+[2026-09-07T11:39:47Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +2 newly finished
+[2026-09-07T11:39:47Z] [b05] Pass 63: ok=171, in-flight/pending=1, unparsed=28 (total=200)
+[2026-09-07T11:41:17Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +6 newly finished
+[2026-09-07T11:41:17Z] [b05] Pass 64: ok=174, in-flight/pending=1, unparsed=25 (total=200)
+[2026-09-07T11:42:47Z] [b05] Child process exited (rc=3221225622) after 89.0s | Progress: +2 newly finished
+[2026-09-07T11:42:47Z] [b05] Pass 65: ok=175, in-flight/pending=1, unparsed=24 (total=200)
+[2026-09-07T11:44:17Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T11:44:17Z] [b05] Pass 66: ok=176, in-flight/pending=1, unparsed=23 (total=200)
+[2026-09-07T11:45:47Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T11:45:47Z] [b05] Pass 67: ok=178, in-flight/pending=1, unparsed=21 (total=200)
+[2026-09-07T11:47:17Z] [b05] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T11:47:18Z] [b05] Pass 68: ok=179, in-flight/pending=1, unparsed=20 (total=200)
+[2026-09-07T11:49:49Z] [b05] Child process exited (rc=3221225622) after 151.3s | Progress: +8 newly finished
+[2026-09-07T11:49:50Z] [b05] Pass 69: ok=183, in-flight/pending=1, unparsed=16 (total=200)
+[2026-09-07T11:52:06Z] [b05] Child process exited (rc=3221225622) after 135.6s | Progress: +8 newly finished
+[2026-09-07T11:52:06Z] [b05] Pass 70: ok=187, in-flight/pending=1, unparsed=12 (total=200)
+[2026-09-07T11:53:56Z] [b05] Child process exited (rc=3221225622) after 109.5s | Progress: +6 newly finished
+[2026-09-07T11:53:57Z] [b05] Pass 71: ok=190, in-flight/pending=1, unparsed=9 (total=200)
+[2026-09-07T11:55:52Z] [b05] Child process exited (rc=3221225622) after 114.9s | Progress: +6 newly finished
+[2026-09-07T11:55:53Z] [b05] Pass 72: ok=193, in-flight/pending=1, unparsed=6 (total=200)
+[2026-09-07T11:57:48Z] [b05] Child process exited (rc=3221225622) after 114.9s | Progress: +4 newly finished
+[2026-09-07T11:57:49Z] [b05] Pass 73: ok=195, in-flight/pending=1, unparsed=4 (total=200)
+[2026-09-07T11:59:44Z] [b05] Child process exited (rc=3221225622) after 114.7s | Progress: +6 newly finished
+[2026-09-07T11:59:44Z] [b05] Pass 74: ok=198, in-flight/pending=1, unparsed=1 (total=200)
+[2026-09-07T12:01:03Z] [b05] Child process exited (rc=0) after 77.9s | Progress: +3 newly finished
+[2026-09-07T12:01:03Z] [b05] Pass 75: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T12:01:08Z] [pipeline] Wave b05 fully analyzed in 123.5 mins
+[2026-09-07T12:01:12Z] [b06] Pass 1: ok=4, in-flight/pending=1, unparsed=195 (total=200)
+[2026-09-07T12:03:30Z] [b06] Child process exited (rc=3221225622) after 138.2s | Progress: +4 newly finished
+[2026-09-07T12:03:31Z] [b06] Pass 2: ok=6, in-flight/pending=1, unparsed=193 (total=200)
+[2026-09-07T12:05:26Z] [b06] Child process exited (rc=3221225622) after 115.0s | Progress: +6 newly finished
+[2026-09-07T12:05:26Z] [b06] Pass 3: ok=9, in-flight/pending=1, unparsed=190 (total=200)
+[2026-09-07T12:07:22Z] [b06] Child process exited (rc=3221225622) after 115.0s | Progress: +6 newly finished
+[2026-09-07T12:07:22Z] [b06] Pass 4: ok=12, in-flight/pending=1, unparsed=187 (total=200)
+[2026-09-07T12:10:13Z] [b06] Child process exited (rc=3221225622) after 170.1s | Progress: +8 newly finished
+[2026-09-07T12:10:13Z] [b06] Pass 5: ok=16, in-flight/pending=1, unparsed=183 (total=200)
+[2026-09-07T12:11:57Z] [b06] Child process exited (rc=3221225622) after 103.7s | Progress: +8 newly finished
+[2026-09-07T12:11:58Z] [b06] Pass 6: ok=20, in-flight/pending=1, unparsed=179 (total=200)
+[2026-09-07T12:13:59Z] [b06] Child process exited (rc=3221225622) after 121.0s | Progress: +3 newly finished
+[2026-09-07T12:14:00Z] [b06] Pass 7: ok=21, in-flight/pending=2, unparsed=177 (total=200)
+[2026-09-07T12:15:55Z] [b06] Child process exited (rc=3221225622) after 115.0s | Progress: +6 newly finished
+[2026-09-07T12:15:56Z] [b06] Pass 8: ok=24, in-flight/pending=2, unparsed=174 (total=200)
+[2026-09-07T12:17:31Z] [b06] Child process exited (rc=3221225622) after 94.9s | Progress: +6 newly finished
+[2026-09-07T12:17:31Z] [b06] Pass 9: ok=27, in-flight/pending=2, unparsed=171 (total=200)
+[2026-09-07T12:19:47Z] [b06] Child process exited (rc=3221225622) after 135.0s | Progress: +8 newly finished
+[2026-09-07T12:19:47Z] [b06] Pass 10: ok=31, in-flight/pending=2, unparsed=167 (total=200)
+[2026-09-07T12:21:43Z] [b06] Child process exited (rc=3221225622) after 114.9s | Progress: +6 newly finished
+[2026-09-07T12:21:43Z] [b06] Pass 11: ok=34, in-flight/pending=2, unparsed=164 (total=200)
+[2026-09-07T12:23:44Z] [b06] Child process exited (rc=3221225622) after 120.1s | Progress: +4 newly finished
+[2026-09-07T12:23:44Z] [b06] Pass 12: ok=36, in-flight/pending=2, unparsed=162 (total=200)
+[2026-09-07T12:25:34Z] [b06] Child process exited (rc=3221225622) after 109.8s | Progress: +6 newly finished
+[2026-09-07T12:25:35Z] [b06] Pass 13: ok=39, in-flight/pending=2, unparsed=159 (total=200)
+[2026-09-07T12:27:30Z] [b06] Child process exited (rc=3221225622) after 115.0s | Progress: +10 newly finished
+[2026-09-07T12:27:31Z] [b06] Pass 14: ok=44, in-flight/pending=2, unparsed=154 (total=200)
+[2026-09-07T12:29:26Z] [b06] Child process exited (rc=3221225622) after 114.9s | Progress: +8 newly finished
+[2026-09-07T12:29:26Z] [b06] Pass 15: ok=48, in-flight/pending=2, unparsed=150 (total=200)
+[2026-09-07T12:31:22Z] [b06] Child process exited (rc=3221225622) after 114.7s | Progress: +4 newly finished
+[2026-09-07T12:31:22Z] [b06] Pass 16: ok=50, in-flight/pending=2, unparsed=148 (total=200)
+[2026-09-07T12:33:18Z] [b06] Child process exited (rc=3221225622) after 115.1s | Progress: +6 newly finished
+[2026-09-07T12:33:18Z] [b06] Pass 17: ok=53, in-flight/pending=2, unparsed=145 (total=200)
+[2026-09-07T12:34:53Z] [b06] Child process exited (rc=3221225622) after 94.5s | Progress: +2 newly finished
+[2026-09-07T12:34:53Z] [b06] Pass 18: ok=54, in-flight/pending=2, unparsed=144 (total=200)
+[2026-09-07T12:36:49Z] [b06] Child process exited (rc=3221225622) after 115.3s | Progress: +4 newly finished
+[2026-09-07T12:36:50Z] [b06] Pass 19: ok=56, in-flight/pending=2, unparsed=142 (total=200)
+[2026-09-07T12:38:19Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +6 newly finished
+[2026-09-07T12:38:19Z] [b06] Pass 20: ok=59, in-flight/pending=2, unparsed=139 (total=200)
+[2026-09-07T12:40:06Z] [b06] Child process exited (rc=3221225622) after 105.7s | Progress: +6 newly finished
+[2026-09-07T12:40:06Z] [b06] Pass 21: ok=62, in-flight/pending=2, unparsed=136 (total=200)
+[2026-09-07T12:42:57Z] [b06] Child process exited (rc=3221225622) after 170.3s | Progress: +6 newly finished
+[2026-09-07T12:42:57Z] [b06] Pass 22: ok=65, in-flight/pending=2, unparsed=133 (total=200)
+[2026-09-07T12:44:27Z] [b06] Child process exited (rc=3221225622) after 89.3s | Progress: +8 newly finished
+[2026-09-07T12:44:27Z] [b06] Pass 23: ok=69, in-flight/pending=2, unparsed=129 (total=200)
+[2026-09-07T12:45:57Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T12:45:57Z] [b06] Pass 24: ok=70, in-flight/pending=2, unparsed=128 (total=200)
+[2026-09-07T12:47:44Z] [b06] Child process exited (rc=3221225622) after 106.0s | Progress: +2 newly finished
+[2026-09-07T12:47:44Z] [b06] Pass 25: ok=71, in-flight/pending=2, unparsed=127 (total=200)
+[2026-09-07T12:50:26Z] [b06] Child process exited (rc=3221225622) after 161.5s | Progress: +10 newly finished
+[2026-09-07T12:50:27Z] [b06] Pass 26: ok=76, in-flight/pending=2, unparsed=122 (total=200)
+[2026-09-07T12:51:57Z] [b06] Child process exited (rc=3221225622) after 89.6s | Progress: +2 newly finished
+[2026-09-07T12:51:58Z] [b06] Pass 27: ok=77, in-flight/pending=2, unparsed=121 (total=200)
+[2026-09-07T12:53:26Z] [b06] Child process exited (rc=3221225477) after 88.1s | Progress: +2 newly finished
+[2026-09-07T12:53:27Z] [b06] Pass 28: ok=78, in-flight/pending=2, unparsed=120 (total=200)
+[2026-09-07T12:54:56Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +0 newly finished
+[2026-09-07T12:54:59Z] [b06] Pass 29: ok=78, in-flight/pending=2, unparsed=120 (total=200)
+[2026-09-07T12:56:26Z] [b06] Child process exited (rc=3221225622) after 87.2s | Progress: +2 newly finished
+[2026-09-07T12:56:27Z] [b06] Pass 30: ok=79, in-flight/pending=2, unparsed=119 (total=200)
+[2026-09-07T12:57:56Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T12:57:57Z] [b06] Pass 31: ok=82, in-flight/pending=2, unparsed=116 (total=200)
+[2026-09-07T12:59:26Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T12:59:27Z] [b06] Pass 32: ok=83, in-flight/pending=2, unparsed=115 (total=200)
+[2026-09-07T13:00:56Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T13:00:57Z] [b06] Pass 33: ok=85, in-flight/pending=2, unparsed=113 (total=200)
+[2026-09-07T13:02:26Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:02:27Z] [b06] Pass 34: ok=86, in-flight/pending=2, unparsed=112 (total=200)
+[2026-09-07T13:03:56Z] [b06] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T13:03:57Z] [b06] Pass 35: ok=87, in-flight/pending=2, unparsed=111 (total=200)
+[2026-09-07T13:05:26Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +0 newly finished
+[2026-09-07T13:05:29Z] [b06] Pass 36: ok=87, in-flight/pending=2, unparsed=111 (total=200)
+[2026-09-07T13:06:56Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +4 newly finished
+[2026-09-07T13:06:57Z] [b06] Pass 37: ok=89, in-flight/pending=2, unparsed=109 (total=200)
+[2026-09-07T13:08:26Z] [b06] Child process exited (rc=3221225477) after 89.2s | Progress: +6 newly finished
+[2026-09-07T13:08:27Z] [b06] Pass 38: ok=92, in-flight/pending=2, unparsed=106 (total=200)
+[2026-09-07T13:09:56Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +4 newly finished
+[2026-09-07T13:09:57Z] [b06] Pass 39: ok=94, in-flight/pending=2, unparsed=104 (total=200)
+[2026-09-07T13:11:26Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T13:11:27Z] [b06] Pass 40: ok=97, in-flight/pending=2, unparsed=101 (total=200)
+[2026-09-07T13:12:56Z] [b06] Child process exited (rc=3221225477) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:12:57Z] [b06] Pass 41: ok=98, in-flight/pending=2, unparsed=100 (total=200)
+[2026-09-07T13:14:26Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:14:27Z] [b06] Pass 42: ok=99, in-flight/pending=2, unparsed=99 (total=200)
+[2026-09-07T13:15:56Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:15:57Z] [b06] Pass 43: ok=100, in-flight/pending=2, unparsed=98 (total=200)
+[2026-09-07T13:17:26Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T13:17:27Z] [b06] Pass 44: ok=102, in-flight/pending=2, unparsed=96 (total=200)
+[2026-09-07T13:18:56Z] [b06] Child process exited (rc=3221225477) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:18:57Z] [b06] Pass 45: ok=103, in-flight/pending=2, unparsed=95 (total=200)
+[2026-09-07T13:20:26Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T13:20:27Z] [b06] Pass 46: ok=105, in-flight/pending=2, unparsed=93 (total=200)
+[2026-09-07T13:21:56Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T13:21:57Z] [b06] Pass 47: ok=108, in-flight/pending=2, unparsed=90 (total=200)
+[2026-09-07T13:23:27Z] [b06] Child process exited (rc=3221225622) after 89.2s | Progress: +6 newly finished
+[2026-09-07T13:23:27Z] [b06] Pass 48: ok=111, in-flight/pending=2, unparsed=87 (total=200)
+[2026-09-07T13:24:57Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +2 newly finished
+[2026-09-07T13:24:57Z] [b06] Pass 49: ok=112, in-flight/pending=2, unparsed=86 (total=200)
+[2026-09-07T13:26:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T13:26:27Z] [b06] Pass 50: ok=114, in-flight/pending=2, unparsed=84 (total=200)
+[2026-09-07T13:27:57Z] [b06] Child process exited (rc=3221225477) after 89.0s | Progress: +4 newly finished
+[2026-09-07T13:27:57Z] [b06] Pass 51: ok=116, in-flight/pending=2, unparsed=82 (total=200)
+[2026-09-07T13:29:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +3 newly finished
+[2026-09-07T13:29:27Z] [b06] Pass 52: ok=118, in-flight/pending=1, unparsed=81 (total=200)
+[2026-09-07T13:30:57Z] [b06] Child process exited (rc=3221225622) after 89.2s | Progress: +3 newly finished
+[2026-09-07T13:30:57Z] [b06] Pass 53: ok=119, in-flight/pending=2, unparsed=79 (total=200)
+[2026-09-07T13:32:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:32:27Z] [b06] Pass 54: ok=120, in-flight/pending=2, unparsed=78 (total=200)
+[2026-09-07T13:33:57Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T13:33:57Z] [b06] Pass 55: ok=123, in-flight/pending=2, unparsed=75 (total=200)
+[2026-09-07T13:35:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T13:35:27Z] [b06] Pass 56: ok=125, in-flight/pending=2, unparsed=73 (total=200)
+[2026-09-07T13:36:57Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +6 newly finished
+[2026-09-07T13:36:57Z] [b06] Pass 57: ok=128, in-flight/pending=2, unparsed=70 (total=200)
+[2026-09-07T13:38:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:38:27Z] [b06] Pass 58: ok=129, in-flight/pending=2, unparsed=69 (total=200)
+[2026-09-07T13:39:57Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T13:39:57Z] [b06] Pass 59: ok=131, in-flight/pending=2, unparsed=67 (total=200)
+[2026-09-07T13:41:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T13:41:27Z] [b06] Pass 60: ok=132, in-flight/pending=2, unparsed=66 (total=200)
+[2026-09-07T13:42:57Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +0 newly finished
+[2026-09-07T13:42:59Z] [b06] Pass 61: ok=132, in-flight/pending=2, unparsed=66 (total=200)
+[2026-09-07T13:44:27Z] [b06] Child process exited (rc=3221225477) after 87.1s | Progress: +0 newly finished
+[2026-09-07T13:44:29Z] [b06] Pass 62: ok=132, in-flight/pending=2, unparsed=66 (total=200)
+[2026-09-07T13:45:57Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T13:45:59Z] [b06] Pass 63: ok=132, in-flight/pending=2, unparsed=66 (total=200)
+[2026-09-07T13:47:27Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T13:47:29Z] [b06] Pass 64: ok=132, in-flight/pending=2, unparsed=66 (total=200)
+[2026-09-07T13:48:57Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +2 newly finished
+[2026-09-07T13:48:57Z] [b06] Pass 65: ok=133, in-flight/pending=2, unparsed=65 (total=200)
+[2026-09-07T13:50:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T13:50:27Z] [b06] Pass 66: ok=135, in-flight/pending=2, unparsed=63 (total=200)
+[2026-09-07T13:51:57Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +2 newly finished
+[2026-09-07T13:51:57Z] [b06] Pass 67: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T13:53:27Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +0 newly finished
+[2026-09-07T13:53:29Z] [b06] Pass 68: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T13:54:57Z] [b06] Child process exited (rc=3221225622) after 87.0s | Progress: +0 newly finished
+[2026-09-07T13:54:59Z] [b06] Pass 69: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T13:56:27Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T13:56:29Z] [b06] Pass 70: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T13:57:57Z] [b06] Child process exited (rc=3221225622) after 87.3s | Progress: +0 newly finished
+[2026-09-07T13:58:00Z] [b06] Pass 71: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T13:59:27Z] [b06] Child process exited (rc=3221225622) after 86.7s | Progress: +0 newly finished
+[2026-09-07T13:59:29Z] [b06] Pass 72: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T14:00:57Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T14:00:59Z] [b06] Pass 73: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T14:02:27Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +0 newly finished
+[2026-09-07T14:02:29Z] [b06] Pass 74: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T14:03:57Z] [b06] Child process exited (rc=3221225622) after 87.3s | Progress: +0 newly finished
+[2026-09-07T14:04:02Z] [pipeline] Wave b06 fully analyzed in 122.9 mins
+[2026-09-07T14:04:05Z] [b07] Pass 1: ok=3, in-flight/pending=1, unparsed=141 (total=145)
+[2026-09-07T14:05:27Z] [b07] Child process exited (rc=3221225622) after 81.3s | Progress: +0 newly finished
+[2026-09-07T14:05:29Z] [b07] Pass 2: ok=3, in-flight/pending=1, unparsed=141 (total=145)
+[2026-09-07T14:06:57Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +4 newly finished
+[2026-09-07T14:06:57Z] [b07] Pass 3: ok=5, in-flight/pending=1, unparsed=139 (total=145)
+[2026-09-07T14:08:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +8 newly finished
+[2026-09-07T14:08:27Z] [b07] Pass 4: ok=9, in-flight/pending=1, unparsed=135 (total=145)
+[2026-09-07T14:09:57Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +4 newly finished
+[2026-09-07T14:09:57Z] [b07] Pass 5: ok=11, in-flight/pending=1, unparsed=133 (total=145)
+[2026-09-07T14:11:27Z] [b07] Child process exited (rc=3221225477) after 89.3s | Progress: +6 newly finished
+[2026-09-07T14:11:27Z] [b07] Pass 6: ok=14, in-flight/pending=1, unparsed=130 (total=145)
+[2026-09-07T14:12:57Z] [b07] Child process exited (rc=3221225477) after 89.1s | Progress: +8 newly finished
+[2026-09-07T14:12:57Z] [b07] Pass 7: ok=18, in-flight/pending=1, unparsed=126 (total=145)
+[2026-09-07T14:14:27Z] [b07] Child process exited (rc=3221225477) after 88.8s | Progress: +0 newly finished
+[2026-09-07T14:14:29Z] [b07] Pass 8: ok=18, in-flight/pending=1, unparsed=126 (total=145)
+[2026-09-07T14:15:57Z] [b07] Child process exited (rc=3221225477) after 87.1s | Progress: +4 newly finished
+[2026-09-07T14:15:58Z] [b07] Pass 9: ok=20, in-flight/pending=1, unparsed=124 (total=145)
+[2026-09-07T14:17:27Z] [b07] Child process exited (rc=3221225477) after 88.8s | Progress: +2 newly finished
+[2026-09-07T14:17:27Z] [b07] Pass 10: ok=21, in-flight/pending=1, unparsed=123 (total=145)
+[2026-09-07T14:18:57Z] [b07] Child process exited (rc=3221225477) after 88.9s | Progress: +5 newly finished
+[2026-09-07T14:18:57Z] [b07] Pass 11: ok=24, in-flight/pending=0, unparsed=121 (total=145)
+[2026-09-07T14:20:27Z] [b07] Child process exited (rc=3221225477) after 89.0s | Progress: +9 newly finished
+[2026-09-07T14:20:27Z] [b07] Pass 12: ok=28, in-flight/pending=1, unparsed=116 (total=145)
+[2026-09-07T14:21:57Z] [b07] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T14:21:57Z] [b07] Pass 13: ok=30, in-flight/pending=1, unparsed=114 (total=145)
+[2026-09-07T14:23:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +4 newly finished
+[2026-09-07T14:23:27Z] [b07] Pass 14: ok=32, in-flight/pending=1, unparsed=112 (total=145)
+[2026-09-07T14:24:57Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +0 newly finished
+[2026-09-07T14:24:59Z] [b07] Pass 15: ok=32, in-flight/pending=1, unparsed=112 (total=145)
+[2026-09-07T14:26:27Z] [b07] Child process exited (rc=3221225477) after 87.3s | Progress: +4 newly finished
+[2026-09-07T14:26:27Z] [b07] Pass 16: ok=34, in-flight/pending=1, unparsed=110 (total=145)
+[2026-09-07T14:27:57Z] [b07] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T14:27:57Z] [b07] Pass 17: ok=35, in-flight/pending=1, unparsed=109 (total=145)
+[2026-09-07T14:29:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +0 newly finished
+[2026-09-07T14:29:29Z] [b07] Pass 18: ok=35, in-flight/pending=1, unparsed=109 (total=145)
+[2026-09-07T14:30:57Z] [b07] Child process exited (rc=3221226505) after 87.2s | Progress: +2 newly finished
+[2026-09-07T14:30:57Z] [b07] Pass 19: ok=36, in-flight/pending=1, unparsed=108 (total=145)
+[2026-09-07T14:32:27Z] [b07] Child process exited (rc=3221225622) after 89.4s | Progress: +4 newly finished
+[2026-09-07T14:32:27Z] [b07] Pass 20: ok=38, in-flight/pending=1, unparsed=106 (total=145)
+[2026-09-07T14:33:57Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +4 newly finished
+[2026-09-07T14:33:57Z] [b07] Pass 21: ok=40, in-flight/pending=1, unparsed=104 (total=145)
+[2026-09-07T14:35:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +0 newly finished
+[2026-09-07T14:35:29Z] [b07] Pass 22: ok=40, in-flight/pending=1, unparsed=104 (total=145)
+[2026-09-07T14:36:57Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +2 newly finished
+[2026-09-07T14:36:57Z] [b07] Pass 23: ok=41, in-flight/pending=1, unparsed=103 (total=145)
+[2026-09-07T14:38:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T14:38:27Z] [b07] Pass 24: ok=42, in-flight/pending=1, unparsed=102 (total=145)
+[2026-09-07T14:39:57Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T14:39:57Z] [b07] Pass 25: ok=43, in-flight/pending=1, unparsed=101 (total=145)
+[2026-09-07T14:41:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +2 newly finished
+[2026-09-07T14:41:27Z] [b07] Pass 26: ok=44, in-flight/pending=1, unparsed=100 (total=145)
+[2026-09-07T14:42:57Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T14:42:57Z] [b07] Pass 27: ok=45, in-flight/pending=1, unparsed=99 (total=145)
+[2026-09-07T14:44:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +0 newly finished
+[2026-09-07T14:44:29Z] [b07] Pass 28: ok=45, in-flight/pending=1, unparsed=99 (total=145)
+[2026-09-07T14:45:57Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +2 newly finished
+[2026-09-07T14:45:57Z] [b07] Pass 29: ok=46, in-flight/pending=1, unparsed=98 (total=145)
+[2026-09-07T14:47:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T14:47:27Z] [b07] Pass 30: ok=47, in-flight/pending=1, unparsed=97 (total=145)
+[2026-09-07T14:48:57Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T14:48:57Z] [b07] Pass 31: ok=48, in-flight/pending=1, unparsed=96 (total=145)
+[2026-09-07T14:50:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +2 newly finished
+[2026-09-07T14:50:27Z] [b07] Pass 32: ok=49, in-flight/pending=1, unparsed=95 (total=145)
+[2026-09-07T14:51:57Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T14:51:57Z] [b07] Pass 33: ok=51, in-flight/pending=1, unparsed=93 (total=145)
+[2026-09-07T14:53:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T14:53:27Z] [b07] Pass 34: ok=52, in-flight/pending=1, unparsed=92 (total=145)
+[2026-09-07T14:54:57Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T14:54:57Z] [b07] Pass 35: ok=54, in-flight/pending=1, unparsed=90 (total=145)
+[2026-09-07T14:56:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +2 newly finished
+[2026-09-07T14:56:27Z] [b07] Pass 36: ok=55, in-flight/pending=1, unparsed=89 (total=145)
+[2026-09-07T14:57:57Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T14:57:57Z] [b07] Pass 37: ok=57, in-flight/pending=1, unparsed=87 (total=145)
+[2026-09-07T14:59:27Z] [b07] Child process exited (rc=3221225622) after 89.4s | Progress: +2 newly finished
+[2026-09-07T14:59:27Z] [b07] Pass 38: ok=58, in-flight/pending=1, unparsed=86 (total=145)
+[2026-09-07T15:00:57Z] [b07] Child process exited (rc=3221225477) after 89.2s | Progress: +2 newly finished
+[2026-09-07T15:00:57Z] [b07] Pass 39: ok=59, in-flight/pending=1, unparsed=85 (total=145)
+[2026-09-07T15:02:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T15:02:27Z] [b07] Pass 40: ok=60, in-flight/pending=1, unparsed=84 (total=145)
+[2026-09-07T15:03:57Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T15:03:57Z] [b07] Pass 41: ok=61, in-flight/pending=1, unparsed=83 (total=145)
+[2026-09-07T15:05:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T15:05:27Z] [b07] Pass 42: ok=62, in-flight/pending=1, unparsed=82 (total=145)
+[2026-09-07T15:06:57Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +2 newly finished
+[2026-09-07T15:06:57Z] [b07] Pass 43: ok=63, in-flight/pending=1, unparsed=81 (total=145)
+[2026-09-07T15:08:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +4 newly finished
+[2026-09-07T15:08:27Z] [b07] Pass 44: ok=65, in-flight/pending=1, unparsed=79 (total=145)
+[2026-09-07T15:09:57Z] [b07] Child process exited (rc=3221225477) after 89.3s | Progress: +3 newly finished
+[2026-09-07T15:09:57Z] [b07] Pass 45: ok=67, in-flight/pending=0, unparsed=78 (total=145)
+[2026-09-07T15:11:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +3 newly finished
+[2026-09-07T15:11:27Z] [b07] Pass 46: ok=68, in-flight/pending=1, unparsed=76 (total=145)
+[2026-09-07T15:12:57Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +2 newly finished
+[2026-09-07T15:12:57Z] [b07] Pass 47: ok=69, in-flight/pending=1, unparsed=75 (total=145)
+[2026-09-07T15:14:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +4 newly finished
+[2026-09-07T15:14:27Z] [b07] Pass 48: ok=71, in-flight/pending=1, unparsed=73 (total=145)
+[2026-09-07T15:15:57Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +0 newly finished
+[2026-09-07T15:15:59Z] [b07] Pass 49: ok=71, in-flight/pending=1, unparsed=73 (total=145)
+[2026-09-07T15:17:27Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +0 newly finished
+[2026-09-07T15:17:29Z] [b07] Pass 50: ok=71, in-flight/pending=1, unparsed=73 (total=145)
+[2026-09-07T15:18:57Z] [b07] Child process exited (rc=3221225477) after 87.2s | Progress: +2 newly finished
+[2026-09-07T15:18:57Z] [b07] Pass 51: ok=72, in-flight/pending=1, unparsed=72 (total=145)
+[2026-09-07T15:20:27Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +2 newly finished
+[2026-09-07T15:20:27Z] [b07] Pass 52: ok=73, in-flight/pending=1, unparsed=71 (total=145)
+[2026-09-07T15:21:57Z] [b07] Child process exited (rc=3221225622) after 89.3s | Progress: +4 newly finished
+[2026-09-07T15:21:57Z] [b07] Pass 53: ok=75, in-flight/pending=1, unparsed=69 (total=145)
+[2026-09-07T15:23:27Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +0 newly finished
+[2026-09-07T15:23:29Z] [b07] Pass 54: ok=75, in-flight/pending=1, unparsed=69 (total=145)
+[2026-09-07T15:24:57Z] [b07] Child process exited (rc=3221225622) after 87.3s | Progress: +2 newly finished
+[2026-09-07T15:24:57Z] [b07] Pass 55: ok=76, in-flight/pending=1, unparsed=68 (total=145)
+[2026-09-07T15:26:35Z] [b07] Child process exited (rc=3221225622) after 97.3s | Progress: +2 newly finished
+[2026-09-07T15:26:35Z] [b07] Pass 56: ok=77, in-flight/pending=1, unparsed=67 (total=145)
+[2026-09-07T15:28:31Z] [b07] Child process exited (rc=3221225622) after 115.2s | Progress: +2 newly finished
+[2026-09-07T15:28:31Z] [b07] Pass 57: ok=78, in-flight/pending=1, unparsed=66 (total=145)
+[2026-09-07T15:30:24Z] [b07] Child process exited (rc=3221225622) after 112.7s | Progress: +4 newly finished
+[2026-09-07T15:30:25Z] [b07] Pass 58: ok=80, in-flight/pending=1, unparsed=64 (total=145)
+[2026-09-07T15:32:28Z] [b07] Child process exited (rc=3221225622) after 122.7s | Progress: +2 newly finished
+[2026-09-07T15:32:28Z] [b07] Pass 59: ok=81, in-flight/pending=1, unparsed=63 (total=145)
+[2026-09-07T15:35:50Z] [b07] Child process exited (rc=3221225622) after 201.7s | Progress: +4 newly finished
+[2026-09-07T15:35:51Z] [b07] Pass 60: ok=83, in-flight/pending=1, unparsed=61 (total=145)
+[2026-09-07T15:37:20Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +4 newly finished
+[2026-09-07T15:37:21Z] [b07] Pass 61: ok=85, in-flight/pending=1, unparsed=59 (total=145)
+[2026-09-07T15:38:50Z] [b07] Child process exited (rc=3221225622) after 89.1s | Progress: +2 newly finished
+[2026-09-07T15:38:50Z] [b07] Pass 62: ok=86, in-flight/pending=1, unparsed=58 (total=145)
+[2026-09-07T15:40:38Z] [b07] Child process exited (rc=3221225622) after 107.4s | Progress: +4 newly finished
+[2026-09-07T15:40:39Z] [b07] Pass 63: ok=88, in-flight/pending=1, unparsed=56 (total=145)
+[2026-09-07T15:42:08Z] [b07] Child process exited (rc=3221225622) after 89.1s | Progress: +4 newly finished
+[2026-09-07T15:42:09Z] [b07] Pass 64: ok=90, in-flight/pending=1, unparsed=54 (total=145)
+[2026-09-07T15:44:03Z] [b07] Child process exited (rc=3221225622) after 114.2s | Progress: +2 newly finished
+[2026-09-07T15:44:03Z] [b07] Pass 65: ok=91, in-flight/pending=1, unparsed=53 (total=145)
+[2026-09-07T15:45:59Z] [b07] Child process exited (rc=3221225622) after 115.2s | Progress: +0 newly finished
+[2026-09-07T15:46:01Z] [b07] Pass 66: ok=91, in-flight/pending=1, unparsed=53 (total=145)
+[2026-09-07T15:47:55Z] [b07] Child process exited (rc=3221225622) after 113.1s | Progress: +0 newly finished
+[2026-09-07T15:47:57Z] [b07] Pass 67: ok=91, in-flight/pending=1, unparsed=53 (total=145)
+[2026-09-07T15:49:56Z] [b07] Child process exited (rc=3221225622) after 117.9s | Progress: +6 newly finished
+[2026-09-07T15:49:56Z] [b07] Pass 68: ok=94, in-flight/pending=1, unparsed=50 (total=145)
+[2026-09-07T15:51:57Z] [b07] Child process exited (rc=3221225622) after 120.5s | Progress: +10 newly finished
+[2026-09-07T15:51:57Z] [b07] Pass 69: ok=99, in-flight/pending=1, unparsed=45 (total=145)
+[2026-09-07T15:53:53Z] [b07] Child process exited (rc=3221225622) after 115.0s | Progress: +8 newly finished
+[2026-09-07T15:53:53Z] [b07] Pass 70: ok=103, in-flight/pending=1, unparsed=41 (total=145)
+[2026-09-07T15:55:48Z] [b07] Child process exited (rc=3221225622) after 114.9s | Progress: +4 newly finished
+[2026-09-07T15:55:49Z] [b07] Pass 71: ok=105, in-flight/pending=1, unparsed=39 (total=145)
+[2026-09-07T15:57:44Z] [b07] Child process exited (rc=3221225622) after 115.1s | Progress: +2 newly finished
+[2026-09-07T15:57:45Z] [b07] Pass 72: ok=106, in-flight/pending=1, unparsed=38 (total=145)
+[2026-09-07T15:59:40Z] [b07] Child process exited (rc=3221225622) after 115.1s | Progress: +4 newly finished
+[2026-09-07T15:59:40Z] [b07] Pass 73: ok=108, in-flight/pending=1, unparsed=36 (total=145)
+[2026-09-07T16:01:36Z] [b07] Child process exited (rc=3221225622) after 115.1s | Progress: +6 newly finished
+[2026-09-07T16:01:36Z] [b07] Pass 74: ok=111, in-flight/pending=1, unparsed=33 (total=145)
+[2026-09-07T16:04:28Z] [b07] Child process exited (rc=3221225622) after 171.6s | Progress: +8 newly finished
+[2026-09-07T16:04:29Z] [b07] Pass 75: ok=115, in-flight/pending=1, unparsed=29 (total=145)
+[2026-09-07T16:06:33Z] [b07] Child process exited (rc=3221225622) after 123.9s | Progress: +6 newly finished
+[2026-09-07T16:06:33Z] [b07] Pass 76: ok=118, in-flight/pending=1, unparsed=26 (total=145)
+[2026-09-07T16:08:32Z] [b07] Child process exited (rc=3221225622) after 118.3s | Progress: +4 newly finished
+[2026-09-07T16:08:32Z] [b07] Pass 77: ok=120, in-flight/pending=1, unparsed=24 (total=145)
+[2026-09-07T16:10:30Z] [b07] Child process exited (rc=3221225622) after 117.1s | Progress: +6 newly finished
+[2026-09-07T16:10:30Z] [b07] Pass 78: ok=123, in-flight/pending=1, unparsed=21 (total=145)
+[2026-09-07T16:12:03Z] [b07] Child process exited (rc=3221225622) after 92.5s | Progress: +4 newly finished
+[2026-09-07T16:12:04Z] [b07] Pass 79: ok=125, in-flight/pending=1, unparsed=19 (total=145)
+[2026-09-07T16:13:33Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +6 newly finished
+[2026-09-07T16:13:34Z] [b07] Pass 80: ok=128, in-flight/pending=1, unparsed=16 (total=145)
+[2026-09-07T16:15:33Z] [b07] Child process exited (rc=3221225622) after 118.8s | Progress: +2 newly finished
+[2026-09-07T16:15:33Z] [b07] Pass 81: ok=129, in-flight/pending=1, unparsed=15 (total=145)
+[2026-09-07T16:17:29Z] [b07] Child process exited (rc=3221225622) after 115.0s | Progress: +4 newly finished
+[2026-09-07T16:17:29Z] [b07] Pass 82: ok=131, in-flight/pending=1, unparsed=13 (total=145)
+[2026-09-07T16:19:30Z] [b07] Child process exited (rc=3221225622) after 120.5s | Progress: +2 newly finished
+[2026-09-07T16:19:30Z] [b07] Pass 83: ok=132, in-flight/pending=1, unparsed=12 (total=145)
+[2026-09-07T16:21:26Z] [b07] Child process exited (rc=3221225622) after 115.0s | Progress: +0 newly finished
+[2026-09-07T16:21:28Z] [b07] Pass 84: ok=132, in-flight/pending=1, unparsed=12 (total=145)
+[2026-09-07T16:23:21Z] [b07] Child process exited (rc=3221225622) after 112.7s | Progress: +0 newly finished
+[2026-09-07T16:23:23Z] [b07] Pass 85: ok=132, in-flight/pending=1, unparsed=12 (total=145)
+[2026-09-07T16:24:54Z] [b07] Child process exited (rc=3221225622) after 90.5s | Progress: +0 newly finished
+[2026-09-07T16:24:57Z] [b07] Pass 86: ok=132, in-flight/pending=1, unparsed=12 (total=145)
+[2026-09-07T16:26:24Z] [b07] Child process exited (rc=3221225622) after 87.4s | Progress: +0 newly finished
+[2026-09-07T16:26:27Z] [b07] Pass 87: ok=132, in-flight/pending=1, unparsed=12 (total=145)
+[2026-09-07T16:28:19Z] [b07] Child process exited (rc=3221225622) after 111.4s | Progress: +2 newly finished
+[2026-09-07T16:28:19Z] [b07] Pass 88: ok=133, in-flight/pending=1, unparsed=11 (total=145)
+[2026-09-07T16:30:20Z] [b07] Child process exited (rc=3221225622) after 120.4s | Progress: +4 newly finished
+[2026-09-07T16:30:20Z] [b07] Pass 89: ok=135, in-flight/pending=1, unparsed=9 (total=145)
+[2026-09-07T16:32:16Z] [b07] Child process exited (rc=3221225622) after 115.0s | Progress: +3 newly finished
+[2026-09-07T16:32:16Z] [b07] Pass 90: ok=136, in-flight/pending=2, unparsed=7 (total=145)
+[2026-09-07T16:34:49Z] [b07] Child process exited (rc=3221225622) after 152.9s | Progress: +2 newly finished
+[2026-09-07T16:34:50Z] [b07] Pass 91: ok=137, in-flight/pending=2, unparsed=6 (total=145)
+[2026-09-07T16:36:19Z] [b07] Child process exited (rc=3221225622) after 89.2s | Progress: +0 newly finished
+[2026-09-07T16:36:22Z] [b07] Pass 92: ok=137, in-flight/pending=2, unparsed=6 (total=145)
+[2026-09-07T16:38:07Z] [b07] Child process exited (rc=3221225622) after 105.3s | Progress: +0 newly finished
+[2026-09-07T16:38:10Z] [b07] Pass 93: ok=137, in-flight/pending=2, unparsed=6 (total=145)
+[2026-09-07T16:40:15Z] [b07] Child process exited (rc=3221225622) after 124.7s | Progress: +6 newly finished
+[2026-09-07T16:40:15Z] [b07] Pass 94: ok=140, in-flight/pending=2, unparsed=3 (total=145)
+[2026-09-07T16:42:10Z] [b07] Child process exited (rc=3221225622) after 114.8s | Progress: +2 newly finished
+[2026-09-07T16:42:11Z] [b07] Pass 95: ok=141, in-flight/pending=2, unparsed=2 (total=145)
+[2026-09-07T16:44:06Z] [b07] Child process exited (rc=3221225622) after 115.3s | Progress: +2 newly finished
+[2026-09-07T16:44:07Z] [b07] Pass 96: ok=142, in-flight/pending=2, unparsed=1 (total=145)
+[2026-09-07T16:45:49Z] [b07] Child process exited (rc=3221225622) after 102.4s | Progress: +2 newly finished
+[2026-09-07T16:45:50Z] [b07] Pass 97: ok=143, in-flight/pending=2, unparsed=0 (total=145)
+[2026-09-07T16:47:07Z] [b07] Child process exited (rc=0) after 76.7s | Progress: +1 newly finished
+[2026-09-07T16:47:07Z] [b07] Pass 98: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:48:07Z] [b07] Child process exited (rc=0) after 59.2s | Progress: +0 newly finished
+[2026-09-07T16:48:09Z] [b07] Pass 99: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:48:52Z] [b07] Child process exited (rc=3221225622) after 42.0s | Progress: +0 newly finished
+[2026-09-07T16:48:54Z] [b07] Pass 100: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:49:56Z] [b07] Child process exited (rc=0) after 61.3s | Progress: +0 newly finished
+[2026-09-07T16:49:58Z] [b07] Pass 101: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:50:22Z] [b07] Child process exited (rc=3221225622) after 23.2s | Progress: +0 newly finished
+[2026-09-07T16:50:24Z] [b07] Pass 102: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:51:26Z] [b07] Child process exited (rc=0) after 61.6s | Progress: +0 newly finished
+[2026-09-07T16:51:28Z] [b07] Pass 103: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:51:52Z] [b07] Child process exited (rc=3221225622) after 22.9s | Progress: +0 newly finished
+[2026-09-07T16:51:54Z] [b07] Pass 104: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:52:54Z] [b07] Child process exited (rc=0) after 59.8s | Progress: +0 newly finished
+[2026-09-07T16:52:57Z] [b07] Pass 105: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T16:53:57Z] [b07] Child process exited (rc=0) after 60.3s | Progress: +0 newly finished
+[2026-09-07T16:54:01Z] [pipeline] Wave b07 fully analyzed in 170.0 mins
+[2026-09-07T16:54:01Z] [pipeline] All 5 waves completed in 11.00 hours
+
+[2026-09-07T16:54:34Z] === Starting resilient 5-wave corpus run (945 total) ===
+[2026-09-07T16:54:34Z] [b03] Pass 1: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T16:54:41Z] [pipeline] Wave b03 fully analyzed in 0.1 mins
+[2026-09-07T16:54:42Z] [b04] Pass 1: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T16:54:48Z] [pipeline] Wave b04 fully analyzed in 0.1 mins
+[2026-09-07T16:54:49Z] [b05] Pass 1: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T16:54:55Z] [pipeline] Wave b05 fully analyzed in 0.1 mins
+[2026-09-07T16:54:56Z] [b06] Pass 1: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T16:56:02Z] [b06] Child process exited (rc=3221225622) after 66.0s | Progress: +0 newly finished
+[2026-09-07T16:56:05Z] [b06] Pass 2: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T16:57:50Z] [b06] Child process exited (rc=3221225622) after 105.4s | Progress: +0 newly finished
+[2026-09-07T16:57:53Z] [b06] Pass 3: ok=136, in-flight/pending=2, unparsed=62 (total=200)
+[2026-09-07T16:59:53Z] [b06] Child process exited (rc=3221225622) after 119.9s | Progress: +6 newly finished
+[2026-09-07T16:59:54Z] [b06] Pass 4: ok=139, in-flight/pending=2, unparsed=59 (total=200)
+[2026-09-07T17:01:50Z] [b06] Child process exited (rc=3221225622) after 115.9s | Progress: +6 newly finished
+[2026-09-07T17:01:51Z] [b06] Pass 5: ok=142, in-flight/pending=2, unparsed=56 (total=200)
+[2026-09-07T17:03:20Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +4 newly finished
+[2026-09-07T17:03:21Z] [b06] Pass 6: ok=144, in-flight/pending=2, unparsed=54 (total=200)
+[2026-09-07T17:04:50Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +6 newly finished
+[2026-09-07T17:04:51Z] [b06] Pass 7: ok=147, in-flight/pending=2, unparsed=51 (total=200)
+[2026-09-07T17:06:20Z] [b06] Child process exited (rc=3221225622) after 89.0s | Progress: +1 newly finished
+[2026-09-07T17:06:20Z] [b06] Pass 8: ok=148, in-flight/pending=1, unparsed=51 (total=200)
+[2026-09-07T17:07:50Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +3 newly finished
+[2026-09-07T17:07:51Z] [b06] Pass 9: ok=149, in-flight/pending=2, unparsed=49 (total=200)
+[2026-09-07T17:09:20Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +8 newly finished
+[2026-09-07T17:09:21Z] [b06] Pass 10: ok=153, in-flight/pending=2, unparsed=45 (total=200)
+[2026-09-07T17:10:50Z] [b06] Child process exited (rc=3221225477) after 89.0s | Progress: +4 newly finished
+[2026-09-07T17:10:50Z] [b06] Pass 11: ok=155, in-flight/pending=2, unparsed=43 (total=200)
+[2026-09-07T17:12:20Z] [b06] Child process exited (rc=3221225622) after 89.1s | Progress: +0 newly finished
+[2026-09-07T17:12:23Z] [b06] Pass 12: ok=155, in-flight/pending=2, unparsed=43 (total=200)
+[2026-09-07T17:13:50Z] [b06] Child process exited (rc=3221225622) after 87.1s | Progress: +6 newly finished
+[2026-09-07T17:13:51Z] [b06] Pass 13: ok=158, in-flight/pending=2, unparsed=40 (total=200)
+[2026-09-07T17:15:20Z] [b06] Child process exited (rc=3221225622) after 89.3s | Progress: +6 newly finished
+[2026-09-07T17:15:21Z] [b06] Pass 14: ok=161, in-flight/pending=2, unparsed=37 (total=200)
+[2026-09-07T17:17:49Z] [b06] Child process exited (rc=3221225622) after 147.5s | Progress: +4 newly finished
+[2026-09-07T17:17:49Z] [b06] Pass 15: ok=163, in-flight/pending=2, unparsed=35 (total=200)
+[2026-09-07T17:19:19Z] [b06] Child process exited (rc=3221225622) after 89.3s | Progress: +0 newly finished
+[2026-09-07T17:19:22Z] [b06] Pass 16: ok=163, in-flight/pending=2, unparsed=35 (total=200)
+[2026-09-07T17:20:52Z] [b06] Child process exited (rc=3221225622) after 86.2s | Progress: +0 newly finished
+[2026-09-07T17:20:55Z] [b06] Pass 17: ok=163, in-flight/pending=2, unparsed=35 (total=200)
+[2026-09-07T17:22:19Z] [b06] Child process exited (rc=3221225622) after 83.8s | Progress: +0 newly finished
+[2026-09-07T17:22:22Z] [b06] Pass 18: ok=163, in-flight/pending=2, unparsed=35 (total=200)
+[2026-09-07T17:23:50Z] [b06] Child process exited (rc=3221225622) after 86.7s | Progress: +0 newly finished
+[2026-09-07T17:23:52Z] [b06] Pass 19: ok=163, in-flight/pending=2, unparsed=35 (total=200)
+[2026-09-07T17:25:19Z] [b06] Child process exited (rc=3221225622) after 86.2s | Progress: +0 newly finished
+[2026-09-07T17:25:22Z] [b06] Pass 20: ok=163, in-flight/pending=2, unparsed=35 (total=200)
+
+[2026-09-07T17:26:46Z] === Starting resilient 5-wave corpus run (945 total) ===
+[2026-09-07T17:26:47Z] [b03] Pass 1: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T17:26:56Z] [pipeline] Wave b03 fully analyzed in 0.2 mins
+[2026-09-07T17:26:57Z] [b04] Pass 1: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T17:27:07Z] [pipeline] Wave b04 fully analyzed in 0.2 mins
+[2026-09-07T17:27:07Z] [b05] Pass 1: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T17:27:17Z] [pipeline] Wave b05 fully analyzed in 0.2 mins
+[2026-09-07T17:27:18Z] [b06] Pass 1: ok=163, in-flight/pending=1, unparsed=36 (total=200)
+[2026-09-07T17:28:19Z] [b06] Child process exited (rc=3221225622) after 60.7s | Progress: +1 newly finished
+[2026-09-07T17:28:20Z] [b06] Pass 2: ok=163, in-flight/pending=2, unparsed=35 (total=200)
+[2026-09-07T17:29:49Z] [b06] Child process exited (rc=3221225622) after 88.8s | Progress: +1 newly finished
+[2026-09-07T17:29:50Z] [b06] Pass 3: ok=164, in-flight/pending=1, unparsed=35 (total=200)
+[2026-09-07T17:31:21Z] [b06] Child process exited (rc=3221225622) after 90.8s | Progress: +0 newly finished
+[2026-09-07T17:31:23Z] [b06] Pass 4: ok=164, in-flight/pending=1, unparsed=35 (total=200)
+[2026-09-07T17:32:51Z] [b06] Child process exited (rc=3221225477) after 87.1s | Progress: +6 newly finished
+[2026-09-07T17:32:51Z] [b06] Pass 5: ok=167, in-flight/pending=1, unparsed=32 (total=200)
+[2026-09-07T17:34:21Z] [b06] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T17:34:21Z] [b06] Pass 6: ok=168, in-flight/pending=1, unparsed=31 (total=200)
+[2026-09-07T17:35:51Z] [b06] Child process exited (rc=3221225622) after 89.2s | Progress: +2 newly finished
+[2026-09-07T17:35:52Z] [b06] Pass 7: ok=169, in-flight/pending=1, unparsed=30 (total=200)
+[2026-09-07T17:37:21Z] [b06] Child process exited (rc=3221225622) after 88.8s | Progress: +2 newly finished
+[2026-09-07T17:37:22Z] [b06] Pass 8: ok=170, in-flight/pending=1, unparsed=29 (total=200)
+[2026-09-07T17:38:51Z] [b06] Child process exited (rc=3221225622) after 88.8s | Progress: +0 newly finished
+[2026-09-07T17:38:54Z] [b06] Pass 9: ok=170, in-flight/pending=1, unparsed=29 (total=200)
+[2026-09-07T17:40:21Z] [b06] Child process exited (rc=3221225622) after 86.8s | Progress: +2 newly finished
+[2026-09-07T17:40:22Z] [b06] Pass 10: ok=171, in-flight/pending=1, unparsed=28 (total=200)
+[2026-09-07T17:41:51Z] [b06] Child process exited (rc=3221225477) after 88.9s | Progress: +0 newly finished
+[2026-09-07T17:41:54Z] [b06] Pass 11: ok=171, in-flight/pending=1, unparsed=28 (total=200)
+[2026-09-07T17:43:21Z] [b06] Child process exited (rc=3221225622) after 86.8s | Progress: +4 newly finished
+[2026-09-07T17:43:22Z] [b06] Pass 12: ok=173, in-flight/pending=1, unparsed=26 (total=200)
+[2026-09-07T17:44:51Z] [b06] Child process exited (rc=3221225622) after 88.8s | Progress: +4 newly finished
+[2026-09-07T17:44:52Z] [b06] Pass 13: ok=175, in-flight/pending=1, unparsed=24 (total=200)
+[2026-09-07T17:47:09Z] [b06] Child process exited (rc=3221225622) after 136.4s | Progress: +8 newly finished
+[2026-09-07T17:47:09Z] [b06] Pass 14: ok=179, in-flight/pending=1, unparsed=20 (total=200)
+[2026-09-07T17:48:49Z] [b06] Child process exited (rc=3221225622) after 99.6s | Progress: +4 newly finished
+[2026-09-07T17:48:50Z] [b06] Pass 15: ok=181, in-flight/pending=1, unparsed=18 (total=200)
+[2026-09-07T17:51:00Z] [b06] Child process exited (rc=3221225622) after 129.8s | Progress: +6 newly finished
+[2026-09-07T17:51:01Z] [b06] Pass 16: ok=184, in-flight/pending=1, unparsed=15 (total=200)
+[2026-09-07T17:53:01Z] [b06] Child process exited (rc=3221225622) after 120.1s | Progress: +14 newly finished
+[2026-09-07T17:53:02Z] [b06] Pass 17: ok=191, in-flight/pending=1, unparsed=8 (total=200)
+[2026-09-07T17:54:49Z] [b06] Child process exited (rc=3221225622) after 107.0s | Progress: +6 newly finished
+[2026-09-07T17:54:50Z] [b06] Pass 18: ok=194, in-flight/pending=1, unparsed=5 (total=200)
+[2026-09-07T17:56:58Z] [b06] Child process exited (rc=3221225622) after 127.8s | Progress: +8 newly finished
+[2026-09-07T17:56:58Z] [b06] Pass 19: ok=198, in-flight/pending=1, unparsed=1 (total=200)
+[2026-09-07T17:57:46Z] [b06] Child process exited (rc=0) after 47.2s | Progress: +3 newly finished
+[2026-09-07T17:57:47Z] [b06] Pass 20: ok=200, in-flight/pending=0, unparsed=0 (total=200)
+[2026-09-07T17:57:52Z] [pipeline] Wave b06 fully analyzed in 30.6 mins
+[2026-09-07T17:57:53Z] [b07] Pass 1: ok=144, in-flight/pending=0, unparsed=1 (total=145)
+[2026-09-07T17:58:49Z] [b07] Child process exited (rc=3221225622) after 56.1s | Progress: +1 newly finished
+[2026-09-07T17:58:50Z] [b07] Pass 2: ok=144, in-flight/pending=1, unparsed=0 (total=145)
+[2026-09-07T17:59:47Z] [b07] Child process exited (rc=0) after 57.0s | Progress: +1 newly finished
+[2026-09-07T17:59:47Z] [b07] Pass 3: ok=145, in-flight/pending=0, unparsed=0 (total=145)
+[2026-09-07T17:59:51Z] [pipeline] Wave b07 fully analyzed in 2.0 mins
+[2026-09-07T17:59:51Z] [pipeline] All 5 waves completed in 0.55 hours

@@ -37,11 +37,34 @@ Corpus is stratified to cover each surface. Diversity is the anti-hardcoding gua
 - Corpus is re-parsed by `scripts/run_parser_benchmark.py` (`--in sources --out parsed`) using the page-centric CLI seam; output lives under `parsed/` (store layout `raw/dom/images/pages/manifest`).
 
 ## Growth plan
-1. Seed 50 (this report; immediately downloadable + parseable).
-2. Validate harness (reliability/perf/judge) on 50.
-3. Expand manifest to 200 → 500 → 1000 in batches; re-benchmark each batch.
-4. Every expansion appends to `reports/benchmark.md` (so history is preserved).
+1. Seed 50 (initial seed).
+2. Validate harness (reliability/perf/judge) on initial sample.
+3. Expand manifest across 5 strata to 984 candidates (S1: 205, S2: 206, S3: 206, S4: 162, S5: 205).
+4. Download and verify with SHA-256 and `%PDF` magic byte integrity checks.
+
+## Corpus Status (Achieved 2026-09-06)
+
+- **Total Manifest Entries:** 984
+- **Successfully Downloaded & Verified (`status: ok`):** 945 PDFs (96.0% retrieval success)
+- **Documented Failures (`status: error`):** 39 (captured with explicit HTTP status codes/reasons, zero silent losses)
+- **Total Corpus Size on Disk:** 2.87 GB (3,006.94 MB)
+- **Disk Free Headroom:** 21.14 GB free (~91% disk volume capacity maintained)
+- **Corpus Integrity Verification:**
+  - Missing files on disk: 0
+  - `%PDF` magic byte header errors: 0
+  - SHA-256 checksum mismatches: 0
+
+### Stratum Breakdown (OK / Total)
+
+| Stratum | Category | Total Seeded | Verified OK | Errors Logged | Success Rate |
+|---|---|---|---|---|---|
+| **S1** | Multi-column academic reviews | 205 | 204 | 1 | 99.5% |
+| **S2** | Table-dense reports & clinical trials | 206 | 196 | 10 | 95.1% |
+| **S3** | Clinical guidelines & consensus statements | 206 | 182 | 24 | 88.3% |
+| **S4** | Forms, scans, case reports & pathology | 162 | 160 | 2 | 98.8% |
+| **S5** | Mixed imaging & edge cases | 205 | 203 | 2 | 99.0% |
+| **Total** | | **984** | **945** | **39** | **96.0%** |
 
 ## Risks
-- External URLs drift/dead links → manifest retains `retrieved_at` + SHA; dead links are replaced, not silently skipped.
-- Very large PDFs may still OOM even with per-page Docling + OCR downscale (`OCR_MAX_EDGE=2000`) → expected to be captured in `reports/errors.md` and triaged, not hidden.
+- External URLs drift/dead links → manifest retains `retrieved_at` + SHA; dead links are recorded with `status: error` and exact HTTP error, never silently skipped.
+- Very large PDFs may still OOM even with per-page Docling + OCR downscale (`OCR_MAX_EDGE=2000`) → sequential single-worker execution (`--heavy-concurrency 1`) avoids WinError 1455.
