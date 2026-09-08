@@ -296,12 +296,15 @@ def main() -> int:
                 if timing_match and current_doc_name:
                     t_ms = float(timing_match.group(1))
                     w_peak, t_peak = sampler.pop_window_peaks()
-                    doc_telemetry[current_doc_name] = {
-                        "pages": current_doc_pages,
-                        "time_ms": t_ms,
-                        "peak_worker_mb": w_peak,
-                        "peak_tree_mb": t_peak,
-                    }
+                    existing = doc_telemetry.get(current_doc_name)
+                    # Only record/update if we do not have an actual run time or if this is the actual run
+                    if not existing or (t_ms > existing.get("time_ms", 0.0)):
+                        doc_telemetry[current_doc_name] = {
+                            "pages": current_doc_pages,
+                            "time_ms": t_ms,
+                            "peak_worker_mb": max(w_peak, existing.get("peak_worker_mb", 0.0) if existing else 0.0),
+                            "peak_tree_mb": max(t_peak, existing.get("peak_tree_mb", 0.0) if existing else 0.0),
+                        }
                     current_doc_name = None
 
             rc = proc.wait()
