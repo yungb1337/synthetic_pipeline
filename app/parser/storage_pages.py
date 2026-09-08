@@ -75,65 +75,111 @@ class Ledger:
     def __init__(self, root: str):
         self.root = Path(root)
 
+    def _plan_path(self, doc_id: str) -> Path:
+        return self.root / "manifest" / doc_id / "plan.json"
+
+    def _journal_path(self, doc_id: str) -> Path:
+        return self.root / "manifest" / doc_id / "journal.jsonl"
+
     # --- plan ---------------------------------------------------------------
     def write_plan(self, doc_id: str, plan: dict) -> str:
-        p = self.root / "manifest" / doc_id / "plan.json"
+        p = self._plan_path(doc_id)
         write_atomic(p, json.dumps(plan, indent=2, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+        jp = self._journal_path(doc_id)
+        if jp.exists():
+            try:
+                jp.unlink()
+            except Exception:
+                pass
         return f"manifest/{doc_id}/plan.json"
 
     def load_plan(self, doc_id: str) -> dict | None:
-        p = self.root / "manifest" / doc_id / "plan.json"
-        if not p.exists():
+        p = self._plan_path(doc_id)
+        jp = self._journal_path(doc_id)
+        if not p.exists() and not jp.exists():
             return None
 
-        # Try loading the main file
-        try:
-            return json.loads(p.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            logger.warning(f"Ledger corrupted for {doc_id}, attempting .tmp recovery: {e}")
-            # Attempt recovery from .tmp file (from interrupted atomic write)
-            tmp_candidates = list(p.parent.glob(f"{p.name}.tmp*"))
-            for tmp in tmp_candidates:
-                try:
-                    plan = json.loads(tmp.read_text(encoding="utf-8"))
-                    logger.info(f"Recovered {doc_id} plan from {tmp.name}")
-                    # Restore the main file atomically
-                    write_atomic(p, json.dumps(plan, indent=2, ensure_ascii=False, sort_keys=True))
-                    return plan
-                except Exception:
-                    continue
+        plan: dict | None = None
+        if p.exists():
+            # Try loading the main file
+            try:
+                plan = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                logger.warning(f"Ledger corrupted for {doc_id}, attempting .tmp recovery: {e}")
+                # Attempt recovery from .tmp file (from interrupted atomic write)
+                tmp_candidates = list(p.parent.glob(f"{p.name}.tmp*"))
+                for tmp in tmp_candidates:
+                    try:
+                        plan = json.loads(tmp.read_text(encoding="utf-8"))
+                        logger.info(f"Recovered {doc_id} plan from {tmp.name}")
+                        # Restore the main file atomically
+                        write_atomic(p, json.dumps(plan, indent=2, ensure_ascii=False, sort_keys=True))
+                        break
+                    except Exception:
+                        continue
+                if plan is None:
+                    # No recovery possible
+                    logger.error(f"Ledger corruption for {doc_id}: no valid .tmp recovery found")
+                    raise LedgerCorruptionError(f"plan.json corrupt for {doc_id}, no .tmp recovery: {e}")
+            except Exception as e:
+                logger.error(f"Failed to load plan for {doc_id}: {e}")
+                raise LedgerCorruptionError(f"plan.json unreadable for {doc_id}: {e}")
 
-            # No recovery possible
-            logger.error(f"Ledger corruption for {doc_id}: no valid .tmp recovery found")
-            raise LedgerCorruptionError(f"plan.json corrupt for {doc_id}, no .tmp recovery: {e}")
-        except Exception as e:
-            logger.error(f"Failed to load plan for {doc_id}: {e}")
-            raise LedgerCorruptionError(f"plan.json unreadable for {doc_id}: {e}")
+        if plan is None:
+            plan = {"doc_id": doc_id, "pages": {}, "assembly": {"status": "pending"}}
+
+        if jp.exists():
+            try:
+                for line in jp.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    rec = json.loads(line)
+                    op = rec.get("op")
+                    if op == "page":
+                        pages = plan.setdefault("pages", {})
+                        key = str(rec["page_index"])
+                        prev = pages.get(key, {})
+                        prev_attempts = prev.get("attempts", 0) if isinstance(prev, dict) else 0
+                        pages[key] = {
+                            "status": rec["status"],
+                            "checksum": rec.get("checksum", ""),
+                            "engine": rec.get("engine"),
+                            "attempts": prev_attempts + rec.get("attempt", 1),
+                            "errors": rec.get("errors", []),
+                        }
+                    elif op == "assembly":
+                        plan["assembly"] = {
+                            "status": rec["status"],
+                            "assembled_page_set": rec.get("assembled_page_set", []),
+                            "report": rec.get("report", {}),
+                        }
+            except Exception as e:
+                logger.warning(f"Error replaying journal for {doc_id}: {e}")
+
+        return plan
 
     def update_page(self, doc_id: str, page_index: int, status, checksum: str,
                     engine: str | None, attempt: int, errors: list) -> None:
-        # F-04 fix: never silently drop updates when ledger corrupt
-        try:
-            plan = self.load_plan(doc_id)
-        except LedgerCorruptionError:
-            logger.error(f"Cannot update page {page_index} for {doc_id}: ledger corrupted")
-            raise  # propagate — do not silently ignore
-        if plan is None:
-            raise LedgerCorruptionError(f"plan is None for {doc_id} — corruption before update")
-        pages = plan.setdefault("pages", {})
-        key = str(page_index)
-        prev = pages.get(key, {})
-        # G3: ACCUMULATE attempts (prev + this attempt) instead of taking the
-        # max. Each persistence of a page result is one more attempt; the ledger
-        # must reflect the true number of tries across resumes/retries.
-        pages[key] = {
+        """Record one page's status in the ledger.
+
+        Uses an append-only journal (journal.jsonl) to ensure O(1) time per page
+        update regardless of document size (F-04 fix). The journal is consolidated
+        into plan.json during write_plan() or update_assembly().
+        """
+        jp = self._journal_path(doc_id)
+        jp.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "op": "page",
+            "page_index": page_index,
             "status": status.value if isinstance(status, PageStatus) else str(status),
             "checksum": checksum,
             "engine": engine,
-            "attempts": (prev.get("attempts", 0) if isinstance(prev, dict) else 0) + (attempt or 1),
-            "errors": errors,
+            "attempt": attempt or 1,
+            "errors": errors or [],
         }
-        self.write_plan(doc_id, plan)
+        with jp.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def update_assembly(self, doc_id: str, status, assembled_set: list, report: dict) -> None:
         try:
@@ -142,7 +188,7 @@ class Ledger:
             logger.error(f"Cannot update assembly for {doc_id}: ledger corrupted")
             raise
         if plan is None:
-            plan = {}
+            plan = {"doc_id": doc_id, "pages": {}}
         plan.setdefault("pages", {})
         plan["assembly"] = {
             "status": status.value if isinstance(status, PageStatus) else str(status),

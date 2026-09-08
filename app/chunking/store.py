@@ -22,7 +22,7 @@ from typing import Iterator
 
 import numpy as np
 
-from ..parser.storage import _version_suffix
+from ..parser.storage import version_suffix
 from .schema import ChunksArtifact
 
 # embedder_id sanitize charset (architecture §3.6): filesystem-safe.
@@ -110,14 +110,14 @@ class FilesystemChunkStore(ChunkStore):
         return self.root / "chunks" / doc_id / f"chunks-{version}.json"
 
     def put_chunks(self, doc_id: str, artifact: ChunksArtifact) -> str:
-        version = _version_suffix(artifact.chunker_version)
+        version = version_suffix(artifact.chunker_version)
         p = self._chunks_path(doc_id, version)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(artifact.model_dump_json(indent=2), encoding="utf-8")
         return f"chunks/{doc_id}/chunks-{version}.json"
 
     def get_chunks(self, doc_id: str, chunker_version: str) -> ChunksArtifact | None:
-        p = self._chunks_path(doc_id, _version_suffix(chunker_version))
+        p = self._chunks_path(doc_id, version_suffix(chunker_version))
         if not p.exists():
             return None
         return ChunksArtifact.model_validate_json(p.read_text(encoding="utf-8"))
@@ -149,7 +149,7 @@ class FilesystemChunkStore(ChunkStore):
         self, doc_id: str, chunker_version: str, embedder_id: str,
         chunk_ids: list[str], matrix: np.ndarray, meta: dict,
     ) -> str:
-        version = _version_suffix(chunker_version)
+        version = version_suffix(chunker_version)
         npy_path, json_path = self._emb_paths(doc_id, version, embedder_id)
         npy_path.parent.mkdir(parents=True, exist_ok=True)
         np.save(npy_path, np.asarray(matrix, dtype=np.float32))
@@ -162,7 +162,7 @@ class FilesystemChunkStore(ChunkStore):
     def get_embeddings(
         self, doc_id: str, chunker_version: str, embedder_id: str,
     ) -> tuple[list[str], np.ndarray, dict] | None:
-        npy_path, json_path = self._emb_paths(doc_id, _version_suffix(chunker_version), embedder_id)
+        npy_path, json_path = self._emb_paths(doc_id, version_suffix(chunker_version), embedder_id)
         if not json_path.exists() or not npy_path.exists():
             return None
         sidecar = json.loads(json_path.read_text(encoding="utf-8"))

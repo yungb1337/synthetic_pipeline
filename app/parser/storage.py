@@ -59,11 +59,11 @@ class FilesystemStore(Store):
         return key
 
     def put_dom(self, doc_id: str, doc: Document) -> str:
-        version = _version_suffix(doc.provenance.parser_version) if doc.provenance else "unknown"
+        version = version_suffix(doc.provenance.parser_version) if doc.provenance else "unknown"
         return self._put_dom_json(doc_id, "dom", version, doc)
 
     def put_normalized(self, doc_id: str, doc: Document) -> str:
-        version = _version_suffix(doc.provenance.normalizer_version) if doc.provenance else "unknown"
+        version = version_suffix(doc.provenance.normalizer_version) if doc.provenance else "unknown"
         return self._put_dom_json(doc_id, "norm", version, doc)
 
     def _put_dom_json(self, doc_id: str, prefix: str, version: str, doc: Document) -> str:
@@ -97,9 +97,12 @@ def _img_ext(mime: str) -> str:
     return {"image/png": "png", "image/jpeg": "jpg", "image/tiff": "tiff", "image/gif": "gif"}.get(mime, "bin")
 
 
-def _version_suffix(version: str) -> str:
+def version_suffix(version: str) -> str:
     """Strip the role prefix so keys read dom-v0.1.0 / norm-v0.1.0.
 
     parser_version "parser-v0.1.0" -> "v0.1.0"; "unknown" stays as-is.
     """
     return version.split("-", 1)[-1] if version and "-" in version else version
+
+
+_version_suffix = version_suffix
