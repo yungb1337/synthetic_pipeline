@@ -58,6 +58,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
     ap.add_argument("--native-concurrency", type=int, default=None)
     ap.add_argument("--heavy-concurrency", type=int, default=None)
+    ap.add_argument("--in-process", action="store_true", default=None,
+                    help="run heavy engine in-process")
+    ap.add_argument("--no-in-process", action="store_false", dest="in_process", default=None,
+                    help="run heavy engine in subprocess pool")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--offset", type=int, default=None)
     args = ap.parse_args(argv)
@@ -98,6 +102,10 @@ def main(argv: list[str] | None = None) -> int:
         cmd += ["--native-concurrency", str(args.native_concurrency)]
     if args.heavy_concurrency is not None:
         cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
+    if args.in_process is False:
+        cmd.append("--no-in-process")
+    elif args.in_process is True:
+        cmd.append("--in-process")
     if args.limit is not None:
         cmd += ["--limit", str(args.limit)]
     if args.offset is not None:

@@ -208,87 +208,127 @@ def main() -> int:
     peak_corpus_tree_mb = 0.0
 
     if not args.analyze_only:
-        cmd = [sys.executable, str(PARSE_FOLDER), str(src), str(parsed)]
-        if args.no_ocr:
-            cmd.append("--no-ocr")
-        if args.heavy_concurrency is not None:
-            cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
-        if args.limit:
-            cmd += ["--limit", str(args.limit)]
-        if args.offset:
-            cmd += ["--offset", str(args.offset)]
-
         t0 = time.monotonic()
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        assert proc.stdout is not None
+        pass_num = 0
+        consecutive_stalls = 0
 
-        sampler = ProcessTreeMemorySampler(proc.pid, interval=0.15)
-        sampler.start()
+        while True:
+            # Check how many target batch pdfs are already ok
+            ok_cnt = 0
+            for lp in (parsed / "manifest").glob("*/plan.json"):
+                try:
+                    p_data = json.loads(lp.read_text(encoding="utf-8"))
+                    if p_data.get("assembly", {}).get("status") == "ok":
+                        ok_cnt += 1
+                except Exception:
+                    pass
 
-        current_doc_name: str | None = None
-        current_doc_pages: int = 0
+            if ok_cnt >= len(pdfs):
+                break
 
-        for line in proc.stdout:
-            raw_line = line.rstrip()
-            print(raw_line, flush=True)
-            log_lines.append(raw_line)
+            pass_num += 1
+            cmd = [sys.executable, str(PARSE_FOLDER), str(src), str(parsed)]
+            if args.no_ocr:
+                cmd.append("--no-ocr")
+            if args.heavy_concurrency is not None:
+                cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
+            if args.limit:
+                cmd += ["--limit", str(args.limit)]
+            if args.offset:
+                cmd += ["--offset", str(args.offset)]
 
-            if any(sig in raw_line for sig in ERROR_SIGNALS):
-                _append(reports / "errors.md", f"[{_now()}] [{args.batch}] {raw_line.strip()}")
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            assert proc.stdout is not None
 
-            # Telemetry parsing:
-            # Matches "OK   PMC12345.pdf  pdf  pages=12  ..."
-            ok_match = re.match(r"^OK\s+(\S+)\s+\S+\s+pages=(\d+)", raw_line)
-            skip_match = re.match(r"^SKIP\s+(\S+)", raw_line)
-            fail_match = re.match(r"^FAIL\s+(\S+)", raw_line)
+            sampler = ProcessTreeMemorySampler(proc.pid, interval=0.15)
+            sampler.start()
 
-            if ok_match:
-                current_doc_name = ok_match.group(1).strip()
-                current_doc_pages = int(ok_match.group(2))
-            elif skip_match:
-                fname = skip_match.group(1).strip()
-                w_peak, t_peak = sampler.pop_window_peaks()
-                doc_telemetry[fname] = {
-                    "pages": 0,
-                    "time_ms": 0.0,
-                    "peak_worker_mb": w_peak,
-                    "peak_tree_mb": t_peak,
-                }
-            elif fail_match:
-                fname = fail_match.group(1).strip()
-                w_peak, t_peak = sampler.pop_window_peaks()
-                doc_telemetry[fname] = {
-                    "pages": 0,
-                    "time_ms": 0.0,
-                    "peak_worker_mb": w_peak,
-                    "peak_tree_mb": t_peak,
-                }
+            current_doc_name: str | None = None
+            current_doc_pages: int = 0
 
-            # Matches "      timings: ... total=1234.5ms"
-            timing_match = re.search(r"total=([\d\.]+)ms", raw_line)
-            if timing_match and current_doc_name:
-                t_ms = float(timing_match.group(1))
-                w_peak, t_peak = sampler.pop_window_peaks()
-                doc_telemetry[current_doc_name] = {
-                    "pages": current_doc_pages,
-                    "time_ms": t_ms,
-                    "peak_worker_mb": w_peak,
-                    "peak_tree_mb": t_peak,
-                }
-                current_doc_name = None
+            for line in proc.stdout:
+                raw_line = line.rstrip()
+                print(raw_line, flush=True)
+                log_lines.append(raw_line)
 
-        rc = proc.wait()
-        sampler.stop()
+                if any(sig in raw_line for sig in ERROR_SIGNALS):
+                    _append(reports / "errors.md", f"[{_now()}] [{args.batch}] {raw_line.strip()}")
+
+                # Telemetry parsing:
+                # Matches "OK   PMC12345.pdf  pdf  pages=12  ..."
+                ok_match = re.match(r"^OK\s+(\S+)\s+\S+\s+pages=(\d+)", raw_line)
+                skip_match = re.match(r"^SKIP\s+(\S+)", raw_line)
+                fail_match = re.match(r"^FAIL\s+(\S+)", raw_line)
+
+                if ok_match:
+                    current_doc_name = ok_match.group(1).strip()
+                    current_doc_pages = int(ok_match.group(2))
+                elif skip_match:
+                    fname = skip_match.group(1).strip()
+                    w_peak, t_peak = sampler.pop_window_peaks()
+                    if fname not in doc_telemetry:
+                        doc_telemetry[fname] = {
+                            "pages": 0,
+                            "time_ms": 0.0,
+                            "peak_worker_mb": w_peak,
+                            "peak_tree_mb": t_peak,
+                        }
+                elif fail_match:
+                    fname = fail_match.group(1).strip()
+                    w_peak, t_peak = sampler.pop_window_peaks()
+                    if fname not in doc_telemetry:
+                        doc_telemetry[fname] = {
+                            "pages": 0,
+                            "time_ms": 0.0,
+                            "peak_worker_mb": w_peak,
+                            "peak_tree_mb": t_peak,
+                        }
+
+                # Matches "      timings: ... total=1234.5ms"
+                timing_match = re.search(r"total=([\d\.]+)ms", raw_line)
+                if timing_match and current_doc_name:
+                    t_ms = float(timing_match.group(1))
+                    w_peak, t_peak = sampler.pop_window_peaks()
+                    doc_telemetry[current_doc_name] = {
+                        "pages": current_doc_pages,
+                        "time_ms": t_ms,
+                        "peak_worker_mb": w_peak,
+                        "peak_tree_mb": t_peak,
+                    }
+                    current_doc_name = None
+
+            rc = proc.wait()
+            sampler.stop()
+
+            peak_worker_mb = max(peak_worker_mb, sampler.peak_worker_rss_mb)
+            peak_corpus_tree_mb = max(peak_corpus_tree_mb, sampler.peak_total_tree_rss_mb)
+
+            # Check progress made in this pass
+            new_ok_cnt = 0
+            for lp in (parsed / "manifest").glob("*/plan.json"):
+                try:
+                    p_data = json.loads(lp.read_text(encoding="utf-8"))
+                    if p_data.get("assembly", {}).get("status") == "ok":
+                        new_ok_cnt += 1
+                except Exception:
+                    pass
+
+            if new_ok_cnt == ok_cnt:
+                consecutive_stalls += 1
+                if consecutive_stalls >= 3:
+                    print(f"[{_now()}] [{args.batch}] Stopping after 3 consecutive passes with 0 progress", flush=True)
+                    break
+            else:
+                consecutive_stalls = 0
+
         wall_s = time.monotonic() - t0
-        peak_worker_mb = sampler.peak_worker_rss_mb
-        peak_corpus_tree_mb = sampler.peak_total_tree_rss_mb
 
     sys_mem_end = psutil.virtual_memory() if psutil else None
     sys_swap_end = psutil.swap_memory() if psutil else None
