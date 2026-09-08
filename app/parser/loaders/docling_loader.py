@@ -137,11 +137,16 @@ def _build_converter():
 
             ocr = bool(default_config().docling_ocr)
             table_mode = default_config().docling_table_mode or ""
+            generate_picture_images = bool(default_config().docling_generate_picture_images)
         except Exception:
             ocr = True
             table_mode = ""
+            generate_picture_images = True
 
-        opts = _make_pipeline_options(PipelineOptions, ocr=ocr, table_mode=table_mode)
+        opts = _make_pipeline_options(
+            PipelineOptions, ocr=ocr, table_mode=table_mode,
+            generate_picture_images=generate_picture_images,
+        )
         kwargs = {}
 
         # Preferred: per-format PdfFormatOption with the custom pipeline.
@@ -180,17 +185,22 @@ def _build_converter():
         return False
 
 
-def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = ""):
+def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = "",
+                           generate_picture_images: bool = True):
     """Build Docling pipeline options; `ocr` enables Docling's OCR stage (its
     built-in RapidOCR/onnxruntime backend — the same engine family as
-    `app/parser/ocr.py`). Defensive across docling's API drift: falls back to
-    defaults and best-effort attribute setting rather than failing hard."""
-    # `generate_picture_images` asks Docling to crop every detected picture
-    # region from the page image, so figures reach the DOM with real pixels
-    # (ADR-007: captions + figures become typed nodes). Never silently drop a
-    # picture because bytes were not generated.
+    `app/parser/ocr.py`). `generate_picture_images` asks Docling to crop every
+    detected picture region from the page image, so figures reach the DOM with
+    real pixels (ADR-007: captions + figures become typed nodes). Default True
+    preserves historic behaviour; False is the memory-tight lever (figures
+    arrive without embedded pixels). Defensive across docling's API drift:
+    falls back to defaults and best-effort attribute setting rather than
+    failing hard."""
+    # Never silently drop a picture because bytes were not generated — the
+    # flag is config-driven (ParserConfig.docling_generate_picture_images).
     try:
-        opts = cls(do_ocr=ocr, do_code_formula=False, generate_picture_images=True)
+        opts = cls(do_ocr=ocr, do_code_formula=False,
+                   generate_picture_images=generate_picture_images)
     except Exception:
         try:
             opts = cls(do_ocr=ocr, do_code_formula=False)
@@ -199,7 +209,8 @@ def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = ""):
                 opts = cls()
                 for attr in ("do_ocr", "do_code_formula", "generate_picture_images"):
                     try:
-                        setattr(opts, attr, ocr if attr == "do_ocr" else True)
+                        setattr(opts, attr,
+                                ocr if attr == "do_ocr" else generate_picture_images)
                     except Exception:
                         pass
             except Exception:

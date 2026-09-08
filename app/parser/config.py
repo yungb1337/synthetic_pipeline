@@ -47,6 +47,18 @@ class ParserConfig:
     # on-demand OcrMode.DEFAULT so text-rich pages are NOT OCR'd. This lets a
     # docling-routed document with scanned pages still recover their text.
     docling_ocr: bool = True
+    # When True, Docling crops every detected picture region into a host-RAM
+    # raster so figures reach the DOM with pixels (ADR-007). On RAM-tight boxes
+    # this raster (72 dpi x images_scale, pixel AREA ~ scale²) is a major heap
+    # consumer on image-heavy pages; False still recovers the figure node, just
+    # without embedded pixels. Memory-hardening knob (journaled decision).
+    docling_generate_picture_images: bool = True
+    # Heavy (Docling) ProcessPoolExecutor recycling interval: each worker
+    # process is restarted after this many page jobs so the C++/ONNX heap that
+    # does not return to the OS is reclaimed by process exit. Lower = more
+    # reclaim but more engine warm-up (N× model load). Today `run_all_waves.py`
+    # restarts children only on crash; this makes recycling deliberate.
+    heavy_pool_max_tasks_per_child: int = 20
 
     # ADR-011: the routing config snapshot used when layout_backend == "auto".
     # None => factory defaults (RoutingConfig()). Also gates routing on/off.

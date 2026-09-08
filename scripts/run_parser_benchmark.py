@@ -2,33 +2,35 @@
 """run_parser_benchmark.py — parse a corpus batch and emit a benchmark report.
 
 Runs the page-centric parser over a directory of source PDFs, then post-analyzes
-the persisted store (ledgers + DOMs) into a benchmark table. Captures peak memory
-of the whole parse process (psutil) and streams stderr/stdout for error-class
-signals (std::bad_alloc / ONNX / Traceback / FAILED / DEAD) into reports/errors.md.
+the persisted store (ledgers + DOMs) into a benchmark table. Captures fine-grained
+telemetry including:
+  - time per doc & time per page
+  - peak memory per doc & peak memory per corpus (single-worker and total tree RSS)
+  - system memory usage & swap/pagefile delta
+  - streams stderr/stdout for error-class signals into reports/errors.md
 
 Usage:
     .venv/Scripts/python.exe scripts/run_parser_benchmark.py \
         --in <sources/pdf> --out <parsed> --batch b01 \
-        --reports <reports> [--limit N] [--no-ocr]
+        --reports <reports> [--limit N] [--offset N] [--no-ocr] [--heavy-concurrency N]
 
 Analyze-only (no re-parse; post-analyze an existing store):
     --analyze-only   skip the parser child; just join + report the current store
 
 Writes:
-  <reports>/benchmark-<batch>.md  (this run, full per-file detail + parser tail)
+  <reports>/benchmark-<batch>.md  (this run, full per-file detail + telemetry)
   <reports>/benchmark.md          (append-only cumulative one-line per batch)
   <reports>/errors.md             (append-only error-class signals)
-
-The CLI seam is scripts/parse_folder.py; per-doc assembly status / page counts are
-read from the page-ledger manifest (plan.json) and dom/ store afterwards.
-Dependencies: psutil (optional), PyMuPDF (via seam)."""
+"""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
     import psutil
-except ImportError:  # pragma: no cover
+except ImportError:
     psutil = None
 
 PARSE_FOLDER = Path(__file__).resolve().parent / "parse_folder.py"
@@ -56,33 +58,66 @@ def _append(path: Path, line: str) -> None:
         f.write(line.rstrip("\n") + "\n")
 
 
-_LastSample = time.monotonic()  # module-level: 1 Hz throttle across calls
+class ProcessTreeMemorySampler:
+    """Background sampler recording process tree RSS at high frequency."""
 
+    def __init__(self, pid: int, interval: float = 0.15):
+        self.pid = pid
+        self.interval = interval
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self.lock = threading.Lock()
+        self.peak_worker_rss_mb = 0.0
+        self.peak_total_tree_rss_mb = 0.0
+        self.current_window_max_worker_mb = 0.0
+        self.current_window_max_total_mb = 0.0
 
-def _peak_rss_mb(child: subprocess.Popen) -> float:
-    """Best-effort peak RSS (MB) of the parser process tree while it runs.
+    def start(self) -> None:
+        if psutil is None:
+            return
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
-    Sampled at most once/second. NEVER crashes the run: on any error (including
-    WinError 1455 "paging file too small" on heavy loads) it degrades to 0.0 —
-    memory telemetry is advisory, the parse is not."""
-    global _LastSample
-    if psutil is None:
-        return 0.0
-    now = time.monotonic()
-    if now - _LastSample < 1.0:  # throttle: psutil._ppid_map is expensive + fragile
-        return 0.0
-    _LastSample = now
-    try:
-        proc = psutil.Process(child.pid)
-        peak = proc.memory_info().rss
-        for c in proc.children(recursive=True):
+    def stop(self) -> None:
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+    def pop_window_peaks(self) -> tuple[float, float]:
+        """Return (max_worker_mb, max_total_tree_mb) since last pop and reset window."""
+        with self.lock:
+            w_peak = self.current_window_max_worker_mb
+            t_peak = self.current_window_max_total_mb
+            self.current_window_max_worker_mb = 0.0
+            self.current_window_max_total_mb = 0.0
+            return w_peak, t_peak
+
+    def _run(self) -> None:
+        while not self._stop_event.is_set():
             try:
-                peak = max(peak, c.memory_info().rss)
-            except psutil.Error:
-                continue
-    except Exception:  # noqa: BLE001 — best-effort telemetry only
-        return 0.0
-    return peak / (1024 * 1024)
+                parent = psutil.Process(self.pid)
+                procs = [parent] + parent.children(recursive=True)
+                rss_list = []
+                for p in procs:
+                    try:
+                        rss_list.append(p.memory_info().rss / (1024 * 1024))
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+                if rss_list:
+                    max_worker = max(rss_list)
+                    total_tree = sum(rss_list)
+                    with self.lock:
+                        if max_worker > self.peak_worker_rss_mb:
+                            self.peak_worker_rss_mb = max_worker
+                        if total_tree > self.peak_total_tree_rss_mb:
+                            self.peak_total_tree_rss_mb = total_tree
+                        if max_worker > self.current_window_max_worker_mb:
+                            self.current_window_max_worker_mb = max_worker
+                        if total_tree > self.current_window_max_total_mb:
+                            self.current_window_max_total_mb = total_tree
+            except Exception:
+                pass
+            time.sleep(self.interval)
 
 
 def _ledger_status(parsed: Path, doc_id: str) -> dict:
@@ -136,10 +171,7 @@ def main() -> int:
     ap.add_argument("--offset", type=int, default=0, help="starting file index (0=first)")
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
     ap.add_argument("--heavy-concurrency", type=int, default=None,
-                    help="bound the Docling heavy pool (default: RAM-derived). "
-                         "Pass a small value on RAM-limited boxes so the governor "
-                         "cannot over-derive workers from TOTAL ram while the box "
-                         "is otherwise loaded — prevents paging-file exhaustion.")
+                    help="bound the Docling heavy pool (default: RAM-derived).")
     ap.add_argument("--analyze-only", action="store_true",
                     help="skip parser child; just join + report the current store")
     args = ap.parse_args()
@@ -163,11 +195,18 @@ def main() -> int:
         return 2
     print(f"[bench] batch={args.batch} parsing {len(pdfs)} files from {src}")
 
-    # Phase 1 — run the parser over the folder via the CLI seam (single child proc)
+    # Initial memory snapshot
+    sys_mem_start = psutil.virtual_memory() if psutil else None
+    sys_swap_start = psutil.swap_memory() if psutil else None
+
+    # Phase 1 — run the parser over the folder via the CLI seam
     log_lines: list[str] = []
-    peak = 0.0
     wall_s = 0.0
     rc = None
+    doc_telemetry: dict[str, dict] = {}  # filename -> {time_ms, pages, peak_worker_mb, peak_tree_mb}
+    peak_worker_mb = 0.0
+    peak_corpus_tree_mb = 0.0
+
     if not args.analyze_only:
         cmd = [sys.executable, str(PARSE_FOLDER), str(src), str(parsed)]
         if args.no_ocr:
@@ -178,19 +217,81 @@ def main() -> int:
             cmd += ["--limit", str(args.limit)]
         if args.offset:
             cmd += ["--offset", str(args.offset)]
+
         t0 = time.monotonic()
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, encoding="utf-8", errors="replace")
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         assert proc.stdout is not None
+
+        sampler = ProcessTreeMemorySampler(proc.pid, interval=0.15)
+        sampler.start()
+
+        current_doc_name: str | None = None
+        current_doc_pages: int = 0
+
         for line in proc.stdout:
-            print(line.rstrip(), flush=True)
-            log_lines.append(line.rstrip())
-            if any(sig in line for sig in ERROR_SIGNALS):
-                _append(reports / "errors.md", f"[{_now()}] [{args.batch}] {line.strip()}")
-            if psutil is not None:
-                peak = max(peak, _peak_rss_mb(proc))
+            raw_line = line.rstrip()
+            print(raw_line, flush=True)
+            log_lines.append(raw_line)
+
+            if any(sig in raw_line for sig in ERROR_SIGNALS):
+                _append(reports / "errors.md", f"[{_now()}] [{args.batch}] {raw_line.strip()}")
+
+            # Telemetry parsing:
+            # Matches "OK   PMC12345.pdf  pdf  pages=12  ..."
+            ok_match = re.match(r"^OK\s+(\S+)\s+\S+\s+pages=(\d+)", raw_line)
+            skip_match = re.match(r"^SKIP\s+(\S+)", raw_line)
+            fail_match = re.match(r"^FAIL\s+(\S+)", raw_line)
+
+            if ok_match:
+                current_doc_name = ok_match.group(1).strip()
+                current_doc_pages = int(ok_match.group(2))
+            elif skip_match:
+                fname = skip_match.group(1).strip()
+                w_peak, t_peak = sampler.pop_window_peaks()
+                doc_telemetry[fname] = {
+                    "pages": 0,
+                    "time_ms": 0.0,
+                    "peak_worker_mb": w_peak,
+                    "peak_tree_mb": t_peak,
+                }
+            elif fail_match:
+                fname = fail_match.group(1).strip()
+                w_peak, t_peak = sampler.pop_window_peaks()
+                doc_telemetry[fname] = {
+                    "pages": 0,
+                    "time_ms": 0.0,
+                    "peak_worker_mb": w_peak,
+                    "peak_tree_mb": t_peak,
+                }
+
+            # Matches "      timings: ... total=1234.5ms"
+            timing_match = re.search(r"total=([\d\.]+)ms", raw_line)
+            if timing_match and current_doc_name:
+                t_ms = float(timing_match.group(1))
+                w_peak, t_peak = sampler.pop_window_peaks()
+                doc_telemetry[current_doc_name] = {
+                    "pages": current_doc_pages,
+                    "time_ms": t_ms,
+                    "peak_worker_mb": w_peak,
+                    "peak_tree_mb": t_peak,
+                }
+                current_doc_name = None
+
         rc = proc.wait()
+        sampler.stop()
         wall_s = time.monotonic() - t0
+        peak_worker_mb = sampler.peak_worker_rss_mb
+        peak_corpus_tree_mb = sampler.peak_total_tree_rss_mb
+
+    sys_mem_end = psutil.virtual_memory() if psutil else None
+    sys_swap_end = psutil.swap_memory() if psutil else None
 
     # Phase 2 — join each source PDF to its ledger by source_hash
     doc_results: list[dict] = []
@@ -205,57 +306,115 @@ def main() -> int:
             if plan.get("source_hash") == sha:
                 match = plan.get("doc_id")
                 break
+
+        st = {"source_file": p.name}
+        telem = doc_telemetry.get(p.name, {})
+        time_ms = telem.get("time_ms", 0.0)
+        t_pages = telem.get("pages", 0)
+        ms_per_page = (time_ms / t_pages) if t_pages > 0 else 0.0
+
+        st["time_ms"] = time_ms
+        st["ms_per_page"] = ms_per_page
+        st["peak_worker_mb"] = telem.get("peak_worker_mb", 0.0)
+        st["peak_tree_mb"] = telem.get("peak_tree_mb", 0.0)
+
         if match:
-            st = {"source_file": p.name, "doc_id": match}
+            st["doc_id"] = match
             st.update(_ledger_status(parsed, match))
             st.update(_dom_counts(parsed, match))
+            # Fallback expected_pages if telemetry didn't capture
+            if t_pages == 0:
+                exp = st.get("expected_pages") or 0
+                if exp > 0 and time_ms > 0:
+                    st["ms_per_page"] = time_ms / exp
             doc_results.append(st)
         else:
-            doc_results.append({"source_file": p.name, "assembly_status": "UNPARSED"})
+            st["assembly_status"] = "UNPARSED"
+            doc_results.append(st)
 
-    # Phase 3 — compose benchmark report
+    # Phase 3 — compute aggregate statistics
     ok = sum(1 for r in doc_results if r.get("assembly_status") == "ok")
     dead = sum(1 for r in doc_results if r.get("assembly_status") == "dead")
     failed = sum(1 for r in doc_results if r.get("assembly_status") == "failed")
     unparsed = sum(1 for r in doc_results if r.get("assembly_status") == "UNPARSED")
     nblocks = sum(r.get("blocks", 0) for r in doc_results)
     ntables = sum(r.get("tables", 0) for r in doc_results)
+    nrefs = sum(r.get("refs", 0) for r in doc_results)
 
+    total_pages_done = sum(
+        sum(r.get("page_status", {}).values()) for r in doc_results
+    )
+    ok_times = [r["time_ms"] for r in doc_results if r.get("time_ms", 0) > 0]
+    avg_ms_per_doc = (sum(ok_times) / len(ok_times)) if ok_times else 0.0
+    avg_ms_per_page = (sum(ok_times) / total_pages_done) if total_pages_done > 0 and ok_times else 0.0
+
+    # System memory reporting
+    mem_avail_start_gb = (sys_mem_start.available / (1024**3)) if sys_mem_start else 0.0
+    mem_avail_end_gb = (sys_mem_end.available / (1024**3)) if sys_mem_end else 0.0
+    swap_used_start_gb = (sys_swap_start.used / (1024**3)) if sys_swap_start else 0.0
+    swap_used_end_gb = (sys_swap_end.used / (1024**3)) if sys_swap_end else 0.0
+
+    # Phase 4 — compose comprehensive benchmark report
     report = [
         f"# Benchmark {args.batch} — {_now()}",
         "",
-        f"- Files issued: {len(pdfs)} · Assembly ok: `{ok}` · failed: `{failed}` · "
-        f"dead: `{dead}` · unparsed: `{unparsed}`",
-        f"- Wall time: `{wall_s:.1f}s` · peak RSS: `{peak:.0f} MB` · parser exit: `{rc}`",
-        f"- DOM totals: {nblocks} blocks · {ntables} tables",
-        (f"- Parse command: `{' '.join(cmd)}`" if not args.analyze_only else
-         "- Mode: analyze-only (no parse; existing store)"),
+        "## Summary",
+        f"- **Documents**: {len(pdfs)} issued · `{ok}` OK · `{failed}` failed · `{dead}` dead · `{unparsed}` unparsed",
+        f"- **Throughput & Timing**:",
+        f"  - Total wall time: `{wall_s:.1f}s` ({wall_s/60:.2f} mins)",
+        f"  - Total pages parsed: `{total_pages_done}`",
+        f"  - Mean time per doc: `{avg_ms_per_doc:.1f} ms` ({avg_ms_per_doc/1000:.2f}s)",
+        f"  - Mean time per page: `{avg_ms_per_page:.1f} ms` ({avg_ms_per_page/1000:.2f}s)",
+        f"- **Memory Telemetry**:",
+        f"  - Peak memory per corpus (Total tree RSS): `{peak_corpus_tree_mb:.0f} MB`",
+        f"  - Peak worker memory (Max single-process RSS): `{peak_worker_mb:.0f} MB`",
+        f"  - Host RAM available: `{mem_avail_start_gb:.2f} GB` start -> `{mem_avail_end_gb:.2f} GB` end",
+        f"  - Pagefile/Swap committed: `{swap_used_start_gb:.2f} GB` start -> `{swap_used_end_gb:.2f} GB` end",
+        f"- **Extraction Yield**: `{nblocks}` blocks · `{ntables}` tables · `{nrefs}` references",
+        (f"- **Command**: `{' '.join(cmd)}`" if not args.analyze_only else
+         "- **Mode**: analyze-only (no parse; existing store)"),
         "",
-        "| file | assembly | pages(done/exp) | blocks | tables | refs | ro_full |",
-        "|------|----------|------------------|--------|--------|------|---------|",
+        "## Document Metrics",
+        "| file | assembly | pages(done/exp) | time(s) | ms/page | peak_worker(MB) | peak_tree(MB) | blocks | tables | refs | ro_full |",
+        "|------|----------|------------------|---------|---------|-----------------|---------------|--------|--------|------|---------|",
     ]
+
     for r in sorted(doc_results, key=lambda x: x.get("source_file", "")):
         pst = r.get("page_status", {})
         done = sum(pst.values())
+        t_s = f"{r.get('time_ms', 0) / 1000:.2f}" if r.get('time_ms', 0) > 0 else "-"
+        ms_p = f"{r.get('ms_per_page', 0):.0f}" if r.get('ms_per_page', 0) > 0 else "-"
+        p_w = f"{r.get('peak_worker_mb', 0):.0f}" if r.get('peak_worker_mb', 0) > 0 else "-"
+        p_t = f"{r.get('peak_tree_mb', 0):.0f}" if r.get('peak_tree_mb', 0) > 0 else "-"
+
         report.append(
             f"| {r.get('source_file','?')} | {r.get('assembly_status','?')} "
             f"| {done}/{r.get('expected_pages','?')} "
+            f"| {t_s} | {ms_p} | {p_w} | {p_t} "
             f"| {r.get('blocks','-')} | {r.get('tables','-')} "
             f"| {r.get('refs','-')} | {r.get('ro_full','-')} |"
         )
+
     report.append("")
-    report.append("_Parser stdout tail:_")
+    report.append("## Parser Log Tail")
     report += [f"    {l}" for l in log_lines[-8:]]
 
     path = reports / f"benchmark-{args.batch}.md"
     path.write_text("\n".join(report), encoding="utf-8")
-    _append(reports / "benchmark.md",
-            f"- **{args.batch}** ({_now()}): files={len(pdfs)} ok={ok} failed={failed} "
-            f"dead={dead} unparsed={unparsed} wall={wall_s:.1f}s peak={peak:.0f}MB "
-            f"blocks={nblocks} tables={ntables}")
-    print(f"[bench] {args.batch} complete: ok={ok} failed={failed} dead={dead} "
-          f"unparsed={unparsed} wall={wall_s:.1f}s peak={peak:.0f}MB")
-    print(f"[bench] full report: {path}")
+
+    # One-line summary in benchmark.md
+    _append(
+        reports / "benchmark.md",
+        f"- **{args.batch}** ({_now()}): files={len(pdfs)} ok={ok} failed={failed} "
+        f"dead={dead} unparsed={unparsed} wall={wall_s:.1f}s avg_doc={avg_ms_per_doc/1000:.2f}s "
+        f"avg_page={avg_ms_per_page:.0f}ms peak_tree={peak_corpus_tree_mb:.0f}MB "
+        f"peak_worker={peak_worker_mb:.0f}MB blocks={nblocks} tables={ntables}",
+    )
+
+    print(f"\n[bench] {args.batch} complete: ok={ok} failed={failed} dead={dead} "
+          f"unparsed={unparsed} wall={wall_s:.1f}s avg_doc={avg_ms_per_doc/1000:.2f}s "
+          f"peak_tree={peak_corpus_tree_mb:.0f}MB peak_worker={peak_worker_mb:.0f}MB")
+    print(f"[bench] full report written to: {path}")
     return 0
 
 

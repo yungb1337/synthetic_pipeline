@@ -76,13 +76,15 @@ def _run_heavy(item: PageWorkItem, config: ParserConfig) -> PageResult:
         )
 
 
-def _run_native(item: PageWorkItem, band: str, config: ParserConfig) -> PageResult:
+def _run_native(item: PageWorkItem, band: str, config: ParserConfig, engine: Any = None) -> PageResult:
     from .engines.enrichment import EnrichmentEngine
     from .engines.image import ImageEngine
     from .engines.native_pdf import NativePdfEngine
     from .engines.simple import SimpleEngine
 
     try:
+        if engine is not None:
+            return engine.process(item)
         if band == ENRICHMENT:
             return EnrichmentEngine(config).process(item)
         if band == IMAGE:
@@ -273,6 +275,26 @@ class Scheduler:
         self._pool_is_broken = False
         # Lazily created on first heavy submit (and only if not in-process).
 
+        # Hoisted lightweight engines (F-05/F-06 fix: reuse engine instance across pages)
+        from .engines.enrichment import EnrichmentEngine
+        from .engines.image import ImageEngine
+        from .engines.native_pdf import NativePdfEngine
+        from .engines.simple import SimpleEngine
+
+        self._native_engine = NativePdfEngine(config)
+        self._enrichment_engine = EnrichmentEngine(config)
+        self._image_engine = ImageEngine(config)
+        self._simple_engine = SimpleEngine(config)
+
+    def _get_engine(self, band: str):
+        if band == ENRICHMENT:
+            return self._enrichment_engine
+        if band == IMAGE:
+            return self._image_engine
+        if band == SIMPLE:
+            return self._simple_engine
+        return self._native_engine
+
     def _get_in_process_heavy_pool(self) -> ThreadPoolExecutor:
         if self._in_process_heavy_pool is None:
             # Single-thread executor for in-process heavy jobs to ensure
@@ -300,12 +322,13 @@ class Scheduler:
             self._mp_f_value = mp.Value("d", 0.0)
             global _heavy_f_value
             _heavy_f_value = self._mp_f_value
+            max_tasks = getattr(self.config, "heavy_pool_max_tasks_per_child", 20)
             self._heavy_pool = ProcessPoolExecutor(
                 max_workers=self.heavy_concurrency,
                 mp_context=ctx,
                 initializer=_heavy_initializer,
                 initargs=(self.config.docling_models_dir,),
-                max_tasks_per_child=20,
+                max_tasks_per_child=max_tasks if max_tasks and max_tasks > 0 else 20,
             )
         return self._heavy_pool
 
@@ -333,7 +356,8 @@ class Scheduler:
                 else:
                     fut = self._get_heavy_pool().submit(_run_heavy, item, self.config)
             else:
-                fut = self.native_pool.submit(_run_native, item, band, self.config)
+                engine = self._get_engine(band)
+                fut = self.native_pool.submit(_run_native, item, band, self.config, engine)
             futures.append((item, fut))
 
         results: list[PageResult] = []
@@ -421,6 +445,11 @@ class Scheduler:
             self.native_pool.shutdown(wait=True)
         except Exception:
             pass
+        if hasattr(self, "_native_engine") and self._native_engine is not None:
+            try:
+                self._native_engine.close()
+            except Exception:
+                pass
         if self._in_process_heavy_pool is not None:
             try:
                 self._in_process_heavy_pool.shutdown(wait=True)
