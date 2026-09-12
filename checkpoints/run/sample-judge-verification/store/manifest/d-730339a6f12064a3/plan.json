@@ -1,0 +1,148 @@
+{
+  "assembly": {
+    "assembled_page_set": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "report": {
+      "actual_pages": 12,
+      "dead_pages": [],
+      "expected_pages": 12,
+      "failed_pages": [],
+      "missing_pages": []
+    },
+    "status": "ok"
+  },
+  "config_snapshot": {
+    "docling_models_dir": "models/docling",
+    "docling_ocr": true,
+    "docling_table_mode": "FAST",
+    "dom_schema_version": "dom-schema-v0.1.0",
+    "layout_backend": "auto",
+    "max_file_bytes": 536870912,
+    "ocr_enabled": true,
+    "ocr_lang": "en",
+    "ocr_min_confidence": 0.0,
+    "page_retries": 2,
+    "parser_version": "parser-v0.1.0",
+    "pdf_extract_tables": true,
+    "pdf_heading_threshold_ratio": 1.12,
+    "routing": null,
+    "temp_dir": "work"
+  },
+  "created_at": "",
+  "doc_id": "d-730339a6f12064a3",
+  "expected_page_set": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "page_count": 12,
+  "pages": {
+    "0": {
+      "attempts": 1,
+      "checksum": "f70c6d8a6ae74f44ad94aad2939c5e64d6c542c82a965d36532bff2cbfd0ce66",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "1": {
+      "attempts": 1,
+      "checksum": "f0b0c069bbbfeef5b8f21897d655e4ae16c292bff4aa74f352d177b77c9675c7",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "10": {
+      "attempts": 1,
+      "checksum": "248ecd25a5207b919d7af4c890057b5b4c59c3ec608c04d466e46b8d24c2bfb8",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "11": {
+      "attempts": 1,
+      "checksum": "34bd96c0919e69a0e0aafe5ef672e7b867361d650f54bc0fbc5539606efa923c",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "2": {
+      "attempts": 1,
+      "checksum": "8f6bc7083a7055a9becc895b9c4645b7db60d0ed9e0cda7b283431a130bfc539",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "3": {
+      "attempts": 1,
+      "checksum": "8e27ad02f90b6795a76de4c02b649669bd5d2c24d24cd144b3bc74ccb43e9e8a",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "4": {
+      "attempts": 1,
+      "checksum": "2a6750354d4e33234421fcc3cf997087cfaedb70d88cfd8e7586a31d094110e0",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "5": {
+      "attempts": 1,
+      "checksum": "27cfa2f7a6464edecd5b77aec21e01de7f09c2077c1889775d34d23860fb312d",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "6": {
+      "attempts": 1,
+      "checksum": "ace00865ff0941be134c5b708c7f0dadd3775bb92f433092d74208cac94e69a2",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "7": {
+      "attempts": 1,
+      "checksum": "0d75dd0e32248711e8fa6a535a89e9d429d8cc503d5747988360cc5cc2a8321e",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "8": {
+      "attempts": 1,
+      "checksum": "b9c3dafd7dc14371a409dd0ad2349f40d2241276d4331093b56231f1ff2d1688",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "9": {
+      "attempts": 1,
+      "checksum": "b4d81834dac0d2181403874c3a59496862b880293b625d290b8b2dab34226f53",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    }
+  },
+  "route": "docling",
+  "source_hash": "730339a6f12064a3ce1677bdb0cc37f7165e2a98364d9c7cb4512c3130599815"
+}

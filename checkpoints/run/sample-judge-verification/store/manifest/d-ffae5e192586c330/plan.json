@@ -1,0 +1,121 @@
+{
+  "assembly": {
+    "assembled_page_set": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "report": {
+      "actual_pages": 9,
+      "dead_pages": [],
+      "expected_pages": 9,
+      "failed_pages": [],
+      "missing_pages": []
+    },
+    "status": "ok"
+  },
+  "config_snapshot": {
+    "docling_models_dir": "models/docling",
+    "docling_ocr": true,
+    "docling_table_mode": "FAST",
+    "dom_schema_version": "dom-schema-v0.1.0",
+    "layout_backend": "auto",
+    "max_file_bytes": 536870912,
+    "ocr_enabled": true,
+    "ocr_lang": "en",
+    "ocr_min_confidence": 0.0,
+    "page_retries": 2,
+    "parser_version": "parser-v0.1.0",
+    "pdf_extract_tables": true,
+    "pdf_heading_threshold_ratio": 1.12,
+    "routing": null,
+    "temp_dir": "work"
+  },
+  "created_at": "",
+  "doc_id": "d-ffae5e192586c330",
+  "expected_page_set": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "page_count": 9,
+  "pages": {
+    "0": {
+      "attempts": 1,
+      "checksum": "05ee8ab76a0f1e90d4c40d76519d95dfc27111f1141e306ef2ce837c00dd28ac",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "1": {
+      "attempts": 1,
+      "checksum": "bea0fa58691cb8712496e92a6e3f9909a905dadae90dfc0d2e7dac69a08b0465",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "2": {
+      "attempts": 1,
+      "checksum": "08116446ff452d93d68267e3a8f1bc4f263d16e41c4de91d6d777160891a7365",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "3": {
+      "attempts": 1,
+      "checksum": "854d7fe7921dd12021e0ee2c4eead26d44ca4dd62edd0db19791e521bd723a81",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "4": {
+      "attempts": 1,
+      "checksum": "245c378c5507bbcc7b18a32f4f89f1999a14413523df7a4aa56a5e7ba41bcc03",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "5": {
+      "attempts": 1,
+      "checksum": "a166e3af41155da56836430a1630490a6de43f8b963fa026ea6b19cb5c7668c4",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "6": {
+      "attempts": 1,
+      "checksum": "c8e2325c093ffd63f3076295d803d976720f87b61dc60f4bcc0b0539874bbea2",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "7": {
+      "attempts": 1,
+      "checksum": "976e20de89413ef85d90333e23b71586e0393c72dc465744a8044d74fad6e935",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    },
+    "8": {
+      "attempts": 1,
+      "checksum": "68f6e9d89caae78e5aff70aec693d5449b48ff828eb1fec2e320072d1e12e8b9",
+      "engine": "2.118.0",
+      "errors": [],
+      "status": "ok"
+    }
+  },
+  "route": "docling",
+  "source_hash": "ffae5e192586c330b0f1ca378793890d7f63ed378c5e49098e39ab7cfeaeccc9"
+}
