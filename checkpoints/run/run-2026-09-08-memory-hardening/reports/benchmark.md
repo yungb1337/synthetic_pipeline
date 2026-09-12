@@ -1,0 +1,7 @@
+- **b100** (2026-09-08T09:08:03Z): files=100 ok=0 failed=0 dead=0 unparsed=99 wall=55.9s avg_doc=0.00s avg_page=0ms peak_tree=1672MB peak_worker=1645MB blocks=0 tables=0
+- **test2** (2026-09-08T09:14:03Z): files=2 ok=2 failed=0 dead=0 unparsed=0 wall=70.0s avg_doc=33.78s avg_page=1689ms peak_tree=2551MB peak_worker=2524MB blocks=451 tables=14
+- **b100** (2026-09-08T09:15:32Z): files=100 ok=0 failed=0 dead=0 unparsed=99 wall=55.3s avg_doc=0.00s avg_page=0ms peak_tree=1686MB peak_worker=1659MB blocks=0 tables=0
+- **b5** (2026-09-08T09:27:31Z): files=5 ok=0 failed=0 dead=0 unparsed=4 wall=24.5s avg_doc=0.00s avg_page=0ms peak_tree=1594MB peak_worker=1567MB blocks=0 tables=0
+- **test2** (2026-09-08T09:30:31Z): files=2 ok=1 failed=0 dead=0 unparsed=0 wall=77.6s avg_doc=57.62s avg_page=1441ms peak_tree=1888MB peak_worker=1861MB blocks=237 tables=7
+- **test2** (2026-09-08T09:34:49Z): files=2 ok=2 failed=0 dead=0 unparsed=0 wall=134.6s avg_doc=37.49s avg_page=1874ms peak_tree=1893MB peak_worker=1866MB blocks=448 tables=14
+- **b100** (2026-09-08T10:49:14Z): files=100 ok=100 failed=0 dead=0 unparsed=0 wall=4207.7s avg_doc=0.17s avg_page=13ms peak_tree=2600MB peak_worker=2573MB blocks=19231 tables=317

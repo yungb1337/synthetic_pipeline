@@ -1,0 +1,332 @@
+{
+  "doc_id": "d-97b717427b6bf503",
+  "pdf": "checkpoints\\run\\run-2026-09-04-parser-reliability\\sources\\pdf\\PMC13276589.pdf",
+  "model": "gemini-3.5-flash-lite",
+  "judged_at": "2026-09-08T05:55:18Z",
+  "dom_summary": {
+    "document_id": "d-97b717427b6bf503",
+    "source_hash": "97b717427b6b",
+    "metadata": {
+      "title": "ASH/ISTH 2026 guidelines for anticoagulant prophylaxis in pediatric patients at risk of venous thromboembolism",
+      "page_count": 31,
+      "detected_type": "pdf"
+    },
+    "page_count_dom": 31,
+    "blocks_total": 539,
+    "tables_total": 5,
+    "images_total": 12,
+    "references_total": 0,
+    "citation_index_size": 0,
+    "reading_order_full_size": 556,
+    "sample_page1_blocks": [
+      "ASH/ISTH 2026 guidelines for anticoagulant prophylaxis in pediatric patients at risk of venous thromboembolism",
+      "Marisol Betensky, 1,2 Muayad Azzam, 3 Rachel Bercovitz, 4 Rukhmi V. Bhat, 4 Tina Biss, 5 Brian Branchford, 6 Leonardo R. Brandão, 7 Anthony K. C. Chan, 8 E. Vincent S. Faustino, 9 ",
+      "1 Division of Hematology, Department of Pediatrics, Johns Hopkins School of Medicine, Baltimore, MD; 2 Division of Hematology, Cancer and Blood Disorders Institute, Johns Hopkins A"
+    ],
+    "sample_references": [],
+    "tables_preview": [
+      "T1:6r x 5c |  | <eÜommenÖütionf[trength | <eÜommenÖütionf[trength | <eÜommenÖütionf[trength | <eÜommenÖütionf[trength |  | '<eÜommenÖs…' '<eÜommenÖ | '[uggests…' | '[uggestsfügüinst…' |  ;  | :nterpretütionfof [trong | :nterpretütionfof YonÖit | :nterpretütionfof YonÖit | ",
+      "T2:10r x 3c | PICO question | Subgroups | Outcomes | For pediatric patients w | Age groups: children, ad | CVAD-related VTE Non-CVA ; In pediatric patients wi | consolidation/intensific | Major bleeding/CRNMB All",
+      "T3:0r x 1c | ×efürefveryfÜonfiÖentfth | ",
+      "T4:56r x 6c | Author (year) | Agent | Dose | Route | Monitoring | Duration | PICO 1 ALL/lymphoma pedi | PICO 1 ALL/lymphoma pedi | PICO 1 ALL/lymphoma pedi | PICO 1 ALL/lymphoma pedi | PICO 1 ALL/lymphoma pedi | PICO 1 ALL/lymphoma pedi ; O'Brien et al 31 (2024) | Apixaban | ≥ 35 kg, 2.5 mg bid; 25  | po | No | 28 d",
+      "T5:15r x 2c | ORCID profiles: M.B., | M.A., 0000- | 0002-2046-8343; R.B., | 0000-0001-6725-3035; 000 ; 0002-1700-4804; T.B., | 0000-0001-9986-4973; B.B"
+    ],
+    "tables_preview_note": "TABLE PREVIEW IS A BOUNDED SAMPLE: cell text truncated to 24 chars, at most 2 data rows/table, 1200 total chars. Only the tables/cells shown exist in the preview; truncation or absence beyond the shown text is a PREVIEW LIMIT, never a parser defect. Score 'tables' by judging ONLY the content shown against the SOURCE pages that contain them; do not penalize truncation.",
+    "route": {
+      "route": "docling",
+      "complexity_score": 83,
+      "confidence": 0.8868,
+      "reasons": [
+        "high metric_multi_column_probability (0.90) — 28 multi-column page(s)",
+        "high metric_layout_complexity (1.00) — max 60 blocks on a page",
+        "high metric_reading_order_ambiguity (0.80) — reading-order ambiguity 0.80",
+        "high metric_font_diversity (1.00) — 11 distinct font(s)"
+      ],
+      "signals": [
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_foundation_meta_available",
+          "value": true,
+          "confidence": 1.0,
+          "evidence": "PDF metadata present",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_pdf_version",
+          "value": "1.7",
+          "confidence": null,
+          "evidence": "PDF 1.7",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_encrypted",
+          "value": null,
+          "confidence": null,
+          "evidence": "encryption state unavailable",
+          "status": "missing"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_producer_present",
+          "value": true,
+          "confidence": null,
+          "evidence": "producer=PDFlib+PDI 10.0.2p2 (C++/Win64)",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_has_outline",
+          "value": true,
+          "confidence": null,
+          "evidence": "has outline",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_has_tag",
+          "value": null,
+          "confidence": null,
+          "evidence": "tag unavailable",
+          "status": "missing"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_total_char_count",
+          "value": 156285,
+          "confidence": null,
+          "evidence": "156285 printable chars",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_char_per_page",
+          "value": 5041.45,
+          "confidence": null,
+          "evidence": "~5041 chars/page",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_text_ratio",
+          "value": 0.4378,
+          "confidence": null,
+          "evidence": "text ratio 0.438",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_low_text_ratio",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "0/31 text-poor pages",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_low_char_density",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "dense text",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_image_count",
+          "value": 0,
+          "confidence": null,
+          "evidence": "0 images",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_images_per_page",
+          "value": 0.0,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_full_image_page_count",
+          "value": 0,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_image_density",
+          "value": 0.0,
+          "confidence": 0.95,
+          "evidence": "image area avg 0.000/page",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_scanned_page_probability",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "no text-less image page",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_multi_column_probability",
+          "value": 0.903,
+          "confidence": 0.85,
+          "evidence": "28 multi-column page(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_layout_complexity",
+          "value": 1.0,
+          "confidence": null,
+          "evidence": "max 60 blocks on a page",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_block_fragmentation",
+          "value": 1.0,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "table",
+          "version": "1.0.0",
+          "name": "metric_table_present",
+          "value": true,
+          "confidence": null,
+          "evidence": "1 table(s) found",
+          "status": "ok"
+        },
+        {
+          "detector": "table",
+          "version": "1.0.0",
+          "name": "metric_table_probability",
+          "value": 0.25,
+          "confidence": 0.9,
+          "evidence": "1 table(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "form",
+          "version": "1.0.0",
+          "name": "metric_form_probability",
+          "value": 0.285,
+          "confidence": 0.6,
+          "evidence": "form-like density 0.28 (avg_len=221)",
+          "status": "ok"
+        },
+        {
+          "detector": "reading_order",
+          "version": "1.0.0",
+          "name": "metric_reading_order_ambiguity",
+          "value": 0.803,
+          "confidence": 0.8,
+          "evidence": "reading-order ambiguity 0.80",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_font_diversity",
+          "value": 1.0,
+          "confidence": 0.9,
+          "evidence": "11 distinct font(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_unusual_font",
+          "value": true,
+          "confidence": null,
+          "evidence": "8 unusual font(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_font_embedded",
+          "value": true,
+          "confidence": 1.0,
+          "evidence": "11 font(s) observed",
+          "status": "ok"
+        }
+      ],
+      "router_version": "router-v0.1.0",
+      "policy_version": "policy-v0.1.0",
+      "scoring_version": "scoring-v0.1.0",
+      "detector_versions": {
+        "metadata": "1.0.0",
+        "text": "1.0.0",
+        "image": "1.0.0",
+        "layout": "1.0.0",
+        "ocr": "1.0.0",
+        "table": "1.0.0",
+        "form": "1.0.0",
+        "reading_order": "1.0.0",
+        "font": "1.0.0"
+      },
+      "inspection_time_ms": 2128.507,
+      "bands": {
+        "native": [
+          0,
+          30
+        ],
+        "enrichment": [
+          31,
+          60
+        ],
+        "docling": [
+          61,
+          100
+        ]
+      }
+    }
+  },
+  "verdict": {
+    "metrics": {
+      "completeness": 0.98,
+      "fidelity": 0.9,
+      "structure": 0.95,
+      "tables": 0.85,
+      "references": 0.95,
+      "scans_ocr": 1.0
+    },
+    "verdict": "PASS_WITH_ISSUES",
+    "issues": [
+      {
+        "severity": "minor",
+        "surface": "table",
+        "detail": "Table preview snippets show character encoding artifacts or mojibake in table header/cell text (e.g., '<eÜommenÖütionf[trength', '[uggests…')",
+        "suggestion": "Fix font encoding extraction for table headers and recommendation strength cells during DOM generation."
+      }
+    ],
+    "notes": "The DOM successfully extracts dense multi-column academic text, authors, and reference lists with high completeness and correct logical ordering. A minor encoding artifact appears in specific specialized table cells containing recommendation symbols, but overall fidelity and structure are well maintained."
+  }
+}

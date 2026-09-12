@@ -1,0 +1,330 @@
+{
+  "doc_id": "d-730339a6f12064a3",
+  "pdf": "checkpoints\\run\\run-2026-09-04-parser-reliability\\sources\\pdf\\PMC13257860.pdf",
+  "model": "gemini-3.5-flash-lite",
+  "judged_at": "2026-09-08T05:55:06Z",
+  "dom_summary": {
+    "document_id": "d-730339a6f12064a3",
+    "source_hash": "730339a6f120",
+    "metadata": {
+      "title": "Add-on parsaclisib for patients with myelofibrosis and suboptimal response to ruxolitinib: a randomized phase 3 study",
+      "page_count": 12,
+      "detected_type": "pdf"
+    },
+    "page_count_dom": 12,
+    "blocks_total": 152,
+    "tables_total": 3,
+    "images_total": 4,
+    "references_total": 0,
+    "citation_index_size": 0,
+    "reading_order_full_size": 159,
+    "sample_page1_blocks": [
+      "Add-on parsaclisib for patients with myelofibrosis and suboptimal response to ruxolitinib: a randomized phase 3 study",
+      "Jean-Jacques Kiladjian 1 , Uma Borate 2 , Elisabetta Abruzzese 3 , Valerio De Stefano 4 , Tiejun Gong 5 , Massimo Breccia 6 , Francesca Palandri 7 , Fabrizio Pane 8 , Andrea Patria",
+      "1 Saint-Louis Hospital, Paris Cit � e University, INSERM, Paris 75010, France"
+    ],
+    "sample_references": [],
+    "tables_preview": [
+      "T1:17r x 3c | Characteristic | Parsaclisib/ruxolitinib  | Placebo/ruxolitinib ( n  | Age, median (range), y | 65 (43-81) | 63 (33-79) ; Age ≥ 65 y, % | 52.2 | 46.0",
+      "T2:2r x 4c | No. of patients | Baseline | Week 12 | Week 24 | Parsaclisib/ruxolitinib | 90 | 75 | 60 ; Placebo/ruxolitinib | 87 | 71 | 60",
+      "T3:48r x 4c | Event, n (%) | Parsaclisib/ruxolitinib  | Placebo/ruxolitinib ( n  | Crossover from placebo t | Hematological |  |  |  ; Anemia | 28 (31.1) | 22 (25.3) | 6 (14.6)"
+    ],
+    "tables_preview_note": "TABLE PREVIEW IS A BOUNDED SAMPLE: cell text truncated to 24 chars, at most 2 data rows/table, 1200 total chars. Only the tables/cells shown exist in the preview; truncation or absence beyond the shown text is a PREVIEW LIMIT, never a parser defect. Score 'tables' by judging ONLY the content shown against the SOURCE pages that contain them; do not penalize truncation.",
+    "route": {
+      "route": "docling",
+      "complexity_score": 66,
+      "confidence": 0.8868,
+      "reasons": [
+        "high metric_multi_column_probability (0.75) — 9 multi-column page(s)",
+        "high metric_layout_complexity (0.68) — max 27 blocks on a page",
+        "high metric_reading_order_ambiguity (0.61) — reading-order ambiguity 0.61",
+        "high metric_font_diversity (1.00) — 12 distinct font(s)"
+      ],
+      "signals": [
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_foundation_meta_available",
+          "value": true,
+          "confidence": 1.0,
+          "evidence": "PDF metadata present",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_pdf_version",
+          "value": "1.5",
+          "confidence": null,
+          "evidence": "PDF 1.5",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_encrypted",
+          "value": null,
+          "confidence": null,
+          "evidence": "encryption state unavailable",
+          "status": "missing"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_producer_present",
+          "value": true,
+          "confidence": null,
+          "evidence": "producer=PDFlib+PDI 9.0.7p3 (C++/Win32)",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_has_outline",
+          "value": true,
+          "confidence": null,
+          "evidence": "has outline",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_has_tag",
+          "value": null,
+          "confidence": null,
+          "evidence": "tag unavailable",
+          "status": "missing"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_total_char_count",
+          "value": 40821,
+          "confidence": null,
+          "evidence": "40821 printable chars",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_char_per_page",
+          "value": 3401.75,
+          "confidence": null,
+          "evidence": "~3402 chars/page",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_text_ratio",
+          "value": 0.2973,
+          "confidence": null,
+          "evidence": "text ratio 0.297",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_low_text_ratio",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "0/12 text-poor pages",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_low_char_density",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "dense text",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_image_count",
+          "value": 4,
+          "confidence": null,
+          "evidence": "4 images",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_images_per_page",
+          "value": 0.333,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_full_image_page_count",
+          "value": 0,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_image_density",
+          "value": 0.128,
+          "confidence": 0.95,
+          "evidence": "image area avg 0.128/page",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_scanned_page_probability",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "no text-less image page",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_multi_column_probability",
+          "value": 0.75,
+          "confidence": 0.85,
+          "evidence": "9 multi-column page(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_layout_complexity",
+          "value": 0.675,
+          "confidence": null,
+          "evidence": "max 27 blocks on a page",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_block_fragmentation",
+          "value": 1.0,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "table",
+          "version": "1.0.0",
+          "name": "metric_table_present",
+          "value": false,
+          "confidence": 1.0,
+          "evidence": "no table detected (ok measurement)",
+          "status": "ok"
+        },
+        {
+          "detector": "table",
+          "version": "1.0.0",
+          "name": "metric_table_probability",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "no table (measured absent)",
+          "status": "ok"
+        },
+        {
+          "detector": "form",
+          "version": "1.0.0",
+          "name": "metric_form_probability",
+          "value": 0.143,
+          "confidence": 0.6,
+          "evidence": "form-like density 0.14 (avg_len=298)",
+          "status": "ok"
+        },
+        {
+          "detector": "reading_order",
+          "version": "1.0.0",
+          "name": "metric_reading_order_ambiguity",
+          "value": 0.611,
+          "confidence": 0.8,
+          "evidence": "reading-order ambiguity 0.61",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_font_diversity",
+          "value": 1.0,
+          "confidence": 0.9,
+          "evidence": "12 distinct font(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_unusual_font",
+          "value": true,
+          "confidence": null,
+          "evidence": "12 unusual font(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_font_embedded",
+          "value": true,
+          "confidence": 1.0,
+          "evidence": "12 font(s) observed",
+          "status": "ok"
+        }
+      ],
+      "router_version": "router-v0.1.0",
+      "policy_version": "policy-v0.1.0",
+      "scoring_version": "scoring-v0.1.0",
+      "detector_versions": {
+        "metadata": "1.0.0",
+        "text": "1.0.0",
+        "image": "1.0.0",
+        "layout": "1.0.0",
+        "ocr": "1.0.0",
+        "table": "1.0.0",
+        "form": "1.0.0",
+        "reading_order": "1.0.0",
+        "font": "1.0.0"
+      },
+      "inspection_time_ms": 974.015,
+      "bands": {
+        "native": [
+          0,
+          30
+        ],
+        "enrichment": [
+          31,
+          60
+        ],
+        "docling": [
+          61,
+          100
+        ]
+      }
+    }
+  },
+  "verdict": {
+    "metrics": {
+      "completeness": 0.98,
+      "fidelity": 0.97,
+      "structure": 0.95,
+      "tables": 1.0,
+      "references": 0.95,
+      "scans_ocr": 1.0
+    },
+    "verdict": "PASS_WITH_ISSUES",
+    "issues": [
+      {
+        "severity": "minor",
+        "surface": "text",
+        "detail": "Accented character formatting on page 1 ('Cit\u0013e', 'Universit\u0012a') shows occasional ligature/unicode decoding artifacts.",
+        "suggestion": "Improve character encoding normalization during parsing."
+      }
+    ],
+    "notes": "The automated parser successfully extracted the text, section headings, and table structures across the multi-column layout with high fidelity. Minor text artifacts appear on accented characters from page 1, but overall completeness and structure preservation are excellent."
+  }
+}

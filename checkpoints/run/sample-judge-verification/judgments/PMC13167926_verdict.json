@@ -1,0 +1,330 @@
+{
+  "doc_id": "d-e546a005ed1bb895",
+  "pdf": "checkpoints\\run\\run-2026-09-04-parser-reliability\\sources\\pdf\\PMC13167926.pdf",
+  "model": "gemini-3.5-flash-lite",
+  "judged_at": "2026-09-08T05:55:01Z",
+  "dom_summary": {
+    "document_id": "d-e546a005ed1bb895",
+    "source_hash": "e546a005ed1b",
+    "metadata": {
+      "title": "Effects of Xuefu Zhuyu oral liquid as adjunctive treatment for stable angina: a randomized controlled trial",
+      "page_count": 12,
+      "detected_type": "pdf"
+    },
+    "page_count_dom": 12,
+    "blocks_total": 143,
+    "tables_total": 6,
+    "images_total": 4,
+    "references_total": 0,
+    "citation_index_size": 0,
+    "reading_order_full_size": 153,
+    "sample_page1_blocks": [
+      "in Medicine",
+      "OPEN ACCESS",
+      "EDITED BY Youhua Wang, Shanghai University of Traditional"
+    ],
+    "sample_references": [],
+    "tables_preview": [
+      "T1:33r x 3c | Variable | Participants, no. (%) (  | Participants, no. (%) (  |  | XZOL group ( n = 74) | Placebo group ( n = 74) ; Age, mean (SD), y | 61 (8.97) | 61 (8.61)",
+      "T2:4r x 9c | Primary outcome |  |  | FAS |  |  |  | PPS |  | VAS score, mean (SD) | XZOL group ( n = 74) | Placebo group ( n = 74) | Adjusted difference (95% | P- value a | XZOL group ( n = 48) | Placebo group ( n = 51) | Adjusted difference (95% | P- value a ; Baseline (t 0 ) | 4.95 (1.20) | 5.16 (1.36) |  |  | 4.97 (1.13) | 5.20 (1.31) |  | ",
+      "T3:39r x 9c | Secondary outcomes |  | FAS | FAS |  |  |  | PPS |  | Outcomes | XZOL group ( n = 74) | Placebo group ( n = 74) | Mean difference (95% CI) | P- value a | XZOL group ( n = 48) | Placebo group ( n = 51) | Mean difference (95% CI) | P- value a ; VAS at week 24, mean (SD | 2.35 (1.80) | 2.88 (1.91) | NA | NA | 2.15 (1.63) | 3.06 (1.95) | NA | NA"
+    ],
+    "tables_preview_note": "TABLE PREVIEW IS A BOUNDED SAMPLE: cell text truncated to 24 chars, at most 2 data rows/table, 1200 total chars. Only the tables/cells shown exist in the preview; truncation or absence beyond the shown text is a PREVIEW LIMIT, never a parser defect. Score 'tables' by judging ONLY the content shown against the SOURCE pages that contain them; do not penalize truncation.",
+    "route": {
+      "route": "docling",
+      "complexity_score": 86,
+      "confidence": 0.8868,
+      "reasons": [
+        "high metric_multi_column_probability (1.00) — 12 multi-column page(s)",
+        "high metric_layout_complexity (1.00) — max 94 blocks on a page",
+        "high metric_reading_order_ambiguity (0.97) — reading-order ambiguity 0.97",
+        "high metric_font_diversity (1.00) — 11 distinct font(s)"
+      ],
+      "signals": [
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_foundation_meta_available",
+          "value": true,
+          "confidence": 1.0,
+          "evidence": "PDF metadata present",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_pdf_version",
+          "value": "1.7",
+          "confidence": null,
+          "evidence": "PDF 1.7",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_encrypted",
+          "value": null,
+          "confidence": null,
+          "evidence": "encryption state unavailable",
+          "status": "missing"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_producer_present",
+          "value": true,
+          "confidence": null,
+          "evidence": "producer=pdfTeX-1.40.16",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_has_outline",
+          "value": true,
+          "confidence": null,
+          "evidence": "has outline",
+          "status": "ok"
+        },
+        {
+          "detector": "metadata",
+          "version": "1.0.0",
+          "name": "metric_has_tag",
+          "value": null,
+          "confidence": null,
+          "evidence": "tag unavailable",
+          "status": "missing"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_total_char_count",
+          "value": 43200,
+          "confidence": null,
+          "evidence": "43200 printable chars",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_char_per_page",
+          "value": 3600.0,
+          "confidence": null,
+          "evidence": "~3600 chars/page",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_text_ratio",
+          "value": 0.2469,
+          "confidence": null,
+          "evidence": "text ratio 0.247",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_low_text_ratio",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "0/12 text-poor pages",
+          "status": "ok"
+        },
+        {
+          "detector": "text",
+          "version": "1.0.0",
+          "name": "metric_low_char_density",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "dense text",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_image_count",
+          "value": 2,
+          "confidence": null,
+          "evidence": "2 images",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_images_per_page",
+          "value": 0.167,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_full_image_page_count",
+          "value": 0,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_image_density",
+          "value": 0.024,
+          "confidence": 0.95,
+          "evidence": "image area avg 0.024/page",
+          "status": "ok"
+        },
+        {
+          "detector": "image",
+          "version": "1.0.0",
+          "name": "metric_scanned_page_probability",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "no text-less image page",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_multi_column_probability",
+          "value": 1.0,
+          "confidence": 0.85,
+          "evidence": "12 multi-column page(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_layout_complexity",
+          "value": 1.0,
+          "confidence": null,
+          "evidence": "max 94 blocks on a page",
+          "status": "ok"
+        },
+        {
+          "detector": "layout",
+          "version": "1.0.0",
+          "name": "metric_block_fragmentation",
+          "value": 1.0,
+          "confidence": null,
+          "evidence": null,
+          "status": "ok"
+        },
+        {
+          "detector": "table",
+          "version": "1.0.0",
+          "name": "metric_table_present",
+          "value": false,
+          "confidence": 1.0,
+          "evidence": "no table detected (ok measurement)",
+          "status": "ok"
+        },
+        {
+          "detector": "table",
+          "version": "1.0.0",
+          "name": "metric_table_probability",
+          "value": 0.0,
+          "confidence": 1.0,
+          "evidence": "no table (measured absent)",
+          "status": "ok"
+        },
+        {
+          "detector": "form",
+          "version": "1.0.0",
+          "name": "metric_form_probability",
+          "value": 0.445,
+          "confidence": 0.6,
+          "evidence": "form-like density 0.45 (avg_len=101)",
+          "status": "ok"
+        },
+        {
+          "detector": "reading_order",
+          "version": "1.0.0",
+          "name": "metric_reading_order_ambiguity",
+          "value": 0.967,
+          "confidence": 0.8,
+          "evidence": "reading-order ambiguity 0.97",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_font_diversity",
+          "value": 1.0,
+          "confidence": 0.9,
+          "evidence": "11 distinct font(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_unusual_font",
+          "value": true,
+          "confidence": null,
+          "evidence": "10 unusual font(s)",
+          "status": "ok"
+        },
+        {
+          "detector": "font",
+          "version": "1.0.0",
+          "name": "metric_font_embedded",
+          "value": true,
+          "confidence": 1.0,
+          "evidence": "11 font(s) observed",
+          "status": "ok"
+        }
+      ],
+      "router_version": "router-v0.1.0",
+      "policy_version": "policy-v0.1.0",
+      "scoring_version": "scoring-v0.1.0",
+      "detector_versions": {
+        "metadata": "1.0.0",
+        "text": "1.0.0",
+        "image": "1.0.0",
+        "layout": "1.0.0",
+        "ocr": "1.0.0",
+        "table": "1.0.0",
+        "form": "1.0.0",
+        "reading_order": "1.0.0",
+        "font": "1.0.0"
+      },
+      "inspection_time_ms": 1196.408,
+      "bands": {
+        "native": [
+          0,
+          30
+        ],
+        "enrichment": [
+          31,
+          60
+        ],
+        "docling": [
+          61,
+          100
+        ]
+      }
+    }
+  },
+  "verdict": {
+    "metrics": {
+      "completeness": 0.98,
+      "fidelity": 0.98,
+      "structure": 0.95,
+      "tables": 0.96,
+      "references": 0.95,
+      "scans_ocr": 1.0
+    },
+    "verdict": "PASS",
+    "issues": [
+      {
+        "severity": "minor",
+        "surface": "table",
+        "detail": "Minor formatting variations and character representations in complex multi-column table headers (e.g., Table 3 sub-columns).",
+        "suggestion": "Verify alignment and column spanning in table extraction models."
+      }
+    ],
+    "notes": "The DOM shows extremely high fidelity and completeness compared to the source PDF. Document text, structural elements, and tables are accurately captured across the sampled preview pages."
+  }
+}
