@@ -20,8 +20,6 @@ from dataclasses import dataclass, field
 from .config import ParserConfig
 from .parts import RecoveredDocument
 from .dom import DocumentBuilder
-from .dom import reading_order
-from .dom.reference_extractor import extract_references
 from .loaders import docling_loader
 from .page_result import PageResult, PageStatus
 from .planner import ExecutionPlan
@@ -192,23 +190,17 @@ class Assembler:
             # recovery (D3). Read here so a missing/corrupt source degrades to
             # "no recovery" rather than crashing the assemble.
             src_bytes = _read_src(src_path)
+            rec.src_bytes = src_bytes
             # D2: run the table-reconstruction safety net on the FOLDED rec (all
             # pages present) so multi-page continuation merge + evidence-graph row
             # recovery only fire when fragments are adjacent.
             rec = docling_loader.reconstruct_tables(rec, src_bytes)
             document = self.builder.build(rec, plan.doc_id, sha256)
-            # D3: generic bibliography extraction. `extract_references` is pure and
-            # guarded against mis-firing on prose that merely contains `[n]`; it
-            # returns ([], {}) when no bibliography signal is found. Source bytes are
-            # passed so a `[n]` marker dropped during layout mapping can be recovered
-            # geometrically from the left margin (faithful; never fabricated).
-            refs, citation_index = extract_references(document.pages, plan.doc_id, src_bytes)
-            if refs:
-                document.references = refs
-                document.citation_index = citation_index
             # D4: complete typed reading sequence (blocks + tables + images), so
             # every semantic content unit appears exactly once in canonical order.
-            document.reading_order_full = reading_order.build_reading_order_full(document.pages)
+            # Already built by DocumentBuilder.build() via SemanticContext —
+            # only re-set here for backward compatibility with older DOMs
+            # where reading_order_full was absent.
             report.document = document
             try:
                 report.dom_key = self.store.put_dom(plan.doc_id, document)

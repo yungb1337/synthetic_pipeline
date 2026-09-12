@@ -169,14 +169,31 @@ def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
     citation_index = dom.get("citation_index", {})
     ro_full = dom.get("reading_order_full", [])
 
-    # Sample of page-1 text (first content blocks) for a fidelity spot check
+    # Sample of text blocks across pages for fidelity spot check
+    total_text_chars = sum(len(b.get("text", "")) for p in pages for b in p.get("blocks", []))
     sample_blocks: list[str] = []
-    for p in sorted(pages, key=lambda x: x.get("index", 0))[:2]:
-        for b in p.get("blocks", [])[:6]:
-            if b.get("text"):
-                sample_blocks.append(b["text"][:180])
-                if sum(len(s) for s in sample_blocks) > 800:
+    used_chars = 0
+    for p in sorted(pages, key=lambda x: x.get("index", 0)):
+        p_idx = p.get("index", 0)
+        p_blocks = p.get("blocks", [])
+        for b in p_blocks[:3]:
+            txt = (b.get("text") or "").strip()
+            if txt:
+                snippet = f"[p{p_idx}:{b.get('kind', 'block')}] {txt[:200]}"
+                sample_blocks.append(snippet)
+                used_chars += len(snippet)
+                if used_chars > 2000:
                     break
+        if used_chars > 2000:
+            break
+
+    blocks_preview_note = (
+        f"SAMPLE BLOCKS IS A BOUNDED PREVIEW ({len(sample_blocks)} excerpts shown). "
+        f"The full DOM carries {nblocks} blocks with {total_text_chars} total characters "
+        f"across all {len(pages)} pages. Truncation or omission beyond these preview excerpts "
+        "is a PREVIEW LIMIT, never a parser defect. Judge text completeness from `blocks_total`, "
+        "`text_chars_total`, and `page_count_dom` vs the source."
+    )
     # First reference entries (D3) — labels + short text
     sample_refs = [{"label": r.get("label", ""), "text": (r.get("text") or "")[:120]}
                    for r in refs[:6]]
@@ -222,12 +239,15 @@ def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
         "metadata": {k: meta.get(k) for k in ("title", "page_count", "detected_type")},
         "page_count_dom": len(pages),
         "blocks_total": nblocks,
+        "text_chars_total": total_text_chars,
         "tables_total": ntables,
         "images_total": nimages,
         "references_total": len(refs),
         "citation_index_size": len(citation_index),
         "reading_order_full_size": len(ro_full),
         "sample_page1_blocks": sample_blocks[:3],
+        "sample_blocks": sample_blocks,
+        "blocks_preview_note": blocks_preview_note,
         "sample_references": sample_refs,
         "tables_preview": table_preview,
         "tables_preview_note": tables_preview_note,

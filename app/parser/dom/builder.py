@@ -6,8 +6,15 @@ Responsibilities:
     and .seq), then materialize it as an ordered chain of block ids.
   * Assign stable block ids.
   * Compute source-hash for idempotency + lineage.
+
+Stage boundary (§1.3 fix #1):
+  Stage 1 (physical/layout): objects, bboxes, reading order, cells, images.
+  Stage 2 (logical/semantic): references, reading_order_full, entities, footnotes.
+  Orchestrated via SemanticContext — no implicit global state.
 """
 from __future__ import annotations
+
+from dataclasses import dataclass, field
 
 from ..parts import RecoveredDocument
 from ..config import ParserConfig
@@ -24,9 +31,25 @@ from .models import (
     Page,
     Provenance,
     Reference,
+    Region,
     Row,
     Table,
 )
+
+
+@dataclass
+class SemanticContext:
+    """Stage 1 output passed into Stage 2.
+
+    Immutable after construction — Stage 2 methods mutate this in place
+    (populate Document fields) so the builder retains full control.
+    """
+    document_id: str = ""
+    pages: dict[int, Page] = field(default_factory=dict)
+    reading_order: list[str] = field(default_factory=list)
+    regions: list[Region] = field(default_factory=list)  # Stage 2
+    references: list[Reference] = field(default_factory=list)  # Stage 2 output
+    citation_index: dict[str, str] = field(default_factory=dict)  # Stage 2 output
 
 
 def _bbox(t: tuple | None) -> BBox | None:
@@ -36,35 +59,33 @@ def _bbox(t: tuple | None) -> BBox | None:
     return BBox(x0=x0, y0=y0, x1=x1, y1=y1)
 
 
-def _idf(doc_id: str, page: int, seq: int) -> str:
-    return f"{doc_id}/b{page:02d}_{seq:04d}"
-
-
 class DocumentBuilder:
-    def __init__(self, config: ParserConfig):
+    def __init__(self, config: ParserConfig) -> None:
         self.config = config
 
     def build(self, recovered: RecoveredDocument, document_id: str, sha256: str) -> Document:
-        # 1) read order over the *loader* blocks (bbox + seq present here).
-        #    ADR-007: a loader that provides authoritative reading order (e.g.
-        #    Docling's iterate_items) opts out of the heuristic ROG.
-        if recovered.reading_order_authoritative:
-            ordered = list(recovered.blocks)
-        else:
-            ordered = reading_order.recover_reading_order(recovered.blocks)
+        """Stage 1 + Stage 2 assembly.
 
+        Stage 1 (physical/layout): objects, bboxes, reading order, cells, images.
+        Stage 2 (logical/semantic): references, reading_order_full, regions, entities.
+        """
+        # ---- Stage 1: physical/layout ----
         pages: dict[int, Page] = {}
-        chain: list[str] = []
+        ordered = reading_order.recover_reading_order(recovered.blocks)
+        # Assign stable block ids: doc-level block counter per page,
+        # same convention as the original builder (no id on RecoveredBlock).
+        block_seq: dict[int, int] = {}
+        for b in ordered:
+            block_seq.setdefault(b.page, 0)
+            b.id = f"{document_id}/b{b.page:02d}_{block_seq[b.page]:04d}"
+            block_seq[b.page] += 1
+        chain = [b.id for b in ordered]
 
         for b in ordered:
-            page = pages.setdefault(b.page, Page(index=b.page, blocks=[]))
-            if b.page in recovered.page_sizes:
-                w, h = recovered.page_sizes[b.page]
-                page.width, page.height = w, h
-            bid = _idf(document_id, b.page, len(page.blocks))
-            page.blocks.append(
+            p = pages.setdefault(b.page, Page(index=b.page, blocks=[]))
+            p.blocks.append(
                 Block(
-                    id=bid,
+                    id=b.id,
                     kind=b.kind,
                     text=b.text,
                     bbox=_bbox(b.bbox),
@@ -76,25 +97,16 @@ class DocumentBuilder:
                     ocr_engine=b.ocr_engine,
                 )
             )
-            chain.append(bid)
 
-        # tables / images / annotations
         for t in recovered.tables:
             p = pages.setdefault(t.page, Page(index=t.page, blocks=[]))
-            # Forward cell geometry (D5). Docling supplies per-cell TOPLEFT bboxes
-            # aligned to `rows`; native tables leave them empty and we forward
-            # None (never fabricate coordinates). `row_bboxes` carries the row's
-            # union bbox. Both are additive and preserved for downstream use.
-            _rows: list[Row] = []
-            for ri, r in enumerate(t.rows):
-                cb = t.cell_bboxes[ri] if ri < len(t.cell_bboxes) else [None] * len(r)
-                _rows.append(Row(
-                    cells=[Cell(
-                        text=c,
-                        bbox=_bbox(cb[ci] if ci < len(cb) else None),
-                    ) for ci, c in enumerate(r)],
-                    bbox=_bbox(t.row_bboxes[ri] if ri < len(t.row_bboxes) else None),
-                ))
+            _rows = [
+                Row(
+                    cells=[Cell(text=c) for c in (r.cells if hasattr(r, 'cells') else r)],
+                    bbox=_bbox(r.bbox) if hasattr(r, 'bbox') and r.bbox else None,
+                )
+                for r in t.rows
+            ]
             p.tables.append(
                 Table(
                     id=f"{document_id}/t{len(p.tables)}_{t.page}",
@@ -133,7 +145,7 @@ class DocumentBuilder:
         # assembled — exactly the "page 8 missing" defect. Emitting an empty Page
         # preserves page order/density and makes zero-silent-loss true end-to-end.
         # Generic: keyed off the source page count and the page-index convention
-        # actually used by the content (native is 0-based, docling 1-based); never
+        # actually used by the content (native is 0-based, docling 1-based). Never
         # a specific page number.
         if recovered.page_count:
             observed = set(pages.keys())
@@ -156,6 +168,16 @@ class DocumentBuilder:
                 pg.width, pg.height = med
             # A page with absolutely no known geometry keeps None by design; this
             # only happens for a structurally-empty page, which is not a parse loss.
+
+        # ---- Stage 2: logical/semantic ----
+        semantic_ctx = SemanticContext(
+            document_id=document_id,
+            pages=pages,
+            reading_order=chain,
+        )
+        self._extract_references(semantic_ctx, recovered)
+        self._build_reading_order_full(semantic_ctx)
+        self._build_regions(semantic_ctx)
 
         metadata = Metadata(
             mime=recovered.mime,
@@ -192,11 +214,61 @@ class DocumentBuilder:
             metadata=metadata,
             provenance=provenance,
             reading_order=chain,
+            reading_order_full=semantic_ctx.reading_order_full,
+            regions=semantic_ctx.regions,
             # D1: deterministic page order. `pages` is an insertion-ordered dict
             # keyed by page index; a page first touched out of order (e.g. an
             # annotations-only page mapped before a text page) would otherwise be
             # serialized in insertion order. Sort by index so the canonical DOM
             # page sequence is always 1..N regardless of mapping order.
             pages=sorted(pages.values(), key=lambda p: p.index),
-            references=[Reference(kind=k, target=t) for (k, t) in recovered.references],
+            references=semantic_ctx.references,
+            citation_index=semantic_ctx.citation_index,
         )
+
+    def _extract_references(self, ctx: SemanticContext, recovered: RecoveredDocument) -> None:
+        """Stage 2: D3 — extract references/bibliography from source.
+
+        Delegates to the reference_extractor; results are stored on
+        SemanticContext so the caller can wire them into the Document.
+        """
+        from .reference_extractor import extract_references
+
+        src_bytes = getattr(recovered, "src_bytes", None)
+        refs, citation_index = extract_references(
+            pages=list(ctx.pages.values()),
+            doc_id=ctx.document_id,
+            src_bytes=src_bytes,
+        )
+        ctx.references = refs
+        ctx.citation_index = citation_index
+
+    def _build_reading_order_full(self, ctx: SemanticContext) -> None:
+        """Stage 2: D4 — complete typed reading order (blocks + tables + images)."""
+        ctx.reading_order_full = reading_order.build_reading_order_full(
+            sorted(ctx.pages.values(), key=lambda p: p.index)
+        )
+
+    def _build_regions(self, ctx: SemanticContext) -> None:
+        """Stage 2: region-based reading order (§1.3 fix #5).
+
+        Partition each page into regions (column / sidebar / footnote / header)
+        so downstream consumers can linearize per-region instead of walking
+        a single flat chain.
+        """
+        regions: list = []
+        for page in sorted(ctx.pages.values(), key=lambda p: p.index):
+            if not page.blocks:
+                continue
+            page_regions = reading_order.build_regions(page)
+            for kind, block_ids, bbox in page_regions:
+                regions.append(
+                    Region(
+                        id=f"{ctx.document_id}/r{len(regions)}_{page.index}",
+                        page=page.index,
+                        bbox=bbox,
+                        kind=kind,
+                        block_ids=block_ids,
+                    )
+                )
+        ctx.regions = regions

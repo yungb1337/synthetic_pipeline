@@ -148,6 +148,19 @@ class Provenance(BaseModel):
     normalization_report: Optional[dict] = None
 
 
+class Region(BaseModel):
+    """Geometric partition of a page (column / sidebar / footnote / header).
+
+    Additive field — absent in older DOMs, consumers that don't need
+    regions ignore this field entirely.
+    """
+    id: str = ""
+    page: int = 0
+    bbox: Optional[BBox] = None
+    kind: str = "column"  # "column" | "sidebar" | "footnote" | "header"
+    block_ids: list[str] = Field(default_factory=list)
+
+
 class Document(BaseModel):
     """The canonical output of the Parser module."""
     version: str
@@ -164,6 +177,10 @@ class Document(BaseModel):
     references: list[Reference] = Field(default_factory=list)
     # n -> reference id, for body `[n]` markers (D3). Additive.
     citation_index: dict[str, str] = Field(default_factory=dict)
+    # Region partition per page (column / sidebar / footnote / header).
+    # Additive — absent in older DOMs, consumers that don't need regions
+    # ignore this field.
+    regions: list["Region"] = Field(default_factory=list)
 
     # aggregate counts for monitoring/validate
     def num_blocks(self) -> int:

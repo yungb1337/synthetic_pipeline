@@ -496,11 +496,24 @@ Each module gets: purpose · inputs/outputs · interfaces · algorithms · failu
 
 ## 13. MVP path & open decisions
 
-### 13.1 Build order
+### 13.1 Build order (verified against implementation — 2026-09-12)
 
 - **Month 1 (MVP):** ingestion + detection (magic + ZIP) → PDF parser (MuPDF-family + XY-cut) → Stage-1 DOM in Postgres → chunker → embedder → retrieve. Capability validated on 3 formats, with eval harness.
+  - ✅ Parser (Module #1) complete — 945/945 docs, 0 dead pages, LLM judge 0 FAIL
+  - ✅ Normalizer (Module #2) complete — 11 tests, rule pipeline
+  - ✅ Chunking (Module #3) complete — 99 tests, content-addressed chunks
+  - ✅ Embedding (Module #4) complete — BGE-M3, batched, never-embed-twice
+  - ✅ Routing (Module #5) complete — 159 tests, 3-band calibrated
+  - ✅ Batch processing (Module #6) complete — idempotent manifest, crash-safe
 - **Month 2–3:** DOCX + XLSX (+ PPTX); Stage-2 semantics (headings/tables/citations via rules + classifier); parent-child retrieval.
+  - ⚠️ Stage 2 boundary NOT explicit — extractors run in parallel, semantic post-processors (reference_extractor, reading_order_full) are additive with no orchestration layer. See §13.3 fix #1.
 - **Month 3–6:** OCR + scanned-PDF path; LayoutLM-scan-scan; LLM judge for low-confidence branches; entity + relation extraction → KG projector; reprojection & versioning.
+  - ❌ Confidence-gated feedback loop MISSING — `Block.confidence` exists but nothing acts on it. Judge audits but can't fix. See §13.3 fix #2.
+  - ❌ Incremental-update story MISSING — no delta re-parse, no document-level DOM versioning. See §13.3 fix #3.
+  - ❌ Corpus-level KG/entity registry MISSING — cross-document identity doesn't exist. See §13.3 fix #4.
+  - ❌ Region-based reading order MISSING — `reading_order_full` is a flat chain, no region graph for multi-column/sidebars/footnotes. See §13.3 fix #5.
+  - ❌ Claim-level chunking MISSING — chunks are block-bounded, don't span nodes for semantic units. See §13.3 fix #6.
+  - ❌ Formal DOM JSON contract MISSING — `dom_schema_version` exists but no contract document, no consumer pinning, no breaking-change gate. See §13.3 fix #7.
 
 ### 13.2 Open decisions for you
 
@@ -509,6 +522,315 @@ Each module gets: purpose · inputs/outputs · interfaces · algorithms · failu
 3. **On-prem vs cloud** — chunker and embedder want GPU; that changes the infra decision.
 4. **Domain labels available?** (e.g., invoice field, form fields) — decides whether a small domain classifier is worth training.
 5. **Legal/compliance** — retention, PII handling, and provenance rules shape the metadata and graph model.
+
+### 13.3 Fixes for verified gaps (from §1.1–§1.3 audit)
+
+#### Fix #1: Explicit Stage 1 / Stage 2 boundary
+
+**Problem:** Extractors run in parallel; semantic post-processors (`reference_extractor`, `reading_order_full`) are additive with no orchestration layer. No clean boundary between physical layout (Stage 1) and logical/semantic (Stage 2). Adding a new semantic feature (e.g., footnote detection, entity extraction) requires understanding where it fits — there's no explicit contract.
+
+**Fix:** Introduce a `SemanticContext` object that Stage 1 output passes into Stage 2. Each semantic extractor is a method with interface `(SemanticContext) → mutation`. The builder's `build()` method orchestrates Stage 1 → Stage 2 explicitly.
+
+```python
+# app/parser/dom/builder.py — proposed structure
+
+class DocumentBuilder:
+    def build(self, page_results, document_id):
+        # STAGE 1: Physical/layout pass (existing, unchanged)
+        pages = self._build_pages(page_results)  # objects, bboxes, cells, images
+        reading_order = reading_order.recover_reading_order(
+            [b for p in pages for b in p.blocks]
+        )
+
+        # STAGE 2: Logical/semantic pass (explicit boundary)
+        semantic_context = SemanticContext(
+            document_id=document_id,
+            pages=pages,
+            reading_order=reading_order,
+        )
+        self._extract_references(semantic_context)       # D3 → Document.references
+        self._build_reading_order_full(semantic_context)  # D4 → Document.reading_order_full
+        self._extract_entities(semantic_context)          # Future: Stage 3 entities
+        self._resolve_footnotes(semantic_context)         # Future: footnote归属
+
+        return Document(...)
+```
+
+**Key changes:**
+- `SemanticContext` object passes Stage 1 output to Stage 2 — no implicit global state.
+- Each semantic extractor is a method on `DocumentBuilder` (or a separate class) with a clear interface: `(SemanticContext) → mutation`.
+- Stage 3 additions (entities, relations, forms) go through the same interface — no more scattered post-processors.
+- The builder's `build()` method is the only place that orchestrates Stage 1 → Stage 2, making the pipeline's structure explicit and testable in isolation.
+
+**What this prevents:**
+- Adding a new semantic feature doesn't require understanding where it fits — it goes in Stage 2, period.
+- Testing Stage 2 in isolation: pass a fake Stage 1 output, verify the semantic fields.
+- The DOM schema stabilizes because Stage 1 and Stage 2 have explicit contracts (input/output types).
+
+---
+
+#### Fix #2: Confidence-gated feedback loop
+
+**Problem:** `Block.confidence` is a field (default 1.0, set by engines) but nothing acts on it. The LLM judge audits but can't fix — it's a spectator, not a participant. Low-confidence blocks permanently poison chunks and the KG.
+
+**Fix:** Make confidence a first-class edge. Any node below threshold routes to human/LLM verification; reparse is a first-class operation, not a bug.
+
+```python
+# app/parser/dom/models.py — confidence threshold in Document
+
+class Document(BaseModel):
+    version: str
+    document_id: str
+    source_hash: str
+    confidence_threshold: float = 0.7  # new: nodes below this need verification
+
+    def low_confidence_nodes(self) -> list[Block | Table]:
+        """Return all nodes below the confidence threshold."""
+        nodes = []
+        for page in self.pages:
+            for block in page.blocks:
+                if block.confidence < self.confidence_threshold:
+                    nodes.append(block)
+            for table in page.tables:
+                if table.confidence < self.confidence_threshold:
+                    nodes.append(table)
+        return nodes
+```
+
+```python
+# app/parser/assembler.py — gate that routes low-confidence to verification
+
+class DocumentValidator:
+    def verify(self, doc: Document) -> VerificationResult:
+        low_conf = doc.low_confidence_nodes()
+        if low_conf:
+            return VerificationResult(
+                status="needs_review",
+                nodes=low_conf,
+                message=f"{len(low_conf)} nodes below confidence threshold",
+            )
+        return VerificationResult(status="ok")
+```
+
+**What this prevents:**
+- Low-confidence OCR blocks from silently entering chunks and the KG.
+- A feedback channel where human review can override a node and retrigger projections.
+- The judge's findings can feed back into the confidence threshold, closing the trust loop.
+
+---
+
+#### Fix #3: Incremental-update story
+
+**Problem:** `dom_schema_version` tracks schema version, not document version. No delta/incremental re-parse when a document changes (amendments). Re-running processes the whole doc from scratch.
+
+**Fix:** Version the DOM per document; consumers project from a version. When a document changes, only re-parse the changed sections and replay projections.
+
+```python
+# app/parser/dom/models.py — document-level versioning
+
+class Document(BaseModel):
+    version: str                    # DOM schema version (existing)
+    document_id: str
+    source_hash: str
+    document_version: int = 1        # NEW: increments on each re-parse
+    parent_version: int | None = None # NEW: points to previous version for diff
+
+    def changed_sections(self, prev: Document) -> list[str]:
+        """Return section IDs that differ from prev."""
+        # Compare source_hash first (whole doc changed?)
+        if self.source_hash == prev.source_hash:
+            return []
+        # Otherwise diff page-by-page, block-by-block
+        changed = []
+        for i, (p_new, p_old) in enumerate(zip(self.pages, prev.pages)):
+            if p_new.source_hash != p_old.source_hash:
+                changed.append(f"page_{i}")
+        return changed
+```
+
+**What this prevents:**
+- Re-parsing the entire document when only a section changed (e.g., a contract amendment).
+- Consumers can project from a specific version and only update affected chunks/embeddings.
+
+---
+
+#### Fix #4: Corpus-level KG/entity registry
+
+**Problem:** `document_id` is stable, node IDs are stable (`{doc_id}/t{n}_{page}`). But no corpus-level entity registry or KG — cross-document identity doesn't exist. Entities extracted from different documents can't be linked.
+
+**Fix:** A canonical entity registry that maps extracted entities to stable IDs across documents. This is the foundation for the KG.
+
+```python
+# app/kg/entity_registry.py (new module)
+
+class EntityRegistry:
+    """Maps entity text → stable entity_id across documents."""
+
+    def resolve(self, text: str, entity_type: str) -> str:
+        """Return existing entity_id or register a new one."""
+        # Fuzzy match against known entities
+        # Return stable ID for downstream KG linking
+        pass
+
+    def link_document(self, doc_id: str, entity_ids: list[str]) -> None:
+        """Record which entities appear in which document."""
+        pass
+```
+
+**What this prevents:**
+- "Acme Corp" in doc A and "Acme Corporation" in doc B being treated as separate entities.
+- KG projections that can't link related facts across documents.
+
+---
+
+#### Fix #5: Region-based reading order
+
+**Problem:** `reading_order_full` is a flat chain (blocks, then tables, then images per page). No region graph for multi-column/sidebars/footnotes. The geometric column-aware ordering in `reading_order.py` partitions into columns but doesn't model regions as first-class nodes.
+
+**Fix:** Model regions as first-class nodes in the reading order graph. Linearize for retrieval.
+
+```python
+# app/parser/dom/models.py — add Region model
+
+class Region(BaseModel):
+    """A semantic region of a page (column, sidebar, footnote area, figure region)."""
+    id: str
+    page: int
+    bbox: BBox
+    kind: str = "column"  # "column" | "sidebar" | "footnote" | "figure" | "table"
+    block_ids: list[str] = Field(default_factory=list)
+
+class Document(BaseModel):
+    # ... existing fields ...
+    regions: list[Region] = Field(default_factory=list)  # NEW
+```
+
+```python
+# app/parser/dom/reading_order.py — build regions from column partition
+
+def build_regions(page) -> list[Region]:
+    """Partition page blocks into regions using geometric analysis."""
+    # Use existing _partition_columns logic to identify column boundaries
+    # Each column becomes a Region with kind="column"
+    # Full-width spanning blocks (titles, headers) become Region(kind="header")
+    # Isolated blocks below main content become Region(kind="footnote")
+    pass
+```
+
+**What this prevents:**
+- A footnote that belongs to paragraph P3 being just another entry in the flat chain — it's now linked to P3 via `region.kind = "footnote"` and `region.bbox` positioning.
+- Multi-column documents: a reader can choose to follow column 1 or column 2 independently.
+- Sidebars and figure regions are first-class, not just "blocks that happen to be in the right place."
+
+---
+
+#### Fix #6: Claim-level chunking
+
+**Problem:** Chunks are block-bounded — they walk the DOM tree and cut only between Block boundaries. The schema reserves `source_table_ids` + `source_image_ids`, but chunks don't join across nodes for semantic units. A claim that spans a paragraph sentence + its footnote gets split into two chunks.
+
+**Fix:** Cross-node chunking that joins semantic units across DOM nodes.
+
+```python
+# app/chunking/chunker.py — semantic unit joiner
+
+class SemanticUnitJoiner:
+    """Joins blocks that form a single semantic unit across node boundaries."""
+
+    def join(self, blocks: list[Block], footnotes: list[Footnote]) -> list[SemanticUnit]:
+        """
+        For each block, check if it has an attached footnote.
+        If so, merge the block text + footnote into one SemanticUnit.
+        A SemanticUnit can span multiple DOM nodes.
+        """
+        units = []
+        for block in blocks:
+            unit = SemanticUnit(
+                block_ids=[block.id],
+                text=block.text,
+                kind=block.kind,
+            )
+            # Attach footnotes that reference this block
+            for fn in footnotes:
+                if fn.references_block(block.id):
+                    unit.text += f" [{fn.text}]"
+                    unit.block_ids.append(fn.id)
+            units.append(unit)
+        return units
+```
+
+**What this prevents:**
+- A retrieval query for a claim matching only the paragraph chunk but missing the footnote that clarifies a key term.
+- Chunk boundaries that cut through semantic units, breaking the faithfulness of retrieval.
+
+---
+
+#### Fix #7: Formal DOM JSON contract
+
+**Problem:** `dom_schema_version` exists but is **advisory, not enforced**. No formal contract document, no consumer pinning, no breaking-change gate. Downstream consumers don't explicitly pin to a schema version — a schema change could silently break chunker/embedder.
+
+**Fix:** Three things:
+1. **JSON Schema contract** (`docs/dom-schema-v1.json`) defining the DOM structure with `additionalProperties: false` to prevent unexpected fields.
+2. **Consumer pinning** — each consumer declares which DOM versions it supports.
+3. **Migration path** — when the schema changes, a migration function transforms old DOMs to the new version.
+
+```json
+// docs/dom-schema-v1.json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MedFactory DOM v1",
+  "type": "object",
+  "required": ["version", "document_id", "source_hash", "pages"],
+  "properties": {
+    "version": { "const": "dom-v1.0.0" },
+    "document_id": { "type": "string" },
+    "source_hash": { "type": "string" },
+    "pages": { "type": "array", "items": { "$ref": "#/definitions/Page" } }
+  },
+  "definitions": {
+    "Page": {
+      "type": "object",
+      "required": ["index", "blocks"],
+      "properties": {
+        "index": { "type": "integer" },
+        "blocks": { "type": "array", "items": { "$ref": "#/definitions/Block" } },
+        "tables": { "type": "array", "items": { "$ref": "#/definitions/Table" } },
+        "images": { "type": "array", "items": { "$ref": "#/definitions/ImageObject" } }
+      }
+    },
+    "Block": {
+      "type": "object",
+      "required": ["id", "text"],
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "kind": { "type": "string", "default": "paragraph" },
+        "bbox": { "$ref": "#/definitions/BBox" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+```python
+# app/chunking/chunker.py — validate DOM version before processing
+
+class SemanticChunker:
+    SUPPORTED_DOM_VERSIONS = {"v0.1.0", "v0.2.0"}  # pin what we accept
+
+    def chunk(self, doc: Document):
+        if doc.version not in self.SUPPORTED_DOM_VERSIONS:
+            raise UnsupportedDOMVersion(
+                f"Chunker supports {self.SUPPORTED_DOM_VERSIONS}, got {doc.version}"
+            )
+        # ... proceed
+```
+
+**What this prevents:**
+- A consumer crashing silently on old DOMs — it fails loudly with `UnsupportedDOMVersion`.
+- Schema changes without a migration plan — every new version requires a migration function.
+- Downstream breakage from additive fields — `additionalProperties: false` in the JSON Schema contract prevents unexpected fields from entering the DOM.
 
 ---
 

@@ -35,6 +35,7 @@ key.py
 *.key
 
 # Tooling
+.freebuff/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -51,6 +52,8 @@ logs/
 # never parsed stores, downloaded PDFs, images, or per-doc judge verdict JSONs.
 checkpoints/run/*/parsed/
 checkpoints/run/*/parsed-*/
+checkpoints/run/*/store/
+checkpoints/run/*/input_pdfs/
 checkpoints/run/*/judgment/
 checkpoints/run/*/images/
 checkpoints/run/*/sources/**/*.pdf
