@@ -1,0 +1,1 @@
+- **postfix_group_b** (2026-09-14T12:01:26Z): files=100 ok=100 failed=0 dead=0 unparsed=0 wall=1639.7s avg_doc=16.29s avg_page=1256ms peak_tree=3885MB peak_worker=3858MB blocks=19226 tables=306
