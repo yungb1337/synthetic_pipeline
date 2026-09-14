@@ -58,7 +58,22 @@ class ParserConfig:
     # does not return to the OS is reclaimed by process exit. Lower = more
     # reclaim but more engine warm-up (N× model load). Today `run_all_waves.py`
     # restarts children only on crash; this makes recycling deliberate.
-    heavy_pool_max_tasks_per_child: int = 20
+    # A3: 20 -> 10. Measured worker RSS climbs monotonically across a run
+    # (2,407 -> 3,469 MB in the postfix benchmark) because Docling's C++/ONNX
+    # heap is not returned to the OS between page jobs. At 20 jobs a worker
+    # accumulates ~1 GB of unreclaimed heap before it is finally recycled; at
+    # 10 the leak is bounded to ~0.5 GB and peak pool RSS stays flat across a
+    # long run instead of degrading job-by-job. Cost is 2x the warm-up
+    # frequency, which is cheap relative to the leak.
+    heavy_pool_max_tasks_per_child: int = 10
+
+    # A3: optional RSS trigger for an EXTRA pool rebuild. `ProcessPoolExecutor`
+    # recycles a worker only after `heavy_pool_max_tasks_per_child` jobs; this
+    # hook lets the orchestrator (which cannot see worker RSS directly) force a
+    # full pool rebuild when ITS OWN RSS climbs past the threshold — the
+    # signature of the native pool + persisted-page cache growing unbounded.
+    # 0 / None = disabled. Set to e.g. 6000 (MB) to recycle on a 6 GB box.
+    heavy_pool_rss_threshold_mb: int = 0
 
     # ADR-011: the routing config snapshot used when layout_backend == "auto".
     # None => factory defaults (RoutingConfig()). Also gates routing on/off.

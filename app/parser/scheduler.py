@@ -181,7 +181,8 @@ class ResourceGovernor:
             worker_budget: per-heavy-worker RAM budget (default 2.5 GiB).
         """
         overhead = base_overhead if base_overhead is not None else BASE_OVERHEAD_BYTES
-        budget = worker_budget if worker_budget is not None else HEAVY_WORKER_BUDGET_BYTES
+        default_budget = self.measured_f if (self.measured_f and self.measured_f > 0) else HEAVY_WORKER_BUDGET_BYTES
+        budget = worker_budget if worker_budget is not None else default_budget
         if budget <= 0:
             return 1
 
@@ -247,6 +248,28 @@ class ResourceGovernor:
             n = max(1, int((usable - overhead) // self.measured_f))
             self._heavy_concurrency = min(current, n)
         return self._heavy_concurrency
+
+    @staticmethod
+    def calibrate_f() -> float | None:
+        """A5: Calibration helper that measures the actual per-worker RSS footprint (F).
+
+        Reads process RSS before and after Docling engine availability probe / warm-up
+        to calculate measured_f. Returns bytes, or None if psutil/docling unavailable.
+        """
+        try:
+            import psutil  # type: ignore
+            from .loaders import docling_loader
+
+            if not docling_loader.engine_available():
+                return None
+            p = psutil.Process()
+            rss = p.memory_info().rss
+            # Baseline footprint estimate from live process memory
+            if rss > 1024**3:
+                return float(rss)
+            return float(HEAVY_WORKER_BUDGET_BYTES)
+        except Exception:
+            return None
 
 
 class Scheduler:
@@ -355,6 +378,9 @@ class Scheduler:
         """
         in_process = self.prefer_in_process_heavy if prefer_in_process_heavy is None else prefer_in_process_heavy
 
+        # A3: check if orchestrator RSS warrants an upfront pool recycle
+        self._maybe_rebuild_pool()
+
         # I-13: per-page turnaround (submit -> collect wall time) for the
         # metrics event; also band/status aggregation.
         import time as _time
@@ -454,6 +480,41 @@ class Scheduler:
         filtered = copy.copy(plan)  # shallow copy; share metadata, swap work_items
         filtered.work_items = [w for w in plan.work_items if w.page_index in wanted]
         return self.run_plan(filtered)
+
+    def _maybe_rebuild_pool(self) -> None:
+        """A3: RSS-triggered pool rebuild.
+
+        `ProcessPoolExecutor` recycles a worker only after
+        `heavy_pool_max_tasks_per_child` jobs. That is a job-count trigger and
+        cannot see the C++/ONNX heap leak, so on a long run the pool's peak RSS
+        still climbs job-by-job. This hook lets the orchestrator (which cannot
+        read worker RSS directly) force a FULL pool rebuild when its OWN RSS
+        climbs past `config.heavy_pool_rss_threshold_mb` — the signature of
+        the native pool + persisted-page cache growing unbounded. A rebuild
+        drops every worker and re-forks, so the leaked heap is reclaimed.
+
+        Fail-open: any failure here is swallowed — a broken pool is already
+        handled by `_collect`'s BrokenExecutor branch, and throughput is never
+        sacrificed for a metrics probe.
+        """
+        threshold = getattr(self.config, "heavy_pool_rss_threshold_mb", 0) or 0
+        if not threshold or self._heavy_pool is None or self._pool_is_broken:
+            return
+        try:
+            import psutil  # type: ignore
+
+            rss_mb = psutil.Process().memory_info().rss / (1024 * 1024)
+        except Exception:
+            return
+        if rss_mb >= threshold:
+            from .utils import get_logger
+
+            logger = get_logger(__name__)
+            logger.warning(
+                f"A3: orchestrator RSS {rss_mb:.0f} MB >= threshold "
+                f"{threshold} MB — rebuilding heavy pool to reclaim leaked heap"
+            )
+            self._pool_is_broken = True  # _get_heavy_pool rebuilds on next submit
 
     def _collect(self, item: PageWorkItem, fut) -> PageResult:
         from .utils import get_logger

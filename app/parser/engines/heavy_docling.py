@@ -15,6 +15,8 @@ The mapping reuses the exact existing helpers from `docling_loader`
 """
 from __future__ import annotations
 
+import threading
+
 from ..config import ParserConfig
 from ..loaders import docling_loader
 from ..page_result import PageResult, PageStatus
@@ -27,6 +29,27 @@ class HeavyDoclingEngine:
 
     def __init__(self, config: ParserConfig):
         self.config = config
+        # A2: cache the source bytes PER DOCUMENT. The formula fallback below
+        # re-read `item.src_path` on EVERY page (open+read, ~10-50 MB per
+        # page) even though the bytes are already inside the ConversionResult
+        # and are identical for every page of the same document. Reading once
+        # per document and reusing is O(1) file reads per doc instead of O(N).
+        self._src_cache: dict[str, bytes] = {}
+        self._src_cache_lock = threading.Lock()
+
+    def _src_bytes(self, src_path: str) -> bytes:
+        with self._src_cache_lock:
+            cached = self._src_cache.get(src_path)
+            if cached is not None:
+                return cached
+        try:
+            with open(src_path, "rb") as fh:
+                data = fh.read()
+        except Exception:
+            data = b""
+        with self._src_cache_lock:
+            self._src_cache[src_path] = data
+        return data
 
     def process(self, item: PageWorkItem) -> PageResult:
         try:
@@ -86,6 +109,14 @@ class HeavyDoclingEngine:
             rec.layout_model = docling_loader._layout_model_name(converter) if converter else None
 
             target = item.page_index + 1
+            # A1: index the document's items BY PAGE ONCE, then look up this
+            # page. The previous loop called `doc.iterate_items()` once per
+            # page and filtered `page_no != target`, which is O(N x M) item
+            # iterations across the whole document (N pages x M items each) —
+            # the same O(N^2) class I-04 fixed in the enrichment band, still
+            # open here. `iterate_items` is not free; this turns a 30-page
+            # document's ~900 iterations into ~90.
+            by_page: dict[int, list] = {}
             for entry in doc.iterate_items():
                 item_ = entry[0] if isinstance(entry, tuple) and entry else entry
                 try:
@@ -93,13 +124,15 @@ class HeavyDoclingEngine:
                     page_no = int(getattr(prov, "page_no", 0) or 0)
                 except Exception:
                     page_no = 0
-                if page_no != target:
-                    continue
+                by_page.setdefault(page_no, []).append(item_)
+            for item_ in by_page.get(target, []):
                 docling_loader._map_item(item_, rec, doc)
 
             # formula fallback: read source bytes (single reused path)
+            # A2: reuse the per-document cached bytes instead of re-reading the
+            # file on every page.
             try:
-                data = open(item.src_path, "rb").read()
+                data = self._src_bytes(item.src_path)
                 docling_loader._recover_formula_text(data, rec)
             except Exception:
                 pass

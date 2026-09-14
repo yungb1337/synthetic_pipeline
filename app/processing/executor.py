@@ -210,7 +210,8 @@ class BatchWorker:
         self._report.skipped = len(refs) - len(todo)
 
         if todo:
-            with ThreadPoolExecutor(max_workers=self.config.concurrency) as pool:
+            workers = self._effective_concurrency()
+            with ThreadPoolExecutor(max_workers=workers) as pool:
                 futures = [pool.submit(self._run_with_retries, r) for r in todo]
                 for fut in futures:
                     self._record(fut.result())
@@ -230,6 +231,27 @@ class BatchWorker:
         # after the first run would break every subsequent extract(). The pool is
         # released exactly once at process exit via `close_scheduler()` (CLI / atexit).
         return self._report
+
+    def _effective_concurrency(self) -> int:
+        """A4: the batch-layer thread count actually used for this run.
+
+        Defaults to `config.concurrency`. When `config.concurrency_cap_heavy`
+        is set (default 2), the cap is `heavy_concurrency * cap` so batch
+        threads can never outnumber the heavy pool's capacity — which is what
+        starves the native pool and inflates peak RSS on docling-heavy
+        corpora. The cap is always >= 1 and never exceeds `concurrency`, so a
+        native-only corpus (heavy_concurrency=None -> 1) is unaffected.
+        """
+        cap = getattr(self.config, "concurrency_cap_heavy", 2) or 0
+        base = self.config.concurrency
+        if not cap or cap <= 0:
+            return base
+        heavy = getattr(self.config, "heavy_concurrency", None)
+        # None => the Scheduler's ResourceGovernor derives it at runtime; we
+        # cannot see it here, so fall back to the uncapped value (safe).
+        if not heavy:
+            return base
+        return max(1, min(base, int(heavy) * int(cap)))
 
     def _run_with_retries(self, ref: DocRef) -> DocResult:
         for attempt in range(self.config.max_retries):

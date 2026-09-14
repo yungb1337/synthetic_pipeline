@@ -250,6 +250,29 @@ class Ledger:
             with jp.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
+    def update_pages_batch(self, doc_id: str, updates: list[dict]) -> None:
+        """A6: Record multiple page statuses in the journal in a single batch write."""
+        if not updates:
+            return
+        jp = self._journal_path(doc_id)
+        jp.parent.mkdir(parents=True, exist_ok=True)
+        lines = []
+        for u in updates:
+            st = u["status"]
+            entry = {
+                "op": "page",
+                "page_index": u["page_index"],
+                "status": st.value if isinstance(st, PageStatus) else str(st),
+                "checksum": u.get("checksum", ""),
+                "engine": u.get("engine"),
+                "attempt": u.get("attempt") or 1,
+                "errors": u.get("errors") or [],
+            }
+            lines.append(json.dumps(entry, ensure_ascii=False) + "\n")
+        with self._jl:
+            with jp.open("a", encoding="utf-8") as f:
+                f.writelines(lines)
+
     def update_assembly(self, doc_id: str, status, assembled_set: list, report: dict) -> None:
         try:
             plan = self.load_plan(doc_id)

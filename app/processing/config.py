@@ -10,6 +10,15 @@ from dataclasses import dataclass
 class ProcessingConfig:
     # parallelism
     concurrency: int = min(16, (os.cpu_count() or 4) + 1)   # worker pool size
+    # A4: cap the batch-layer concurrency so batch threads can never outnumber
+    # the heavy (Docling) pool's capacity. Today `concurrency` is 17 on this
+    # box while the heavy pool is RAM-capped at 4 workers — so up to 17 batch
+    # threads can be blocked simultaneously on docling pages, starving the
+    # native pool and inflating peak RSS (+72% vs baseline). Capping at
+    # `heavy_concurrency * 2` keeps enough batch threads to saturate the heavy
+    # pool without queuing docling work behind an unbounded thread count.
+    # 0 / None = disabled (legacy behaviour: `concurrency` used as-is).
+    concurrency_cap_heavy: int = 2
     # Page-centric engine (ADR-013): native pool is wide; heavy (Docling) pool is
     # bounded by measured RAM. None => auto-derived by ResourceGovernor. Pass an
     # explicit int to override (e.g. --heavy-concurrency 2 on a small box).

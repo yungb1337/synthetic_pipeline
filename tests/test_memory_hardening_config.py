@@ -11,26 +11,26 @@ from app.parser.scheduler import Scheduler
 def test_parser_config_hardening_defaults():
     cfg = default_config()
     assert cfg.docling_generate_picture_images is True
-    assert cfg.heavy_pool_max_tasks_per_child == 20
+    assert cfg.heavy_pool_max_tasks_per_child == 10
 
     snap = cfg.snapshot()
     assert "docling_generate_picture_images" in snap
     assert snap["docling_generate_picture_images"] is True
     assert "heavy_pool_max_tasks_per_child" in snap
-    assert snap["heavy_pool_max_tasks_per_child"] == 20
+    assert snap["heavy_pool_max_tasks_per_child"] == 10
 
 
 def test_parser_config_custom_values():
     cfg = ParserConfig(
         docling_generate_picture_images=False,
-        heavy_pool_max_tasks_per_child=10,
+        heavy_pool_max_tasks_per_child=5,
     )
     assert cfg.docling_generate_picture_images is False
-    assert cfg.heavy_pool_max_tasks_per_child == 10
+    assert cfg.heavy_pool_max_tasks_per_child == 5
 
     snap = cfg.snapshot()
     assert snap["docling_generate_picture_images"] is False
-    assert snap["heavy_pool_max_tasks_per_child"] == 10
+    assert snap["heavy_pool_max_tasks_per_child"] == 5
 
 
 def test_make_pipeline_options_honors_generate_picture_images():
