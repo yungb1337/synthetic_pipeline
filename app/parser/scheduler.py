@@ -1,17 +1,28 @@
 """Scheduler + ResourceGovernor (ADR-013 T12).
 
-`ResourceGovernor` derives `heavy_concurrency` from measured RAM (and an
-optional measured per-engine footprint `F`), never a fixed cap — "scale by
-hardware". `Scheduler` decouples a wide `native_pool` (ThreadPoolExecutor: PyMuPDF
-/ enrichment / image / simple — GIL-releasing, cheap) from a bounded
-`heavy_pool` (ProcessPoolExecutor for Docling). The heavy engine is built INSIDE
-each worker (initializer sets `OMP_NUM_THREADS=1` / `MKL_NUM_THREADS=1` etc.) so
-the BLAS-thread multiplier is neutralized and the engine is reused per process
+`Scheduler` decouples a wide `native_pool` (ThreadPoolExecutor: PyMuPDF /
+enrichment / image / simple — GIL-releasing, cheap) from a bounded `heavy_pool`
+(ProcessPoolExecutor for Docling). The heavy engine is built INSIDE each worker
+(initializer sets `OMP_NUM_THREADS=1` / `MKL_NUM_THREADS=1` etc.) so the
+BLAS-thread multiplier is neutralized and the engine is reused per process
 (no N× warm-up). Backpressure + per-page persistence + exception containment
 mean one crashing heavy page becomes `FAILED`, never a whole-run crash.
+
+I-02 (Option B): heavy concurrency is an HONEST value computed ONCE at
+`Scheduler` init — a RAM-derived default (`ResourceGovernor.derive_default_
+heavy_concurrency`: usable RAM after 20% headroom and a 2 GiB base overhead,
+divided by a conservative 2.5 GiB per-worker budget), floored at 1, or the
+operator's explicit `--heavy-concurrency`. The old worker-side "F probe"
+publish path was DEAD CODE (nothing ever wrote the shared `multiprocessing.Value`),
+so the auto path could never exceed 1 and the "measure and rescale mid-flight"
+behavior documented in the run-2026-08-19 checkpoint never existed. It is now
+removed rather than pretended. `periodic_recheck` remains available and acts
+only when `governor.measured_f` is set explicitly (operator / external
+measurement); it still adjusts DOWNWARD only.
 """
 from __future__ import annotations
 
+import copy
 import multiprocessing as mp
 import multiprocessing.spawn as mpsp
 import os
@@ -40,11 +51,27 @@ from .storage_pages import Ledger, PageStore
 HEADROOM = 0.80  # reserve OS + native pool + orchestrator
 
 
-# --- module-level heavy worker (picklable on Windows spawn) -----------------
-# C1: the F footprint probe is performed INSIDE the heavy worker (never in the
-# orchestrator). The measured value is published to a shared multiprocessing.Value
-# so the orchestrator's governor can refine `heavy_concurrency` on the fly.
-_heavy_f_value = None  # set when the pool is created (mp.Value)
+def _percentile(sorted_vals: list[float], q: float) -> float | None:
+    """I-13: linear-interpolated percentile of an ALREADY-SORTED list."""
+    if not sorted_vals:
+        return None
+    if len(sorted_vals) == 1:
+        return float(sorted_vals[0])
+    idx = (q / 100.0) * (len(sorted_vals) - 1)
+    lo = int(idx)
+    hi = min(lo + 1, len(sorted_vals) - 1)
+    frac = idx - lo
+    return float(sorted_vals[lo] * (1 - frac) + sorted_vals[hi] * frac)
+
+# I-02 (Option B): conservative per-worker RAM budget for a Docling heavy
+# worker (OMP/MKL pinned to 1 thread, page-bounded convert). The measured
+# per-engine footprint on this corpus was ~2.6 GB; 2.5 GiB is the shipped
+# budget so (usable - overhead) // budget never overcommits. Override per
+# call (`derive_default_heavy_concurrency(worker_budget=...)`) or pin the
+# whole pool with `--heavy-concurrency`.
+HEAVY_WORKER_BUDGET_BYTES = 2.5 * 1024**3
+# Base orchestrator overhead: the parser process itself + the native pool.
+BASE_OVERHEAD_BYTES = 2 * 1024**3
 
 
 def _heavy_initializer(models_dir: str):
@@ -108,68 +135,17 @@ def _resolve_band(item: PageWorkItem) -> str:
 
 @dataclass
 class ResourceGovernor:
-    """Derive heavy concurrency from measured RAM / GPU (Fact + Recommendation)."""
+    """Derive heavy concurrency from RAM (I-02: honest, no dead probe).
+
+    `measured_f` is None unless set EXPLICITLY (operator / external
+    measurement); `periodic_recheck` acts only when it is set, and only
+    downward.
+    """
 
     config: ParserConfig | None = None
-    # A measured per-engine footprint in bytes; None => auto/probe or unknown.
+    # A measured per-engine footprint in bytes; None => unknown (recheck no-op).
     measured_f: float | None = None
     _heavy_concurrency: int = 1
-
-    # --- measured footprint (cold-start probe) -------------------------------
-    def measure_footprint(self) -> float | None:
-        """Measure per-engine RAM `F` by warming the engine and converting two
-        representative pages. Returns bytes or None when Docling is unavailable
-        or psutil is missing (caller then uses concurrency 1)."""
-        if self.measured_f is not None:
-            return self.measured_f
-        try:
-            import fitz  # type: ignore
-            from .loaders import docling_loader
-        except Exception:
-            return None
-        if not docling_loader.engine_available() or not docling_loader.docling_guard():
-            return None
-        try:
-            import psutil  # type: ignore
-        except Exception:
-            return None
-
-        # Build a small + a large synthetic PDF for the probe.
-        try:
-            import tempfile
-            small = fitz.open()
-            p = small.new_page(width=595, height=842)
-            p.insert_text((72, 100), "Probe page small content.", fontsize=11)
-            small_b = small.tobytes()
-            large = fitz.open()
-            for _ in range(3):
-                pg = large.new_page(width=1190, height=1684)
-                for i in range(60):
-                    pg.insert_text((72, 80 + i * 18), "Probe row %d with some moderately long text to occupy memory." % i, fontsize=10)
-            large_b = large.tobytes()
-
-            peak = 0
-            base = psutil.Process().memory_info().rss
-            for blob in (small_b, large_b):
-                tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-                tmp.write(blob)
-                tmp.close()
-                res = docling_loader.convert_path(tmp.name, 0)
-                try:
-                    peak = max(peak, psutil.Process().memory_info().rss - base)
-                except Exception:
-                    pass
-                try:
-                    os.unlink(tmp.name)
-                except Exception:
-                    pass
-            # account both in-flight peak + retained model weights (the engine
-            # stays resident for the process lifetime). C3: this must NOT
-            # double-count the engine delta — take the MAX, not the SUM.
-            self.measured_f = max(peak, psutil.Process().memory_info().rss - base)
-            return self.measured_f
-        except Exception:
-            return None
 
     def _cgroup_max(self):
         for v2 in ("/sys/fs/cgroup/memory.max",):
@@ -188,6 +164,43 @@ class ResourceGovernor:
                 pass
         return None
 
+    def derive_default_heavy_concurrency(self, ram_cap: float | None = None,
+                                          base_overhead: float | None = None,
+                                          worker_budget: float | None = None) -> int:
+        """I-02 (Option B): the shipped heavy-concurrency default.
+
+        Formula: max(1, floor((usable - overhead) / worker_budget)) where
+        `usable = min(total_ram, cgroup_max) * HEADROOM`. Computed ONCE at
+        Scheduler init — no mid-flight rescaling. Without psutil (RAM
+        unknown) this returns the safe floor of 1 — it NEVER fabricates a
+        RAM size (I-12).
+
+        Args:
+            ram_cap: explicit total-RAM override (tests / cgroups-aware callers).
+            base_overhead: orchestrator + native pool budget (default 2 GiB).
+            worker_budget: per-heavy-worker RAM budget (default 2.5 GiB).
+        """
+        overhead = base_overhead if base_overhead is not None else BASE_OVERHEAD_BYTES
+        budget = worker_budget if worker_budget is not None else HEAVY_WORKER_BUDGET_BYTES
+        if budget <= 0:
+            return 1
+
+        if ram_cap is not None:
+            total = float(ram_cap)
+        else:
+            try:
+                import psutil  # type: ignore
+            except Exception:
+                # I-12: RAM unknown => safe floor. Never assume a size.
+                return 1
+            total = float(psutil.virtual_memory().total)
+
+        cgroup = self._cgroup_max()
+        cap = min(total, cgroup) if cgroup else total
+        usable = cap * HEADROOM
+        n = int((usable - overhead) // budget)
+        return max(1, n)
+
     def derive_heavy_concurrency(self, ram_cap: float | None = None,
                                  base_overhead: float | None = None,
                                  F: float | None = None) -> int:
@@ -199,10 +212,12 @@ class ResourceGovernor:
         try:
             import psutil  # type: ignore
         except Exception:
-            psutil = None
+            # I-12: without psutil the RAM is UNKNOWN — return the safe floor 1
+            # (same semantic as F=None). The previous code fabricated a 16 GiB
+            # box and could derive concurrency >1 on a smaller machine.
+            return 1
 
-        ram_total = ram_cap if ram_cap is not None else (
-            psutil.virtual_memory().total if psutil else 16 * 1024**3)
+        ram_total = ram_cap if ram_cap is not None else psutil.virtual_memory().total
         cgroup = self._cgroup_max()
         cap = min(ram_total, cgroup) if cgroup else ram_total
         usable = cap * HEADROOM
@@ -242,33 +257,36 @@ class Scheduler:
                  heavy_concurrency: int | None = None,
                  page_store: PageStore | None = None,
                  ledger: Ledger | None = None,
-                 prefer_in_process_heavy: bool = False):
+                 prefer_in_process_heavy: bool = False,
+                 metrics_sink=None):
         self.config = config
         self.page_store = page_store
         self.ledger = ledger
         self.prefer_in_process_heavy = prefer_in_process_heavy
+        # I-13: optional sink for the `parser.metrics.v1` aggregate event
+        # (emitted at the end of every run_plan). None => no metrics emitted.
+        self.metrics_sink = metrics_sink
 
         self.native_concurrency = native_concurrency or min(32, ((mp.cpu_count() or 4) * 2))
         self.native_pool = ThreadPoolExecutor(max_workers=self.native_concurrency)
 
         # C1: do NOT build/warm the Docling engine in the orchestrator process.
-        # The F footprint probe is expensive (multi-hundred-MB load + seconds)
-        # and is meaningless for native-only / non-PDF runs. Instead we lazily
-        # derive `heavy_concurrency` from RAM only (F=None => safe floor of 1),
-        # and run the real F probe inside the heavy worker (via a
-        # multiprocessing.Value, see _heavy_initializer) the first time a
-        # docling page is actually submitted. The single-doc
+        # The heavy pool is expensive (multi-hundred-MB model load + seconds)
+        # and is meaningless for native-only / non-PDF runs — it is created
+        # lazily on the first docling submission. The single-doc
         # `prefer_in_process_heavy=True` path may still warm locally and reuse.
+        #
+        # I-02 (Option B): heavy concurrency is computed ONCE here — the
+        # operator's explicit value, else the RAM-derived default (floored at
+        # 1, safe-floor 1 without psutil). The old worker-side F-probe publish
+        # path was dead code (nothing ever wrote the shared Value) and has
+        # been removed; `periodic_recheck` still works when `measured_f` is
+        # set explicitly and only ever shrinks.
         self.governor = ResourceGovernor(config=config)
-        self._f_probe_done = False
         if heavy_concurrency is not None:
             self.heavy_concurrency = heavy_concurrency
         else:
-            # RAM-only derivation; F probe deferred to the worker.
-            self.heavy_concurrency = self.governor.derive_heavy_concurrency(F=None)
-
-        # Shared probe handle (worker-published F). None until first docling job.
-        self._mp_f_value = None
+            self.heavy_concurrency = self.governor.derive_default_heavy_concurrency()
 
         self._in_process_heavy_pool = None
         self._heavy_pool = None
@@ -317,11 +335,6 @@ class Scheduler:
                 except Exception:
                     pass
             ctx = mp.get_context("spawn")
-            # C1: create the shared F probe value (worker-published) before the
-            # pool starts, so the initializer can write to it.
-            self._mp_f_value = mp.Value("d", 0.0)
-            global _heavy_f_value
-            _heavy_f_value = self._mp_f_value
             max_tasks = getattr(self.config, "heavy_pool_max_tasks_per_child", 20)
             self._heavy_pool = ProcessPoolExecutor(
                 max_workers=self.heavy_concurrency,
@@ -342,6 +355,12 @@ class Scheduler:
         """
         in_process = self.prefer_in_process_heavy if prefer_in_process_heavy is None else prefer_in_process_heavy
 
+        # I-13: per-page turnaround (submit -> collect wall time) for the
+        # metrics event; also band/status aggregation.
+        import time as _time
+        t_run0 = _time.time()
+        submitted_at: dict[int, float] = {}
+
         futures = []
         for item in plan.work_items:
             band = _resolve_band(item)
@@ -358,37 +377,83 @@ class Scheduler:
             else:
                 engine = self._get_engine(band)
                 fut = self.native_pool.submit(_run_native, item, band, self.config, engine)
+            submitted_at[item.page_index] = _time.time()
             futures.append((item, fut))
 
         results: list[PageResult] = []
         by_fut = {fut: item for item, fut in futures}
-        completed = 0
         for fut in as_completed(list(by_fut)):
             res = self._collect(by_fut[fut], fut)
             results.append(res)
-            # C2: periodically recheck available RAM and downsize the heavy
-            # concurrency (never upward mid-flight). Applied to the in-memory
-            # governor + the live pool's max_workers where supported.
-            completed += 1
-            if not in_process and completed % 4 == 0:
-                try:
-                    f = None
-                    if self._mp_f_value is not None and self._mp_f_value.value > 0:
-                        f = self._mp_f_value.value
-                    self.governor.measured_f = f
-                    new_c = self.governor.periodic_recheck(self.heavy_concurrency)
-                    if new_c < self.heavy_concurrency:
-                        self.heavy_concurrency = new_c
-                        try:
-                            self._heavy_pool._max_workers = new_c  # bounded downward
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
 
         # preserve page order for downstream assembly
         results.sort(key=lambda r: r.page_index)
+
+        # I-13: emit the run-level aggregate metrics (additive; never crashes).
+        if self.metrics_sink is not None:
+            try:
+                self._emit_metrics(plan, results, submitted_at, t_run0, _time.time())
+            except Exception:
+                pass
         return results
+
+    def _emit_metrics(self, plan, results: list[PageResult],
+                      submitted_at: dict, t0: float, t1: float) -> None:
+        """I-13: aggregate + publish `parser.metrics.v1` for one run_plan.
+
+        Additive observability only — nothing here changes execution.
+        """
+        by_band: dict[str, int] = {}
+        by_status: dict[str, int] = {}
+        turnaround: list[float] = []
+        for r in results:
+            by_band[r.route] = by_band.get(r.route, 0) + 1
+            s = r.status.value if hasattr(r.status, "value") else str(r.status)
+            by_status[s] = by_status.get(s, 0) + 1
+            t_s = submitted_at.get(r.page_index)
+            if t_s is not None:
+                turnaround.append(max(0.0, (t1 - t_s) * 1000.0))
+        turnaround.sort()
+
+        rss_mb = None
+        try:
+            import psutil  # type: ignore
+
+            rss_mb = round(psutil.Process().memory_info().rss / (1024 * 1024), 1)
+        except Exception:
+            pass
+
+        self.metrics_sink("parser.metrics.v1", {
+            "parser_version": getattr(self.config, "parser_version", None),
+            "doc_id": getattr(plan, "doc_id", None),
+            "pages_total": len(results),
+            "by_band": by_band,
+            "by_status": by_status,
+            "page_turnaround_ms": {
+                "p50": _percentile(turnaround, 50),
+                "p95": _percentile(turnaround, 95),
+                "p99": _percentile(turnaround, 99),
+            },
+            "run_ms": round((t1 - t0) * 1000.0, 1),
+            "rss_mb": rss_mb,
+            "native_concurrency": self.native_concurrency,
+            "heavy_concurrency": self.heavy_concurrency,
+        })
+
+    def run_plan_for_pages(self, plan, page_indexes) -> list[PageResult]:
+        """I-03: execute ONLY the given pages of `plan` through the normal pools.
+
+        Used by the Assembler's bounded retry pass so a docling retry runs in
+        the heavy pool (or the single-worker in-process pool) instead of
+        in-process in the caller's thread — which, under batch concurrency,
+        could run concurrent in-process Docling conversions (the exact
+        RAM-spike / `std::bad_alloc` hazard the scheduler exists to prevent).
+        Results are persisted + contained exactly like `run_plan`.
+        """
+        wanted = set(page_indexes)
+        filtered = copy.copy(plan)  # shallow copy; share metadata, swap work_items
+        filtered.work_items = [w for w in plan.work_items if w.page_index in wanted]
+        return self.run_plan(filtered)
 
     def _collect(self, item: PageWorkItem, fut) -> PageResult:
         from .utils import get_logger
@@ -425,17 +490,28 @@ class Scheduler:
                 # a memory-exhaustion cascade). Retries still happen on a clean
                 # run; this only preserves already-achieved quality.
                 if res.status in (PageStatus.FAILED, PageStatus.DEAD):
-                    prior = self.page_store.get_page(item.doc_id, item.page_index)
-                    if prior is not None and prior.status == PageStatus.OK:
-                        logger.info(
-                            f"Restored prior OK page {item.doc_id}/p{item.page_index} "
-                            f"over transient failure (kept good artifact)")
-                        res = prior
+                    # I-07: cheap status probe first; only when a durable OK page
+                    # actually exists do we pay the full read+parse to restore it.
+                    if self.page_store.page_status(item.doc_id, item.page_index) == PageStatus.OK.value:
+                        prior = self.page_store.get_page(item.doc_id, item.page_index)
+                        if prior is not None and prior.status == PageStatus.OK:
+                            logger.info(
+                                f"Restored prior OK page {item.doc_id}/p{item.page_index} "
+                                f"over transient failure (kept good artifact)")
+                            res = prior
                 self.page_store.put_page(item.doc_id, item.page_index, res)
                 self.ledger.update_page(
                     item.doc_id, item.page_index, res.status, res.checksum,
                     res.engine_version or res.docling_version, 1, res.errors,
                 )
+                # I-09: the page (including base64 image blobs) is now DURABLE
+                # in the page store. Release the in-RAM blob bytes so a large
+                # image-heavy document no longer holds pages × blobs until
+                # assembly (multiplied by batch concurrency). The Assembler
+                # reloads blobs from the page store for the pages it folds.
+                for _img in res.images:
+                    if _img.blob:
+                        _img.blob = b""
             except Exception:
                 pass
         return res
@@ -448,6 +524,13 @@ class Scheduler:
         if hasattr(self, "_native_engine") and self._native_engine is not None:
             try:
                 self._native_engine.close()
+            except Exception:
+                pass
+        # I-04: the hoisted enrichment engine holds an inner NativePdfEngine
+        # with cached fitz handles — close it too.
+        if hasattr(self, "_enrichment_engine") and self._enrichment_engine is not None:
+            try:
+                self._enrichment_engine.close()
             except Exception:
                 pass
         if self._in_process_heavy_pool is not None:

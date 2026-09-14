@@ -1,0 +1,2 @@
+- **postfixA** (2026-09-13T18:04:10Z): files=100 ok=100 failed=0 dead=0 unparsed=0 wall=1699.1s avg_doc=16.90s avg_page=1303ms peak_tree=3498MB peak_worker=3469MB blocks=19226 tables=306
+- **postfixB** (2026-09-13T18:53:15Z): files=100 ok=100 failed=0 dead=0 unparsed=0 wall=1613.4s avg_doc=16.05s avg_page=1238ms peak_tree=4476MB peak_worker=4464MB blocks=19226 tables=306

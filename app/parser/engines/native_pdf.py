@@ -142,86 +142,141 @@ class NativePdfEngine:
     once per engine instance and the median font size is computed once and
     cached (F-05/F-06 fix). The handle is cleared only on explicit close or
     when switching to a different document.
+
+    I-01 fix: locking is PER DOCUMENT. One `fitz.Document` handle is not
+    thread-safe across pages, so pages of the SAME document serialize against
+    each other — but DIFFERENT documents extract fully in parallel on the wide
+    native pool. (The old single process-global RLock serialized the entire
+    native band, including every document's O(N)-page median scan, which froze
+    all other documents whenever any document opened.)
     """
     route_band = NATIVE
 
+    # I-01: cap on simultaneously cached document handles (FD/memory bound).
+    _MAX_DOC_CACHE = 32
+
     def __init__(self, config: ParserConfig):
         self.config = config
-        self._lock = threading.RLock()
+        # I-01 fix: per-document locks (src_path -> RLock) guarded by a small
+        # meta-lock. Lock ordering: callers take a document lock alone; the
+        # meta-lock is never held while blocking on a document lock (eviction
+        # only tries document locks non-blocking), so no deadlock is possible.
+        self._locks_guard = threading.Lock()
+        self._doc_locks: dict[str, threading.RLock] = {}  # src_path -> lock
         # F-05/F-06 fix: cache document handle + median per source path
         self._doc_cache: dict[str, tuple[object, float]] = {}  # path -> (fitz.Document, median)
 
-    def _open_and_compute_median(self, src_path: str):
-        """Open document once and compute median font size (cached per path).
+    def _lock_for(self, src_path: str) -> threading.RLock:
+        """Get-or-create the per-document lock (I-01)."""
+        with self._locks_guard:
+            lock = self._doc_locks.get(src_path)
+            if lock is None:
+                lock = threading.RLock()
+                self._doc_locks[src_path] = lock
+            return lock
 
-        F-05/F-06 fix: avoids O(n²) median recomputation and N fitz.open() calls.
+    def _evict_if_over_budget_locked(self, keep_path: str) -> None:
+        """Bound `_doc_cache` size (file-descriptor / memory safety).
+
+        Called while HOLDING `keep_path`'s document lock. A victim is only
+        evicted when its own document lock can be acquired WITHOUT blocking —
+        a document with an in-flight page (lock held/busy) is non-evictable,
+        so we never close a handle out from under a running extraction.
         """
-        import fitz
-
-        with self._lock:
-            if src_path in self._doc_cache:
-                return self._doc_cache[src_path]
-
+        if len(self._doc_cache) <= self._MAX_DOC_CACHE:
+            return
+        for old_path in list(self._doc_cache.keys()):
+            if old_path == keep_path:
+                continue
+            old_lock = self._doc_locks.get(old_path)
+            if old_lock is None or not old_lock.acquire(blocking=False):
+                continue
             try:
-                doc = fitz.open(src_path)
-            except Exception as e:
-                # Cache the failure so we don't retry on every page
-                self._doc_cache[src_path] = (None, 12.0)
-                raise e
-
-            # Compute document-wide median body size once
-            sizes: list[float] = []
-            for pi in range(doc.page_count):
-                for blk in doc[pi].get_text("dict").get("blocks", []):
-                    if blk.get("type") != 0:
-                        continue
-                    for line in blk.get("lines", []):
-                        for span in line.get("spans", []):
-                            if span.get("text", "").strip():
-                                sizes.append(float(span.get("size", 0.0)))
-            body_med = sorted(sizes)[len(sizes) // 2] if sizes else 12.0
-
-            # Bound cache size to prevent leaking file descriptors in long-running processes
-            if len(self._doc_cache) > 16:
-                old_path, (old_doc, _) = next(iter(self._doc_cache.items()))
+                with self._locks_guard:
+                    entry = self._doc_cache.pop(old_path, None)
+                    self._doc_locks.pop(old_path, None)
+                old_doc = entry[0] if entry else None
                 if old_doc is not None:
                     try:
                         old_doc.close()
                     except Exception:
                         pass
-                del self._doc_cache[old_path]
+                return  # evicted one handle; enough for now
+            finally:
+                old_lock.release()
 
-            self._doc_cache[src_path] = (doc, body_med)
-            return doc, body_med
+    def _open_and_compute_median(self, src_path: str):
+        """Open document once and compute median font size (cached per path).
+
+        F-05/F-06 fix: avoids O(n²) median recomputation and N fitz.open() calls.
+        I-01: the caller MUST already hold the per-document lock (`_lock_for`).
+        The median scan is a document-wide O(N) pass and runs under THIS
+        document's lock only — it never blocks other documents.
+        """
+        import fitz
+
+        if src_path in self._doc_cache:
+            return self._doc_cache[src_path]
+
+        try:
+            doc = fitz.open(src_path)
+        except Exception as e:
+            # Cache the failure so we don't retry on every page
+            self._doc_cache[src_path] = (None, 12.0)
+            raise e
+
+        # Compute document-wide median body size once (per-document lock held)
+        sizes: list[float] = []
+        for pi in range(doc.page_count):
+            for blk in doc[pi].get_text("dict").get("blocks", []):
+                if blk.get("type") != 0:
+                    continue
+                for line in blk.get("lines", []):
+                    for span in line.get("spans", []):
+                        if span.get("text", "").strip():
+                            sizes.append(float(span.get("size", 0.0)))
+        body_med = sorted(sizes)[len(sizes) // 2] if sizes else 12.0
+
+        # Bound cache size to prevent leaking file descriptors in long-running
+        # processes (I-01: eviction is in-flight-aware — see helper docstring).
+        self._evict_if_over_budget_locked(src_path)
+
+        self._doc_cache[src_path] = (doc, body_med)
+        return doc, body_med
 
     def extract_page(self, src_path: str, page_index: int) -> PageResult:
-        import fitz  # PyMuPDF
-
+        # I-01: serialize only THIS document's pages under its own lock. The
+        # open + O(N) median scan also run under the same per-document lock, so
+        # other documents keep extracting in parallel the whole time.
         try:
-            doc, body_med = self._open_and_compute_median(src_path)
-            if doc is None:
-                return PageResult(
-                    doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                    errors=[{"page_no": page_index + 1, "category": "native_open",
-                             "message": "failed to open document"}],
-                )
-        except Exception as e:
-            return PageResult(
-                doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                errors=[{"page_no": page_index + 1, "category": "native_open", "message": str(e)}],
-            )
-
-        try:
-            with self._lock:
-                if page_index < 0 or page_index >= doc.page_count:
+            with self._lock_for(src_path):
+                try:
+                    doc, body_med = self._open_and_compute_median(src_path)
+                except Exception as e:
                     return PageResult(
                         doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                        errors=[{"page_no": page_index + 1, "category": "native_range",
-                                 "message": f"page {page_index} out of range (doc has {doc.page_count})"}],
+                        errors=[{"page_no": page_index + 1, "category": "native_open", "message": str(e)}],
                     )
-                res = _native_page_from_doc(doc[page_index], page_index, self.config, body_med=body_med)
-            return res
-        except Exception as e:
+                if doc is None:
+                    return PageResult(
+                        doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
+                        errors=[{"page_no": page_index + 1, "category": "native_open",
+                                 "message": "failed to open document"}],
+                    )
+                try:
+                    if page_index < 0 or page_index >= doc.page_count:
+                        return PageResult(
+                            doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
+                            errors=[{"page_no": page_index + 1, "category": "native_range",
+                                     "message": f"page {page_index} out of range (doc has {doc.page_count})"}],
+                        )
+                    return _native_page_from_doc(doc[page_index], page_index, self.config, body_med=body_med)
+                except Exception as e:
+                    return PageResult(
+                        doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
+                        errors=[{"page_no": page_index + 1, "category": "native_extract", "message": str(e)}],
+                    )
+        except Exception as e:  # defensive: lock/meta-lock failures never crash the pool
             return PageResult(
                 doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
                 errors=[{"page_no": page_index + 1, "category": "native_extract", "message": str(e)}],
@@ -235,12 +290,26 @@ class NativePdfEngine:
         return res
 
     def close(self) -> None:
-        """Close all cached document handles (F-05/F-06 fix cleanup)."""
-        with self._lock:
-            for doc, _ in self._doc_cache.values():
-                if doc is not None:
+        """Close all cached document handles (F-05/F-06 fix cleanup).
+
+        I-01: each handle is closed under ITS document lock, so an in-flight
+        page of that document finishes before the handle goes away.
+        """
+        with self._locks_guard:
+            paths = list(self._doc_locks.keys())
+        for path in paths:
+            lock = self._doc_locks.get(path)
+            if lock is None:
+                continue
+            with lock:
+                with self._locks_guard:
+                    entry = self._doc_cache.pop(path, None)
+                    self._doc_locks.pop(path, None)
+                if entry is not None and entry[0] is not None:
                     try:
-                        doc.close()
+                        entry[0].close()
                     except Exception:
                         pass
+        with self._locks_guard:
             self._doc_cache.clear()
+            self._doc_locks.clear()

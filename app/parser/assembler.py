@@ -140,10 +140,22 @@ def _fold_results(results: list[PageResult], plan: ExecutionPlan) -> RecoveredDo
 
 
 class Assembler:
-    def __init__(self, config: ParserConfig, store: Store, ledger: Ledger | None = None):
+    def __init__(self, config: ParserConfig, store: Store, ledger: Ledger | None = None,
+                 scheduler=None):
+        """`scheduler` (I-03): the pipeline's shared `Scheduler`. When supplied,
+        page retries are executed THROUGH its pools (docling retries go to the
+        heavy pool — never run in-process). Optional for backward compatibility;
+        tests may construct an Assembler without one, in which case the legacy
+        synchronous path is used and heavy pages are executed in-process
+        (single-doc/interactive context only).
+        """
         self.config = config
         self.store = store
         self.ledger = ledger
+        self.scheduler = scheduler
+        # I-09: page store for blob reload at fold time (None = no reload;
+        # blobs must then be present in the results as passed in).
+        self.page_store = None
         self.builder = DocumentBuilder(config)
 
     def assemble(self, plan: ExecutionPlan, results: list[PageResult],
@@ -165,6 +177,14 @@ class Assembler:
             # simplicity; we reuse the engines via a small synchronous re-run.
             results = self._retry_pages(plan, results, report)
             report = DocumentValidator.classify(results, plan)
+
+        # I-09: the scheduler released in-RAM image blobs after persisting each
+        # page (durable in the page store). Reload the BLOBS (full page
+        # objects, preserving in-RAM table/blocks provenance) for the pages
+        # that are about to be folded, so `put_image` sees the same bytes as
+        # before this change. Only pages missing blob bytes pay the reload.
+        if self.page_store is not None:
+            results = self._reload_page_blobs(plan, results)
 
         if report.missing_pages or report.failed_pages:
             # Exhausted: dead-letter any still-failed/missing pages.
@@ -234,6 +254,32 @@ class Assembler:
                 pass
         return report
 
+    def _reload_page_blobs(self, plan: ExecutionPlan,
+                           results: list[PageResult]) -> list[PageResult]:
+        """I-09: restore image blob bytes from the durable page store.
+
+        Returns the original list untouched when every image-bearing page
+        already carries its blobs (single-doc / no-strip paths). Pages with
+        stripped blobs are replaced by their persisted counterparts.
+        """
+        by_page = {r.page_index: r for r in results}
+        out = list(results)
+        replaced = False
+        for i, r in enumerate(results):
+            if not r.images:
+                continue
+            if all(img.blob for img in r.images):
+                continue  # nothing stripped — no reload needed
+            try:
+                durable = self.page_store.get_page(plan.doc_id, r.page_index)
+            except Exception:
+                durable = None
+            if durable is None:
+                continue  # faithful degradation: strip-safe empty blobs stand
+            out[i] = durable
+            replaced = True
+        return out if replaced else results
+
     def _retry_pages(self, plan: ExecutionPlan, results: list[PageResult],
                      report: AssemblyReport) -> list[PageResult]:
         from .engines.enrichment import EnrichmentEngine
@@ -243,7 +289,37 @@ class Assembler:
 
         by_page = {r.page_index: r for r in results}
         retry_pages = set(report.failed_pages) | set(report.missing_pages)
+
+        # B2 skip FIRST (applies to both dispatch paths): never re-run a page
+        # whose failure was `engine_unavailable` — the engine is cached-unavailable
+        # in this process, so a retry is guaranteed to hit the same wall.
+        retry_pages = {
+            p for p in retry_pages
+            if not (by_page.get(p) is not None and any(
+                (e.get("category") or "") == "engine_unavailable"
+                for e in (by_page[p].errors or [])))
+        }
+
+        # I-03: when a scheduler is wired, execute retries THROUGH its pools so
+        # a docling retry never runs in-process in the caller's thread (under
+        # batch concurrency that meant concurrent in-process Docling
+        # conversions — the RAM-spike / std::bad_alloc hazard the scheduler's
+        # single-worker in-process pool exists to prevent).
+        if self.scheduler is not None:
+            if retry_pages:
+                retried = self.scheduler.run_plan_for_pages(plan, retry_pages)
+                for r in retried:
+                    by_page[r.page_index] = r
+            return list(by_page.values())
+
+        # Legacy in-process path (no scheduler wired; single-doc / tests only).
         for p in retry_pages:
+            # B2: never retry an engine that is unavailable. `engine_unavailable`
+            # means the docling converter could not be built in THIS process
+            # (e.g. memory-exhaustion cascade); the engine is cached False, so a
+            # retry is guaranteed to hit the same wall and only burns wall-time.
+            # Those pages keep their FAILED result (dead-lettered below) — a
+            # later clean run retries them via the normal scheduler path.
             # B2: never retry an engine that is unavailable. `engine_unavailable`
             # means the docling converter could not be built in THIS process
             # (e.g. memory-exhaustion cascade); the engine is cached False, so a

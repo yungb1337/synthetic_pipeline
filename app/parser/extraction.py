@@ -91,12 +91,11 @@ class Extractor:
         self.root = Path(root)
         self.page_store = page_store or PageStore(str(self.root))
         self.ledger = ledger or Ledger(str(self.root))
-        self.planner = Planner(self.page_store, self.ledger)
-        self.assembler = Assembler(config, store, self.ledger)
 
         # Use the shared scheduler (injected by the executor) if present, else
         # build a one-off scheduler that runs heavy pages in-process (no fork for
-        # a single-doc interactive call).
+        # a single-doc interactive call). MUST be resolved before the assembler
+        # is constructed (I-03 wires the scheduler into it).
         self.scheduler = scheduler or get_shared_scheduler()
         self._own_scheduler = self.scheduler is None
         if self.scheduler is None:
@@ -105,11 +104,26 @@ class Extractor:
                 prefer_in_process_heavy=True,
             )
 
+        self.planner = Planner(self.page_store, self.ledger)
+        # I-03: the assembler re-runs failed pages THROUGH the scheduler's
+        # pools, so a docling retry never executes in-process in a batch
+        # worker thread (concurrent in-process Docling = RAM-spike hazard).
+        self.assembler = Assembler(config, store, self.ledger, scheduler=self.scheduler)
+        # I-09: the assembler reloads image blobs from the page store for the
+        # pages it folds (the scheduler releases in-RAM blobs after persist).
+        self.assembler.page_store = self.page_store
+
     def extract(self, data: bytes, filename: str = "", sha256: str | None = None,
                  resume: bool = False) -> ParseOutcome:
         t0 = time.time()
         sha = sha256 or hashlib.sha256(data).hexdigest()
         doc_id = f"d-{sha[:16]}"
+
+        # I-06: detect ONCE, hash ONCE — every later stage reuses these.
+        # (Previously: detect ran in extract() AND in SourceScan.scan, plus a
+        # third time on the resume fast-path; SourceScan re-hashed the full
+        # buffer even when the executor had already supplied the sha256.)
+        detected = detection.detect(data, filename)
 
         # Fast resumption check: if document was already assembled OK and DOM exists, return instantly
         if resume:
@@ -121,7 +135,6 @@ class Extractor:
                     try:
                         from .dom import Document
                         doc = Document.model_validate_json(dom_files[-1].read_text(encoding="utf-8"))
-                        detected = detection.detect(data, filename)
                         elapsed = (time.time() - t0) * 1000
                         rep = ledger_plan.get("assembly", {}).get("report") or {}
                         doc_report = {
@@ -142,7 +155,6 @@ class Extractor:
                         pass
 
         t_detect = time.time()
-        detected = detection.detect(data, filename)
         if detected.unresolved:
             self._emit("document.parse_failed", None, {"reason": "unresolved", "slug": detected.slug})
             return ParseOutcome(None, "unresolved", None, detected)
@@ -163,7 +175,8 @@ class Extractor:
         # --- source scan (expected page set) ---------------------------------
         t_scan0 = time.time()
         try:
-            manifest = SourceScan.scan(data, filename, self._fs_store())
+            manifest = SourceScan.scan(data, filename, self._fs_store(),
+                                       detected=detected, source_hash=sha)
         except UnsupportedFormat as e:
             self._emit("document.parse_failed", None, {"reason": f"unsupported:{e}"})
             return ParseOutcome(None, "unsupported", None, detected, {"error": str(e)})

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .detection import detect
+from . import detection  # I-06: module-attr access keeps detect patchable/countable
 
 if TYPE_CHECKING:
     from .storage import FilesystemStore
@@ -58,9 +58,19 @@ class SourceScan:
     """Detect + count pages + write ONE reusable source file."""
 
     @staticmethod
-    def scan(data: bytes, filename: str, store: "FilesystemStore") -> SourceManifest:
-        detected = detect(data, filename)
-        source_hash = hashlib.sha256(data).hexdigest()
+    def scan(data: bytes, filename: str, store: "FilesystemStore",
+             detected: "detection.Detected | None" = None,
+             source_hash: str | None = None) -> SourceManifest:
+        """Scan the source. I-06: callers that already detected the type and/or
+        hashed the bytes (`Extractor.extract` always has both) pass them in so
+        the full file is not re-hashed and detection is not run twice (three
+        times on the resume fast-path) per extract. Standalone callers omit
+        them and get the previous behavior exactly.
+        """
+        if detected is None:
+            detected = detection.detect(data, filename)
+        if source_hash is None:
+            source_hash = hashlib.sha256(data).hexdigest()
         doc_id = f"d-{source_hash[:16]}"
 
         # Write bytes once to a reusable path.

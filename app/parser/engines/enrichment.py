@@ -23,9 +23,26 @@ class EnrichmentEngine:
 
     def __init__(self, config: ParserConfig):
         self.config = config
+        # I-04 fix: ONE inner native engine per EnrichmentEngine (created
+        # here, reused for every page). The scheduler hoists one
+        # EnrichmentEngine per process, so the inner engine's per-document
+        # caches (open fitz handle + document-wide median font size) persist
+        # across pages of the same document — O(N) total native work instead
+        # of the old O(N²) (a fresh engine per page re-opened the PDF and
+        # re-scanned the whole document for the median on EVERY page).
+        # Requires the I-01 per-document locking inside NativePdfEngine for
+        # safe concurrent use from the native pool.
+        self._native = NativePdfEngine(config)
+
+    def close(self) -> None:
+        """I-04: propagate close to the inner native engine (fitz handles)."""
+        try:
+            self._native.close()
+        except Exception:
+            pass
 
     def process(self, item: PageWorkItem) -> PageResult:
-        native = NativePdfEngine(self.config)
+        native = self._native
         res = native.process(item)
         # Count text-bearing blocks only (a page with no text is a candidate for
         # OCR; tables/images alone do not count as "readable text").

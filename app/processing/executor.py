@@ -28,6 +28,29 @@ from ..normalizer.normalizer import Normalizer
 from .config import ProcessingConfig
 from .corpus import DocRef, load_manifest, pending, save_manifest
 
+# --- I-13: bridge scheduler metrics events into the live BatchReport --------
+_metrics_lock = threading.Lock()
+_metrics_report: "BatchReport | None" = None
+
+
+def _metrics_sink(name: str, payload: dict) -> None:
+    """Scheduler -> BatchReport metrics bridge (I-13)."""
+    if name != "parser.metrics.v1":
+        return
+    global _metrics_report
+    with _metrics_lock:
+        if _metrics_report is not None:
+            try:
+                _metrics_report.merge_metrics(payload)
+            except Exception:
+                pass
+
+
+def _set_metrics_report(report: "BatchReport | None") -> None:
+    global _metrics_report
+    with _metrics_lock:
+        _metrics_report = report
+
 
 @dataclass
 class DocResult:
@@ -51,6 +74,34 @@ class BatchReport:
     ids: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     manifest_path: str = ""
+    # I-13: aggregate observability (additive; derived at run end).
+    retried_docs: int = 0            # documents that needed >1 attempt
+    pages_seen: int = 0              # page-turnaround samples seen via metrics
+    docs_per_s: float = 0.0
+    pages_per_s: float = 0.0
+    page_turnaround_p50_ms: float | None = None
+    page_turnaround_p95_ms: float | None = None
+    page_turnaround_p99_ms: float | None = None
+    rss_mb: float | None = None
+    by_band: dict = field(default_factory=dict)
+    by_page_status: dict = field(default_factory=dict)
+
+    def merge_metrics(self, payload: dict) -> None:
+        """I-13: fold one `parser.metrics.v1` payload into the run report."""
+        self.pages_seen += int(payload.get("pages_total") or 0)
+        for k, v in (payload.get("by_band") or {}).items():
+            self.by_band[k] = self.by_band.get(k, 0) + int(v)
+        for k, v in (payload.get("by_status") or {}).items():
+            self.by_page_status[k] = self.by_page_status.get(k, 0) + int(v)
+        ta = payload.get("page_turnaround_ms") or {}
+        for q, attr in (("p50", "page_turnaround_p50_ms"),
+                        ("p95", "page_turnaround_p95_ms"),
+                        ("p99", "page_turnaround_p99_ms")):
+            val = ta.get(q)
+            if val is not None:
+                setattr(self, attr, val)
+        if payload.get("rss_mb") is not None:
+            self.rss_mb = payload["rss_mb"]
 
 
 class ParseNormalizePipeline:
@@ -80,6 +131,10 @@ class ParseNormalizePipeline:
                 heavy_concurrency=proc_cfg.heavy_concurrency,
                 page_store=page_store, ledger=ledger,
             )
+        # I-13: route scheduler metrics events into the current run's report.
+        # The scheduler is process-wide while reports are per-run, so the sink
+        # reads/writes the worker's live report reference under a small lock.
+        ParseNormalizePipeline._scheduler.metrics_sink = _metrics_sink
         # batch pipelines emit to a file sink (events.jsonl), not stdout
         events_path = str(Path(root) / "events.jsonl")
         self.extractor = Extractor(
@@ -138,6 +193,8 @@ class BatchWorker:
         self._manifest_dirty = False      # set on new sha; _flush rewrites only if set
         self._report = BatchReport(manifest_path=config.manifest_path)
         self._flush_every = 256
+        # I-13: give the shared scheduler's metrics sink the live report.
+        _set_metrics_report(self._report)
 
     def run(self, refs: list[DocRef]) -> BatchReport:
         t_start = time.time()
@@ -159,6 +216,15 @@ class BatchWorker:
                     self._record(fut.result())
         self._flush()
         self._report.elapsed_ms = (time.time() - t_start) * 1000
+        # I-13: aggregate throughput for this run.
+        try:
+            secs = self._report.elapsed_ms / 1000.0
+            if secs > 0:
+                self._report.docs_per_s = round(self._report.ok / secs, 3)
+                if self._report.pages_seen:
+                    self._report.pages_per_s = round(self._report.pages_seen / secs, 3)
+        except Exception:
+            pass
         # NOTE: the shared heavy pool is NOT closed here — the pipeline (and its
         # shared Scheduler) is reused across runs in the same process, so closing
         # after the first run would break every subsequent extract(). The pool is

@@ -1,0 +1,47 @@
+[32m[INFO] 2026-09-14 11:32:06,596 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-09-14 11:32:06,777 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\Asus\Downloads\projects\22_07\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-09-14 11:32:06,777 [RapidOCR] main.py:63: Using C:\Users\Asus\Downloads\projects\22_07\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-09-14 11:32:06,898 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-09-14 11:32:06,901 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\Asus\Downloads\projects\22_07\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-09-14 11:32:06,902 [RapidOCR] main.py:63: Using C:\Users\Asus\Downloads\projects\22_07\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-09-14 11:32:07,009 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-09-14 11:32:07,036 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\Asus\Downloads\projects\22_07\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+[32m[INFO] 2026-09-14 11:32:07,036 [RapidOCR] main.py:63: Using C:\Users\Asus\Downloads\projects\22_07\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+Loading weights:   0%|          | 0/770 [00:00<?, ?it/s]Loading weights:  61%|######1   | 473/770 [00:00<00:00, 4727.91it/s]Loading weights: 100%|##########| 770/770 [00:00<00:00, 4702.74it/s]
+[33m[WARNING] 2026-09-14 11:32:15,035 [RapidOCR] main.py:132: The text detection result is empty[0m
+RapidOCR returned empty result!
+[pool] task 1/30 page=0 pid=37720 ms=9382 build_s=13.6 ram_avail=2.3GB
+[pool] task 2/30 page=1 pid=37720 ms=389 build_s=13.6 ram_avail=2.3GB
+[pool] task 3/30 page=2 pid=37720 ms=384 build_s=13.6 ram_avail=2.3GB
+[pool] task 4/30 page=3 pid=37720 ms=917 build_s=13.6 ram_avail=2.2GB
+[pool] task 5/30 page=4 pid=37720 ms=419 build_s=13.6 ram_avail=2.2GB
+[pool] task 6/30 page=5 pid=37720 ms=5878 build_s=13.6 ram_avail=2.2GB
+[pool] task 7/30 page=6 pid=37720 ms=2479 build_s=13.6 ram_avail=2.2GB
+[pool] task 8/30 page=7 pid=37720 ms=2380 build_s=13.6 ram_avail=2.2GB
+[pool] task 9/30 page=8 pid=37720 ms=1919 build_s=13.6 ram_avail=2.2GB
+[pool] task 10/30 page=9 pid=37720 ms=1770 build_s=13.6 ram_avail=2.2GB
+[pool] task 11/30 page=10 pid=37720 ms=1307 build_s=13.6 ram_avail=2.2GB
+[pool] task 12/30 page=11 pid=37720 ms=1831 build_s=13.6 ram_avail=2.2GB
+[pool] task 13/30 page=12 pid=37720 ms=3392 build_s=13.6 ram_avail=2.2GB
+[pool] task 14/30 page=13 pid=37720 ms=1921 build_s=13.6 ram_avail=2.2GB
+[pool] task 15/30 page=14 pid=37720 ms=5522 build_s=13.6 ram_avail=2.2GB
+[pool] task 16/30 page=15 pid=37720 ms=8296 build_s=13.6 ram_avail=2.2GB
+[pool] task 17/30 page=16 pid=37720 ms=583 build_s=13.6 ram_avail=2.2GB
+[pool] task 18/30 page=17 pid=37720 ms=387 build_s=13.6 ram_avail=2.2GB
+[pool] task 19/30 page=18 pid=37720 ms=414 build_s=13.6 ram_avail=2.2GB
+[pool] task 20/30 page=19 pid=37720 ms=539 build_s=13.6 ram_avail=2.2GB
+[pool] task 21/30 page=20 pid=37720 ms=461 build_s=13.6 ram_avail=2.2GB
+[pool] task 22/30 page=21 pid=37720 ms=471 build_s=13.6 ram_avail=2.2GB
+[pool] task 23/30 page=22 pid=37720 ms=323 build_s=13.6 ram_avail=2.2GB
+[33m[WARNING] 2026-09-14 11:32:58,468 [RapidOCR] main.py:132: The text detection result is empty[0m
+RapidOCR returned empty result!
+[pool] task 24/30 page=0 pid=37720 ms=1416 build_s=13.6 ram_avail=2.2GB
+[pool] task 25/30 page=1 pid=37720 ms=388 build_s=13.6 ram_avail=2.2GB
+[pool] task 26/30 page=2 pid=37720 ms=395 build_s=13.6 ram_avail=2.2GB
+[pool] task 27/30 page=3 pid=37720 ms=966 build_s=13.6 ram_avail=2.2GB
+[pool] task 28/30 page=4 pid=37720 ms=430 build_s=13.6 ram_avail=2.2GB
+[pool] task 29/30 page=5 pid=37720 ms=5360 build_s=13.6 ram_avail=2.2GB
+[pool] task 30/30 page=6 pid=37720 ms=2172 build_s=13.6 ram_avail=2.2GB
+[pool] ... 30/30 elapsed=76s
+[pool] F=1 mtasks=0 tasks=30/30 wall=76.4s procs=1 respawns~0 build_s_per_proc=[13.64] convert_ms mean=2083 min=323 max=9382

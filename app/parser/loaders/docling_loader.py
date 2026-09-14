@@ -35,6 +35,7 @@ os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 from ..parts import RecoveredBlock, RecoveredDocument, RecoveredImage, RecoveredTable
 
 _engine = None
+_engine_cache: dict[tuple, object] = {}   # I-05: (ocr, table_mode, gpi) -> converter
 _lock = threading.Lock()
 
 # ItemLabel -> our Block kind. Keyed by the enum's `.value` string, which is
@@ -90,12 +91,19 @@ def engine_name() -> str | None:
 
 
 # --- converter construction -------------------------------------------------
-def _build_converter():
+def _build_converter(ocr: bool | None = None, table_mode: str = "",
+                     generate_picture_images: bool | None = None):
     """Build a DocumentConverter with the compute-light pipeline, defensively.
 
     Docling's API has drifted across versions (PipelineOptions vs
     PdfPipelineOptions, artifacts_path kwarg, ...). Each step is try/except'd so
     we fall back to a plain default converter rather than failing hard.
+
+    I-05: `ocr` / `table_mode` / `generate_picture_images` are now explicit
+    construction inputs. When omitted (None / empty), the shipped defaults are
+    used — identical to the old behavior. The old code read ONLY
+    `default_config()` here, silently ignoring any per-run `ParserConfig`
+    override (e.g. the documented `docling_table_mode="ACCURATE"` opt-in).
     """
     models_dir = _models_dir()
     if models_dir:
@@ -129,23 +137,30 @@ def _build_converter():
         except Exception:
             from docling.datamodel.pipeline_options import PipelineOptions as PipelineOptions
 
-        # Docling OCR (the user-requested feature): use Docling's built-in
-        # RapidOCR/onnxruntime backend (same engine family as app/parser/ocr.py),
-        # on-demand, read from ParserConfig.docling_ocr.
+        # I-05: resolve the effective construction options. Explicit arguments
+        # WIN; only when omitted do we fall back to the shipped defaults.
+        # (Previously `default_config()` was the only source, so per-run
+        # ParserConfig overrides never reached the engine.)
+        _cfg = None
         try:
-            from ..config import default_config
+            from ..config import default_config as _default_config
 
-            ocr = bool(default_config().docling_ocr)
-            table_mode = default_config().docling_table_mode or ""
-            generate_picture_images = bool(default_config().docling_generate_picture_images)
+            _cfg = _default_config()
         except Exception:
-            ocr = True
-            table_mode = ""
-            generate_picture_images = True
+            _cfg = None
+
+        def _cfg_attr(attr: str, default):
+            return getattr(_cfg, attr, default) if _cfg is not None else default
+
+        eff_ocr = bool(_cfg_attr("docling_ocr", True) if ocr is None else ocr)
+        eff_gpi = bool(_cfg_attr("docling_generate_picture_images", True)
+                       if generate_picture_images is None else generate_picture_images)
+        eff_mode = (table_mode or "").strip().upper() or \
+            str(_cfg_attr("docling_table_mode", "FAST")).upper()
 
         opts = _make_pipeline_options(
-            PipelineOptions, ocr=ocr, table_mode=table_mode,
-            generate_picture_images=generate_picture_images,
+            PipelineOptions, ocr=eff_ocr, table_mode=eff_mode,
+            generate_picture_images=eff_gpi,
         )
         kwargs = {}
 
@@ -1186,14 +1201,42 @@ class DoclingConvertError(Exception):
         self.caused = caused
 
 
-def get_engine():
-    """The per-process Docling converter singleton (lazy, once per process).
+def get_engine(ocr: bool | None = None, table_mode: str = "",
+               generate_picture_images: bool | None = None):
+    """Per-process Docling converter, cached per construction-option key (I-05).
 
-    Returns the converter or None when Docling is unavailable. Used by the
-    heavy worker so the engine is reused across page jobs (no N× warm-up).
+    Returns the converter or None when Docling is unavailable. Engines are
+    built once per (ocr, table_mode, generate_picture_images) key and reused
+    across page jobs — no N× warm-up within a key. Each distinct key costs one
+    extra engine warm-up per process (keys are few; callers should not vary
+    options per page). With no arguments, the shipped default engine is built
+    and cached under the default key — identical to the old behavior.
     """
-    engine_available()  # ensures _engine is built
-    return _engine if _engine is not False else None
+    engine_available()  # ensures the DEFAULT engine path + availability are primed
+    try:
+        from ..config import default_config as _default_config
+
+        _cfg = _default_config()
+    except Exception:
+        _cfg = None
+    eff_ocr = bool(getattr(_cfg, "docling_ocr", True) if ocr is None else ocr)
+    eff_gpi = bool(getattr(_cfg, "docling_generate_picture_images", True)
+                   if generate_picture_images is None else generate_picture_images)
+    # Key mode must match what the build will actually use (empty -> shipped
+    # default mode), or the default engine and an explicit-FAST engine would
+    # be two identical converters under different keys.
+    eff_mode = ((table_mode or "").strip().upper()
+                or str(getattr(_cfg, "docling_table_mode", "FAST") or "FAST").strip().upper())
+    key = (eff_ocr, eff_mode, eff_gpi)
+    with _lock:
+        eng = _engine_cache.get(key)
+        if eng is None:
+            eng = _build_converter(ocr=ocr, table_mode=table_mode,
+                                   generate_picture_images=generate_picture_images)
+            if eng is False or eng is None:
+                return None
+            _engine_cache[key] = eng
+        return eng if eng is not False else None
 
 
 def convert_path(path: str, page: int, models_dir: str | None = None,
@@ -1214,11 +1257,11 @@ def convert_path(path: str, page: int, models_dir: str | None = None,
     if models_dir:
         os.environ.setdefault("DOCLING_MODELS_PATH", models_dir)
 
-    # If config overrides provided, rebuild engine with those settings
-    # (Note: this is still using the global engine; a full fix would require
-    # per-config engines, but that's expensive. For now, the engine uses
-    # default_config() at build time, which should match the scheduler's config.)
-    engine = get_engine()
+    # I-05: the per-item construction overrides now reach the engine cache
+    # (the previous code accepted them and silently ignored them — the engine
+    # was always built from default_config(), so e.g. the documented
+    # docling_table_mode="ACCURATE" opt-in never took effect).
+    engine = get_engine(ocr=ocr, table_mode=table_mode)
     if engine is None:
         return None
     try:

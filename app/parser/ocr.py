@@ -22,6 +22,14 @@ from pathlib import Path
 # Minimize import cost + keep module importable without the heavy engine.
 _engine = None
 _lock = threading.Lock()
+# I-10: serializes ENGINE CALLS. `ocr._engine` is one module-global RapidOCR
+# instance shared by all native-pool threads (enrichment OCR runs concurrently
+# on the wide pool), and RapidOCR's thread-safety is undocumented — the ONNX
+# session is usually re-entrant but the wrapper may mutate internal
+# preprocessing state. The engine init lock (`_lock`) does NOT cover calls.
+# Cost: OCR calls serialize (they are compute-bound anyway); correctness no
+# longer depends on an undocumented property.
+_call_lock = threading.Lock()
 # engine_name() reports the onnxruntime family; version kept generic so the
 # upgrade to the v6 `rapidocr` package is transparent to provenance consumers.
 _engine_name = "rapidocr-onnxruntime"
@@ -133,7 +141,9 @@ def ocr_image(image) -> list[tuple[str, tuple[float, float, float, float], float
             import numpy as _np
             image = _np.asarray(image)
     try:
-        res = _engine(image)
+        # I-10: one engine call at a time (see _call_lock note above).
+        with _call_lock:
+            res = _engine(image)
     except Exception:
         return []
     return _extract_results(res)
@@ -148,32 +158,6 @@ def ocr_bytes(data: bytes) -> list[tuple[str, tuple[float, float, float, float],
 
     img = Image.open(BytesIO(data)).convert("RGB")
     return ocr_image(img)
-
-
-def batch_ocr_bytes(items: list[bytes]) -> list[list[tuple[str, tuple[float, float, float, float], float]]]:
-    """OCR many images sequentially, reusing ONE loaded engine.
-
-    The heavy model is loaded once (see `engine_available`) and reused across
-    all items, avoiding a cold-start per image. This is a warm loop, not a true
-    model-batched call (RapidOCR is per-image). Returns a per-item list of
-    (text, bbox, confidence); an unavailable engine yields [] for every item.
-
-    NOTE: not yet wired into the pipeline (scale-batch spec overstates this);
-    kept as the seam a future batch caller would use.
-    """
-    if not engine_available():
-        return [[] for _ in items]
-    from io import BytesIO
-    from PIL import Image
-
-    out = []
-    for data in items:
-        try:
-            img = Image.open(BytesIO(data)).convert("RGB")
-            out.append(ocr_image(img))
-        except Exception:
-            out.append([])
-    return out
 
 
 def warm() -> bool:
