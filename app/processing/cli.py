@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--heavy-concurrency", type=int, default=None,
                     help="override Docling (ProcessPool) pool size (auto by default)")
     ap.add_argument("--manifest", default="work/manifest.json")
+    ap.add_argument("--shard-index", type=int, default=0, help="B3: cluster worker shard index (0 <= index < total)")
+    ap.add_argument("--shard-total", type=int, default=1, help="B3: total cluster worker shards")
     ap.add_argument("--no-ocr", action="store_true")
     ap.add_argument("--embed", action="store_true", help="also run batched (dummy) embeddings over normalized blocks")
     args = ap.parse_args(argv)
@@ -44,7 +46,8 @@ def main(argv: list[str] | None = None) -> int:
         cfg = replace(cfg, heavy_concurrency=args.heavy_concurrency)
     if args.no_ocr:
         cfg = replace(cfg, ocr_warm=False)
-    cfg = replace(cfg, manifest_path=args.manifest)
+    cfg = replace(cfg, manifest_path=args.manifest,
+                  shard_index=args.shard_index, shard_total=args.shard_total)
 
     store = FilesystemStore(args.out)
     pipeline = ParseNormalizePipeline(store, config=cfg)

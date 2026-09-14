@@ -64,6 +64,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="run heavy engine in subprocess pool")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--offset", type=int, default=None)
+    ap.add_argument("--shards", type=int, default=1,
+                    help="B1: number of concurrent parser processes to run on the box")
+    ap.add_argument("--shard-index", type=int, default=None,
+                    help="B3: specific shard index for multi-box cluster workers")
+    ap.add_argument("--shard-total", type=int, default=None,
+                    help="B3: total shard count for multi-box cluster workers")
     args = ap.parse_args(argv)
 
     # Accept either positional or --in/--out forms.
@@ -95,24 +101,53 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[parse_folder] launching parser...\n")
 
     py = _resolve_venv_python()
-    cmd = [py, "-m", "app.parser.cli", "--in", str(src), "--out", str(dst)]
+    base_cmd = [py, "-m", "app.parser.cli", "--in", str(src), "--out", str(dst)]
     if args.no_ocr:
-        cmd.append("--no-ocr")
+        base_cmd.append("--no-ocr")
     if args.native_concurrency is not None:
-        cmd += ["--native-concurrency", str(args.native_concurrency)]
+        base_cmd += ["--native-concurrency", str(args.native_concurrency)]
     if args.heavy_concurrency is not None:
-        cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
+        base_cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
     if args.in_process is False:
-        cmd.append("--no-in-process")
+        base_cmd.append("--no-in-process")
     elif args.in_process is True:
-        cmd.append("--in-process")
+        base_cmd.append("--in-process")
     if args.limit is not None:
-        cmd += ["--limit", str(args.limit)]
+        base_cmd += ["--limit", str(args.limit)]
     if args.offset is not None:
-        cmd += ["--offset", str(args.offset)]
+        base_cmd += ["--offset", str(args.offset)]
 
-    # Pass through so the user sees the parser's own progress/summary.
-    return subprocess.call(cmd)
+    # B3: Explicit single shard on a cluster worker
+    if args.shard_index is not None and args.shard_total is not None:
+        cmd = list(base_cmd) + [
+            "--shard-index", str(args.shard_index),
+            "--shard-total", str(args.shard_total),
+        ]
+        return subprocess.call(cmd)
+
+    # B1: Multi-process sharding on a single box
+    if args.shards and args.shards > 1:
+        num_shards = int(args.shards)
+        print(f"[parse_folder] B1: spawning {num_shards} concurrent shard processes...\n")
+        procs = []
+        for s_idx in range(num_shards):
+            cmd = list(base_cmd) + [
+                "--shard-index", str(s_idx),
+                "--shard-total", str(num_shards),
+            ]
+            p = subprocess.Popen(cmd)
+            procs.append(p)
+
+        exit_codes = [p.wait() for p in procs]
+        if any(c != 0 for c in exit_codes):
+            failed = sum(1 for c in exit_codes if c != 0)
+            print(f"\n[parse_folder] ERROR: {failed}/{num_shards} shards exited with errors", file=sys.stderr)
+            return 1
+        print(f"\n[parse_folder] all {num_shards} shards completed successfully.")
+        return 0
+
+    # Single-process run
+    return subprocess.call(base_cmd)
 
 
 if __name__ == "__main__":

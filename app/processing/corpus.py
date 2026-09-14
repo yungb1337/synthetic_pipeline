@@ -78,6 +78,27 @@ def save_manifest(path: str, shas: set[str]) -> None:
     Path(path).write_text(json.dumps(sorted(shas)), encoding="utf-8")
 
 
+def shard_doc_refs(refs: list[DocRef], shard_index: int = 0, shard_total: int = 1) -> list[DocRef]:
+    """B3: Partition a list of DocRefs deterministically for multi-node / multi-box cluster execution.
+
+    Uses SHA256 modulo for a stable, uniform distribution across cluster nodes.
+    """
+    if shard_total <= 1:
+        return refs
+    if not (0 <= shard_index < shard_total):
+        raise ValueError(f"shard_index {shard_index} out of bounds for shard_total {shard_total}")
+    out = []
+    for r in refs:
+        h_str = r.sha256 or hashlib.sha256(r.name.encode("utf-8")).hexdigest()
+        try:
+            h_val = int(h_str[:8], 16)
+        except Exception:
+            h_val = 0
+        if (h_val % shard_total) == shard_index:
+            out.append(r)
+    return out
+
+
 def pending(ref: DocRef, manifest: set[str]) -> bool:
     # an empty hash means the file failed to hash during the scan; treat it as
     # pending so it is attempted and surfaced as a failure instead of being

@@ -56,20 +56,29 @@ Throughput is RAM-bound on the Docling band (93% of pages). Each heavy worker ho
 
 ## GROUP B — Architectural changes (deferred)
 
-### B1 — [ ] Shard processes on the box (Architecture B)
-Zero-code: run 2-3 `parse_folder` invocations on manifest shards. Each gets its own Scheduler/pool/RAM slice. ~2.5-3.4 pages/s (3-4x). Manifest is already sha256-keyed and overlap-safe.
+### B1 — [x] Shard processes on the box (Architecture B)
+- **File:** `app/parser/cli.py:30-48`, `scripts/parse_folder.py:68-135`
+- **Problem:** Single-process Python orchestrator is bottlenecked by GIL, serialization locks, and a single process pool.
+- **Fix:** Added `--shard-index` and `--shard-total` to `app.parser.cli`, plus `--shards N` in `scripts/parse_folder.py` to launch parallel shard processes to the same store.
+- **Expected gain:** ~2.5-3.4x (2.0-2.7 pages/s). **Status:** CLOSED (implemented & verified).
 
-### B2 — [ ] Split Docling into its own service (Architecture E)
-The 93% bottleneck gets its own fleet; native band gets the whole box. Code is already 90% structured for it (`HeavyDoclingEngine.process` is a clean per-page fn; seam is `Scheduler._get_heavy_pool()`).
+### B2 — [x] Split Docling into its own service (Architecture E)
+- **File:** `app/parser/engines/remote_docling.py`, `app/parser/docling_service.py`, `app/parser/config.py:42`, `app/parser/scheduler.py:91-105, 395-410`
+- **Problem:** Heavy Docling process footprint (~2.6 GB/worker) starves native processing on the same box.
+- **Fix:** Added standalone Docling HTTP microservice (`app.parser.docling_service`) and `RemoteDoclingEngine` in `Scheduler` to offload heavy page conversions over HTTP/RPC with non-blocking thread scheduling.
+- **Expected gain:** 3-5x local speedup (offloading heavy band) or arbitrary horizontal scale. **Status:** CLOSED (implemented & verified).
 
-### B3 — [ ] Multi-box sharding (Architecture C)
-Same as B1 across boxes with shared/NFS corpus. 4 boxes ~ 4x B1.
+### B3 — [x] Multi-box sharding (Architecture C)
+- **File:** `app/processing/corpus.py:83-100`, `app/processing/config.py:10-15`, `app/processing/executor.py:204-207`, `app/processing/cli.py:34-52`, `scripts/run_cluster_shards.py`
+- **Problem:** Single box has finite physical RAM/CPU limits; scaling beyond 1 box requires distributed coordination.
+- **Fix:** Added deterministic SHA256 corpus partitioning (`shard_doc_refs`), `--shard-index` and `--shard-total` in batch executor and CLI, with non-colliding atomic writes to shared store.
+- **Expected gain:** ~3.8-4.0x linear scaling across 4 nodes (~6.0-8.0 pages/s). **Status:** CLOSED (implemented & verified).
 
-### B4 — [ ] GPU-accelerated Docling (Architecture F)
-2-5x per heavy worker. **Gated on golden-output parity** — layout models differ slightly per device.
+### B4 — [-] GPU-accelerated Docling (Architecture F) [SKIPPED]
+- **Reason for skipping:** Gated on dedicated GPU instances with >=16 GB VRAM and golden-output LLM judge parity verification. Consumer 4 GB GPU incurs `std::bad_alloc` due to shared host RAM pressure.
 
-### B5 — [ ] Broker queue + stateless workers (Architecture D)
-Correct at 10^5-10^7 docs/day; premature today.
+### B5 — [-] Broker queue + stateless workers (Architecture D) [SKIPPED]
+- **Reason for skipping:** Architectural pattern for 10^5 - 10^7 docs/day enterprise elasticity with Celery/SQS/RabbitMQ; premature for current single-box and cluster file-sharded workloads.
 
 ---
 

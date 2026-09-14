@@ -36,6 +36,9 @@ class ParserConfig:
     # preserved; only the default flipped).
     layout_backend: str = "auto"
     docling_models_dir: str = "models/docling"  # on-prem model cache
+    # B2: URL of standalone Docling microservice (e.g. "http://localhost:8001").
+    # When non-empty, Docling tasks are offloaded via HTTP/RPC instead of local ProcessPool.
+    docling_service_url: str = ""
     # Table-structure mode passed to Docling's TableFormer (ADR-013 addendum:
     # extraction-quality run). "FAST" recovers correct logical rows for dense /
     # borderless tables (Tables 1/5/6 in the fixture) where "ACCURATE" collapses

@@ -26,6 +26,22 @@ def _file_types():
             ".md", ".markdown", ".txt", ".png", ".jpg", ".jpeg", ".tiff", ".gif")
 
 
+def _shard_files(files: list[Path], shard_index: int = 0, shard_total: int = 1) -> list[Path]:
+    """B1/B3: Partition files deterministically by name hash across shards."""
+    if shard_total <= 1:
+        return files
+    if not (0 <= shard_index < shard_total):
+        raise ValueError(f"shard_index {shard_index} out of bounds for shard_total {shard_total}")
+    import hashlib
+
+    out = []
+    for f in files:
+        h = int(hashlib.sha256(f.name.encode("utf-8")).hexdigest()[:8], 16)
+        if (h % shard_total) == shard_index:
+            out.append(f)
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Synthetic Data Factory — Parser (Extraction->DOM)")
     ap.add_argument("--in", dest="input", required=True, help="input file or directory")
@@ -39,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="run heavy engine in subprocess pool")
     ap.add_argument("--limit", type=int, default=0, help="max files parsed (0=all)")
     ap.add_argument("--offset", type=int, default=0, help="starting file index (0=first)")
+    ap.add_argument("--shard-index", type=int, default=0, help="shard index (0 to shard-total-1)")
+    ap.add_argument("--shard-total", type=int, default=1, help="total number of shards")
     args = ap.parse_args(argv)
 
     cfg = default_config()
@@ -60,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
 
         path = Path(args.input)
         files = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.suffix.lower() in _file_types())
+        if args.shard_total > 1:
+            files = _shard_files(files, shard_index=args.shard_index, shard_total=args.shard_total)
         if args.offset:
             files = files[args.offset:]
         if args.limit:

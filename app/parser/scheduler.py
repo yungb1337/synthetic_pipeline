@@ -89,6 +89,10 @@ def _heavy_initializer(models_dir: str):
 
 
 def _run_heavy(item: PageWorkItem, config: ParserConfig) -> PageResult:
+    if getattr(config, "docling_service_url", ""):
+        from .engines.remote_docling import RemoteDoclingEngine
+        return RemoteDoclingEngine(config).process(item)
+
     from .engines.heavy_docling import HeavyDoclingEngine
 
     try:
@@ -388,15 +392,16 @@ class Scheduler:
         submitted_at: dict[int, float] = {}
 
         futures = []
+        has_remote_docling = bool(getattr(self.config, "docling_service_url", ""))
         for item in plan.work_items:
             band = _resolve_band(item)
             if band == DOCLING:
                 # Docling ALWAYS runs via HeavyDoclingEngine (the per-page,
-                # worker-built engine). When in-process it still executes in the
-                # calling process (no ProcessPool fork); otherwise it runs in the
-                # bounded heavy pool. Never fall through to _run_native (which only
-                # handles native/enrichment/image/simple).
-                if in_process:
+                # worker-built engine) or RemoteDoclingEngine when service URL is set.
+                if has_remote_docling:
+                    # B2: Remote Docling service call is I/O-bound, run directly in native_pool
+                    fut = self.native_pool.submit(_run_heavy, item, self.config)
+                elif in_process:
                     fut = self._get_in_process_heavy_pool().submit(_run_heavy, item, self.config)
                 else:
                     fut = self._get_heavy_pool().submit(_run_heavy, item, self.config)

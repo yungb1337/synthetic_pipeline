@@ -26,7 +26,7 @@ from ..normalizer.config import NormalizerConfig
 from ..normalizer.normalizer import Normalizer
 
 from .config import ProcessingConfig
-from .corpus import DocRef, load_manifest, pending, save_manifest
+from .corpus import DocRef, load_manifest, pending, save_manifest, shard_doc_refs
 
 # --- I-13: bridge scheduler metrics events into the live BatchReport --------
 _metrics_lock = threading.Lock()
@@ -200,6 +200,10 @@ class BatchWorker:
         t_start = time.time()
         if self.config.ocr_warm:
             parser_ocr.engine_available()          # preload once for the pool
+
+        # B3: Partition corpus if cluster sharding is active
+        if getattr(self.config, "shard_total", 1) > 1:
+            refs = shard_doc_refs(refs, self.config.shard_index, self.config.shard_total)
 
         # fresh report + manifest per run (a worker may be reused across runs)
         self._report = BatchReport(manifest_path=self.config.manifest_path)

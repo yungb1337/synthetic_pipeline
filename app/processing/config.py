@@ -32,6 +32,9 @@ class ProcessingConfig:
     # retries
     max_retries: int = 3
     base_backoff_s: float = 1.0
+    # B3: multi-box / distributed cluster sharding
+    shard_index: int = 0          # node shard index (0 <= shard_index < shard_total)
+    shard_total: int = 1          # total number of cluster nodes / shards
     # idempotent incremental run
     manifest_path: str = "work/manifest.json"
     # batching of model-boundary calls
