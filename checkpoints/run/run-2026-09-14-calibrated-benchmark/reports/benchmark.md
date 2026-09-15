@@ -1,0 +1,2 @@
+- **calibrated** (2026-09-14T15:13:04Z): files=100 ok=100 failed=0 dead=0 unparsed=0 wall=479.2s avg_doc=4.76s avg_page=367ms peak_tree=3010MB peak_worker=2983MB blocks=25485 tables=268
+- **calibrated** (2026-09-14T16:42:11Z): files=100 ok=100 failed=0 dead=0 unparsed=0 wall=575.5s avg_doc=5.72s avg_page=441ms peak_tree=3071MB peak_worker=3044MB blocks=25485 tables=373

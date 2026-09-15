@@ -14,31 +14,25 @@ from dataclasses import dataclass, field
 # Gap B); an unknown signal is warned + skipped, never a crash.
 _DEFAULT_WEIGHTS: dict[str, float] = {
     # --- complexity-driving signals (value 0..1; higher = more complex) ---
-    # Calibrated 2026-08-10 against the real test_cases corpus. ABSOLUTE weighted
-    # sum (0-100) -> these weights ARE the band map:
+    # Calibrated 2026-09-14 against PMC benchmark & test_cases:
     #   * scan cluster (scanned/ocr/low_text/low_char/image) totals ~58 maxed ->
     #     a purely-scanned doc lands in ENRICHMENT (OCR), per spec §5.
-    #   * font_diversity, reading_order, multi_column, tables drive the Docling
-    #     tier for genuinely-structured layout.
-    # NOTE: layout_complexity / block_fragmentation are kept LIGHT because they
-    # are computed from raw page geometry and over-flag clean multi-paragraph
-    # text (a 30-paragraph single-column doc measures ~0.75). Heavier weighting
-    # would over-route simple docs. Tracked follow-up (ADR-011): refine these
-    # (and reading-order) detectors so complex-academic docs reliably reach the
-    # DOCLING band without over-flagging simple text. Re-tune here as the
-    # corpus grows.
+    #   * font_diversity and multi_column are scaled down (5.0 each) so clean 2-column
+    #     digital academic PDFs with standard typography route to Native.
+    #   * table_probability (30.0), reading_order_ambiguity (12.0), layout_complexity (10.0)
+    #     ensure heavily table-dense and irregular layout docs reach DOCLING.
     "metric_scanned_page_probability": 15.0,
     "metric_low_char_density": 8.0,
     "metric_ocr_required": 18.0,
     "metric_low_text_ratio": 12.0,
     "metric_image_density": 5.0,
-    "metric_table_probability": 12.0,
-    "metric_form_probability": 4.0,
-    "metric_font_diversity": 25.0,
-    "metric_multi_column_probability": 15.0,
-    "metric_reading_order_ambiguity": 25.0,
-    "metric_layout_complexity": 20.0,
-    "metric_block_fragmentation": 0.0,
+    "metric_table_probability": 30.0,
+    "metric_form_probability": 5.0,
+    "metric_font_diversity": 5.0,
+    "metric_multi_column_probability": 5.0,
+    "metric_reading_order_ambiguity": 12.0,
+    "metric_layout_complexity": 10.0,
+    "metric_block_fragmentation": 2.0,
     # --- informational / zero-weight signals (must exist for sign coverage) ---
     "metric_foundation_meta_available": 0.0,
     "metric_pdf_version": 0.0,

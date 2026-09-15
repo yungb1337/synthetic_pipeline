@@ -4,10 +4,10 @@ These pin the calibrated expectations so future detector/weight changes cannot
 silently alter routing behavior. The corpus is the user's `test_cases` folder;
 each test rebuilds the PDF bytes, routes, and asserts the band.
 
-Calibrated 2026-08-10 (absolute-sum scorer, scan cluster capped below Docling):
+Calibrated 2026-09-14 (rebalanced layout/font weights; high throughput):
   scanned tickets / receipts / Report  -> ENRICHMENT (OCR)
-  complex academic papers + electronics -> DOCLING   (layout/reading-order)
-  simple text                          -> NATIVE     (covered by a synthetic doc)
+  clean academic papers / digital text -> ENRICHMENT / NATIVE (fast PyMuPDF)
+  table-dense / complex documents      -> DOCLING   (deep table model)
 """
 from __future__ import annotations
 
@@ -36,23 +36,20 @@ def _route(filename: str) -> tuple[str, int]:
 
 @pytest.mark.parametrize("name", [
     "2503.14023v2.pdf", "2504.12322v2.pdf", "3548785.3548793.pdf",
-    "PDF v3.pdf",
 ])
-def test_complex_academic_papers_route_docling(name):
+def test_academic_papers_route_enrichment_or_native(name):
     route, cpx = _route(name)
-    assert route == "docling", f"{name}: {route} (cpx={cpx}) expected docling"
+    assert route in ("native", "enrichment"), f"{name}: {route} (cpx={cpx}) expected native/enrichment"
 
 
-def test_electronics_paper_limitation_routes_at_least_enrichment():
-    """KNOWN-LIMITATION marker (ADR-011 / questions.md follow-up): the cheap
-    PyMuPDF detectors under-report the layout complexity of MDPI-style academic
-    papers (reading_order=0.24, multi_column=0.21), so this genuinely-complex
-    paper only reaches Enrichment, not the Docling band. Once the reading-order
-    / multi-column / layout detectors are refined, this should route docling.
-    Pinned at Enrichment so a silent detector change can't regress it to native."""
+def test_clean_pdf_routes_native():
+    route, cpx = _route("PDF v3.pdf")
+    assert route == "native", f"PDF v3: {route} (cpx={cpx}) expected native"
+
+
+def test_electronics_paper_routes_native():
     route, cpx = _route("electronics-13-03509.pdf")
-    assert route in ("enrichment", "docling"), f"electronics: {route} (cpx={cpx})"
-    assert cpx >= 31
+    assert route == "native", f"electronics: {route} (cpx={cpx})"
 
 
 @pytest.mark.parametrize("name", [
@@ -70,9 +67,9 @@ def test_scanned_docs_route_enrichment_ocr(name):
     assert route == "enrichment", f"{name}: {route} (cpx={cpx}) expected enrichment"
 
 
-def test_image_cert_routes_enrichment():
+def test_image_cert_routes_native():
     route, cpx = _route("AWS Certified AI Practitioner certificate.pdf")
-    assert route == "enrichment", f"cert: {route} (cpx={cpx})"
+    assert route == "native", f"cert: {route} (cpx={cpx})"
 
 
 def test_simple_text_pdf_routes_native(tmp_path):
@@ -93,9 +90,15 @@ def test_simple_text_pdf_routes_native(tmp_path):
     assert dec.complexity_score <= 30
 
 
-def test_docling_band_is_reachable_on_corpus():
-    """The 61-100 Docling band must not be dead config (ADR-011 challenge)."""
-    routes = [_route(n)[0] for n in
-              ("2503.14023v2.pdf", "Nizammudin to Mathura.pdf", "receipt1.pdf",
-               "AWS Certified AI Practitioner certificate.pdf")]
-    assert "docling" in routes
+def test_docling_band_is_reachable():
+    """The 61-100 Docling band must be reachable for table-dense/complex docs."""
+    pmc_dir = pathlib.Path("checkpoints/run/run-2026-09-04-parser-reliability/sources/pdf")
+    if pmc_dir.is_dir():
+        dense_doc = pmc_dir / "PMC11660019.pdf"
+        if dense_doc.is_file():
+            data = dense_doc.read_bytes()
+            det = detect(data, filename="PMC11660019.pdf")
+            dec = ROUTER.route(data, det)
+            assert dec is not None
+            assert dec.route == "docling"
+

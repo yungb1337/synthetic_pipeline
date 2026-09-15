@@ -172,6 +172,8 @@ def main() -> int:
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
     ap.add_argument("--heavy-concurrency", type=int, default=None,
                     help="bound the Docling heavy pool (default: RAM-derived).")
+    ap.add_argument("--shards", type=int, default=1,
+                    help="number of concurrent parser shard processes (Architecture B).")
     ap.add_argument("--analyze-only", action="store_true",
                     help="skip parser child; just join + report the current store")
     args = ap.parse_args()
@@ -232,6 +234,8 @@ def main() -> int:
                 cmd.append("--no-ocr")
             if args.heavy_concurrency is not None:
                 cmd += ["--heavy-concurrency", str(args.heavy_concurrency)]
+            if args.shards > 1:
+                cmd += ["--shards", str(args.shards)]
             if args.limit:
                 cmd += ["--limit", str(args.limit)]
             if args.offset:

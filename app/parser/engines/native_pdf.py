@@ -9,6 +9,7 @@ that same core so there is no behaviour regression and no duplicated logic.
 from __future__ import annotations
 
 import hashlib
+import re
 import threading
 
 from ..config import ParserConfig
@@ -16,6 +17,8 @@ from ..mime import MIME as _MIME
 from ..page_result import PageResult, PageStatus
 from ..parts import RecoveredBlock, RecoveredTable, RecoveredImage
 from .base import NATIVE, PageWorkItem
+
+_TABLE_CAPTION_RE = re.compile(r"\b(table|tab\.)\s+[0-9a-zivx]+", re.IGNORECASE)
 
 
 def _image_mime(ext: str) -> str:
@@ -69,25 +72,43 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
         )
 
     if config.pdf_extract_tables:
+        found_tables = []
         try:
-            finder = page.find_tables()
+            finder = page.find_tables(strategy="lines")
+            if finder is not None and finder.tables:
+                found_tables = list(finder.tables)
+            # Academic 3-line table fallback: if gridlines found nothing, check if the
+            # page carries table markers (e.g. "Table 1") and extract with horizontal
+            # lines + whitespace columns.
+            if not found_tables:
+                page_text = "\n".join(b.text for b in all_blocks if isinstance(b, RecoveredBlock))
+                if _TABLE_CAPTION_RE.search(page_text):
+                    finder2 = page.find_tables(horizontal_strategy="lines", vertical_strategy="text")
+                    if finder2 is not None and finder2.tables:
+                        for t in finder2.tables:
+                            try:
+                                rows = t.extract()
+                                if rows and len(rows) >= 2 and len(rows[0]) >= 2:
+                                    found_tables.append(t)
+                            except Exception:
+                                pass
         except Exception:
-            finder = None
-        if finder is not None:
-            for t in getattr(finder, "tables", []):
-                try:
-                    rows = t.extract()
-                except Exception:
-                    rows = []
-                if not rows:
-                    continue
-                header = [str(c).strip() for c in rows[0]]
-                data = [[str(c).strip() for c in r] for r in rows[1:]]
-                bbox = getattr(t, "bbox", None)
-                all_blocks.append(
-                    RecoveredTable(page=page_index, bbox=tuple(bbox) if bbox else None,
-                                   header=header, rows=data, source="native")
-                )
+            pass
+
+        for t in found_tables:
+            try:
+                rows = t.extract()
+            except Exception:
+                rows = []
+            if not rows:
+                continue
+            header = [str(c).strip() for c in rows[0]]
+            data = [[str(c).strip() for c in r] for r in rows[1:]]
+            bbox = getattr(t, "bbox", None)
+            all_blocks.append(
+                RecoveredTable(page=page_index, bbox=tuple(bbox) if bbox else None,
+                               header=header, rows=data, source="native")
+            )
 
     images: list[RecoveredImage] = []
     try:

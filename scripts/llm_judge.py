@@ -36,7 +36,8 @@ import fitz
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DEFAULT_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
+FALLBACK_MODELS = ("gemini-3.1-flash-lite-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash")
 
 # Gemini free-tier can return transient 429/resource-exhausted. We honor the
 # retry_delay the API reports and retry a bounded number of times, then exit 4
@@ -332,23 +333,41 @@ def main() -> int:
     try:
         import google.generativeai as genai
         genai.configure(api_key=key)
-        model = genai.GenerativeModel(args.model)
+
+        # Build candidate model list starting with requested model then fallbacks
+        candidate_models = [args.model]
+        for fm in FALLBACK_MODELS:
+            if fm not in candidate_models:
+                candidate_models.append(fm)
+
         resp = None
+        used_model = args.model
         last_exc: BaseException | None = None
-        for attempt in range(1, _MAX_ATTEMPTS + 1):
-            try:
-                resp = model.generate_content(prompt)
+
+        for current_model_name in candidate_models:
+            model = genai.GenerativeModel(current_model_name)
+            for attempt in range(1, _MAX_ATTEMPTS + 1):
+                try:
+                    resp = model.generate_content(prompt)
+                    used_model = current_model_name
+                    break
+                except Exception as exc:  # noqa: BLE001 — classify rate-limit vs fatal
+                    last_exc = exc
+                    # If daily/per-model quota is exhausted (limit: 500 or 429), immediately switch to next model
+                    err_msg = str(exc)
+                    if "Quota exceeded" in err_msg or "429" in err_msg or "ResourceExhausted" in type(exc).__name__:
+                        print(f"  [judge] model {current_model_name} quota/rate limit hit -> falling back to next candidate model...", file=sys.stderr)
+                        break
+                    if not _rate_limited(exc):
+                        print(f"  [judge] model {current_model_name} call failed: {exc}", file=sys.stderr)
+                        break  # try next fallback model
+                    delay = _retry_delay(exc)
+                    if attempt < _MAX_ATTEMPTS:
+                        print(f"  [judge] {current_model_name} rate-limited (retry {attempt}/{_MAX_ATTEMPTS}); "
+                              f"waiting {delay:.0f}s", file=sys.stderr)
+                        time.sleep(delay)
+            if resp is not None:
                 break
-            except Exception as exc:  # noqa: BLE001 — classify rate-limit vs fatal
-                last_exc = exc
-                if not _rate_limited(exc):
-                    print(f"ERROR: Gemini call failed: {exc}", file=sys.stderr)
-                    return 3
-                delay = _retry_delay(exc)
-                if attempt < _MAX_ATTEMPTS:
-                    print(f"  [judge] rate-limited (retry {attempt}/{_MAX_ATTEMPTS}); "
-                          f"waiting {delay:.0f}s", file=sys.stderr)
-                    time.sleep(delay)
     except Exception as exc:  # noqa: BLE001 — import/configure fatal
         print(f"ERROR: Gemini setup failed: {exc}", file=sys.stderr)
         return 3
@@ -361,20 +380,28 @@ def main() -> int:
         return 4
 
     text = resp.text.strip()
-    if text.startswith("```"):  # strip accidental fences
-        text = text.strip("`")
-        if text.startswith("json"):
-            text = text[4:]
+    if "```" in text:
+        match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if match:
+            text = match.group(1)
+        else:
+            match_start = re.search(r"```(?:json)?\s*(\{.*)", text, re.DOTALL)
+            if match_start:
+                text = match_start.group(1).rstrip("`")
+    if not text.startswith("{"):
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            text = match.group(0)
     try:
         verdict = json.loads(text)
     except json.JSONDecodeError as exc:
         print(f"ERROR: judge returned non-JSON:\n{text[:500]}", file=sys.stderr)
-        return 3
+        return 1
 
     record = {
         "doc_id": dom.get("document_id"),
         "pdf": str(pdf),
-        "model": args.model,
+        "model": used_model,
         "judged_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "dom_summary": dom_sum,
         "verdict": verdict,

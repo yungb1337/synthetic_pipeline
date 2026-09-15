@@ -1,0 +1,2 @@
+- **full_corpus** (2026-09-14T18:00:35Z): files=945 ok=945 failed=0 dead=0 unparsed=0 wall=2886.4s avg_doc=11.42s avg_page=822ms peak_tree=5645MB peak_worker=2532MB blocks=318655 tables=3455
+- **full-corpus** (2026-09-14T18:08:17Z): files=945 ok=945 failed=0 dead=0 unparsed=0 wall=0.0s avg_doc=0.00s avg_page=0ms peak_tree=0MB peak_worker=0MB blocks=318655 tables=3455
