@@ -28,7 +28,7 @@ import multiprocessing.spawn as mpsp
 import os
 import sys
 import traceback
-from concurrent.futures import BrokenExecutor, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import BrokenExecutor, ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from dataclasses import dataclass
 
 try:
@@ -88,7 +88,11 @@ def _heavy_initializer(models_dir: str):
         pass
 
 
+_WORKER_HEAVY_ENGINE = None
+
+
 def _run_heavy(item: PageWorkItem, config: ParserConfig) -> PageResult:
+    global _WORKER_HEAVY_ENGINE
     if getattr(config, "docling_service_url", ""):
         from .engines.remote_docling import RemoteDoclingEngine
         return RemoteDoclingEngine(config).process(item)
@@ -96,7 +100,9 @@ def _run_heavy(item: PageWorkItem, config: ParserConfig) -> PageResult:
     from .engines.heavy_docling import HeavyDoclingEngine
 
     try:
-        return HeavyDoclingEngine(config).process(item)
+        if _WORKER_HEAVY_ENGINE is None:
+            _WORKER_HEAVY_ENGINE = HeavyDoclingEngine(config)
+        return _WORKER_HEAVY_ENGINE.process(item)
     except Exception as e:  # pragma: no cover - defensive containment
         return PageResult(
             doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
@@ -351,6 +357,12 @@ class Scheduler:
     def _get_heavy_pool(self) -> ProcessPoolExecutor:
         if self._heavy_pool is None or self._pool_is_broken:
             # Build/rebuild pool (F-09 fix: rebuild after BrokenProcessPool)
+            old_pool = self._heavy_pool
+            if old_pool is not None:
+                try:
+                    old_pool.shutdown(wait=False, cancel_futures=True)
+                except Exception:
+                    pass
             self._pool_is_broken = False
             try:
                 mpsp.set_executable(sys.executable)
@@ -413,9 +425,39 @@ class Scheduler:
 
         results: list[PageResult] = []
         by_fut = {fut: item for item, fut in futures}
-        for fut in as_completed(list(by_fut)):
-            res = self._collect(by_fut[fut], fut)
-            results.append(res)
+        pending = set(by_fut.keys())
+        page_timeout = float(getattr(self.config, "page_timeout_seconds", 600) or 600)
+        total_deadline = _time.time() + max(page_timeout, page_timeout * len(futures))
+
+        while pending:
+            time_left = max(0.5, total_deadline - _time.time())
+            poll_timeout = min(page_timeout, time_left)
+            done, not_done = wait(pending, timeout=poll_timeout, return_when=FIRST_COMPLETED)
+
+            if not done:
+                # Hard timeout expired on pending workers
+                from .utils import get_logger
+                logger = get_logger(__name__)
+                logger.error(f"Scheduler timeout: {len(not_done)} page tasks exceeded timeout ({page_timeout}s)")
+                for fut in not_done:
+                    item = by_fut[fut]
+                    try:
+                        fut.cancel()
+                    except Exception:
+                        pass
+                    results.append(PageResult(
+                        doc_id=item.doc_id, page_index=item.page_index, route=_resolve_band(item),
+                        status=PageStatus.FAILED,
+                        errors=[{"page_no": item.page_index + 1, "category": "scheduler_timeout",
+                                 "message": f"Worker task exceeded execution timeout ({page_timeout}s)"}],
+                        source_hash=item.source_hash,
+                    ))
+                break
+
+            for fut in done:
+                pending.remove(fut)
+                res = self._collect(by_fut[fut], fut)
+                results.append(res)
 
         # preserve page order for downstream assembly
         results.sort(key=lambda r: r.page_index)

@@ -105,6 +105,15 @@ def _partition_columns(blocks_with_coords: list[tuple[Any, tuple[float, float, f
 
     if best_split:
         _x_cut, left, right = best_split
+        # Check if there are top header items that sit strictly above the two-column region
+        min_left_y = min(it[1][1] for it in left)
+        min_right_y = min(it[1][1] for it in right)
+        top_cutoff = min(min_left_y, min_right_y)
+        top_items = [it for it in blocks_with_coords if it[1][3] <= top_cutoff + 2.0]
+        body_items = [it for it in blocks_with_coords if it[1][3] > top_cutoff + 2.0]
+        if top_items and body_items and len(top_items) < len(blocks_with_coords):
+            return _partition_columns(top_items) + _partition_columns(body_items)
+
         return _partition_columns(left) + _partition_columns(right)
 
     # No multi-column partition found: sort top-to-bottom, clustering nearby baselines

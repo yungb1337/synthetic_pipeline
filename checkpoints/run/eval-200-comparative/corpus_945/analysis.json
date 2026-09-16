@@ -1,0 +1,41 @@
+{
+  "total_judged": 200,
+  "verdict_distribution": {
+    "PASS_WITH_ISSUES": 143,
+    "PASS": 36,
+    "FAIL": 21
+  },
+  "metric_means": {
+    "completeness": 0.9214,
+    "fidelity": 0.908,
+    "structure": 0.818,
+    "tables": 0.534,
+    "references": 0.7452,
+    "scans_ocr": 0.9925
+  },
+  "prior_verdict_distribution": {
+    "PASS": 112,
+    "PASS_WITH_ISSUES": 73,
+    "FAIL": 14
+  },
+  "prior_metric_means": {
+    "completeness": 0.942,
+    "fidelity": 0.9467,
+    "structure": 0.9037,
+    "tables": 0.7079,
+    "references": 0.888,
+    "scans_ocr": 0.9899
+  },
+  "issue_severities": {
+    "major": 157,
+    "minor": 200,
+    "critical": 18
+  },
+  "issue_surfaces": {
+    "reference": 61,
+    "table": 93,
+    "structure": 144,
+    "text": 77
+  },
+  "categories": null
+}

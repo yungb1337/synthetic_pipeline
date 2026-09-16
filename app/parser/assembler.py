@@ -226,11 +226,19 @@ class Assembler:
                 report.dom_key = self.store.put_dom(plan.doc_id, document)
             except Exception as e:
                 report.errors.append({"category": "store_dom", "message": str(e)})
+                report.status = "failed"
+                report.dom_key = None
             try:
                 report.raw_key = self.store.put_raw(plan.doc_id, sha256,
                                                     _read_src(src_path), plan.declared_extension)
             except Exception as e:
                 report.errors.append({"category": "store_raw", "message": str(e)})
+                report.status = "failed"
+                report.raw_key = None
+
+            if not report.dom_key or not report.raw_key:
+                report.status = "failed"
+                report.document = None
         else:
             # Dead-letter: no DOM/raw artifact; keep the report (with explicit
             # actual-vs-expected + dead pages) so the run can prove zero loss.

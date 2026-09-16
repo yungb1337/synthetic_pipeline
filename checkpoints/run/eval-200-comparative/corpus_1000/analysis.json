@@ -1,0 +1,119 @@
+{
+  "total_judged": 200,
+  "verdict_distribution": {
+    "PASS": 98,
+    "PASS_WITH_ISSUES": 98,
+    "FAIL": 3,
+    "PASS_WITH_ISSUes": 1
+  },
+  "metric_means": {
+    "completeness": 0.9797,
+    "fidelity": 0.9855,
+    "structure": 0.9534,
+    "tables": 0.8122,
+    "references": 0.9297,
+    "scans_ocr": 1.0
+  },
+  "prior_verdict_distribution": {
+    "PASS_WITH_ISSUES": 65,
+    "FAIL": 30
+  },
+  "prior_metric_means": {
+    "completeness": 0.8189,
+    "fidelity": 0.8091,
+    "structure": 0.6568,
+    "tables": 0.5284,
+    "references": 0.2779,
+    "scans_ocr": 0.9263
+  },
+  "issue_severities": {
+    "minor": 159,
+    "major": 3
+  },
+  "issue_surfaces": {
+    "table": 58,
+    "structure": 59,
+    "text": 35,
+    "reference": 10
+  },
+  "categories": {
+    "bills_claims_economics": {
+      "count": 40,
+      "verdicts": {
+        "PASS": 22,
+        "PASS_WITH_ISSUES": 18
+      },
+      "metric_means": {
+        "completeness": 0.9817,
+        "fidelity": 0.9867,
+        "structure": 0.9572,
+        "tables": 0.7795,
+        "references": 0.9297,
+        "scans_ocr": 1.0
+      }
+    },
+    "clinical_trials_statistical_tables": {
+      "count": 40,
+      "verdicts": {
+        "PASS": 23,
+        "PASS_WITH_ISSUES": 17
+      },
+      "metric_means": {
+        "completeness": 0.9825,
+        "fidelity": 0.9868,
+        "structure": 0.962,
+        "tables": 0.8342,
+        "references": 0.9332,
+        "scans_ocr": 1.0
+      }
+    },
+    "doctor_guidelines_clinical_notes": {
+      "count": 40,
+      "verdicts": {
+        "PASS_WITH_ISSUES": 21,
+        "PASS": 19
+      },
+      "metric_means": {
+        "completeness": 0.975,
+        "fidelity": 0.9852,
+        "structure": 0.9445,
+        "tables": 0.8227,
+        "references": 0.9222,
+        "scans_ocr": 1.0
+      }
+    },
+    "lab_pathology_reports": {
+      "count": 40,
+      "verdicts": {
+        "PASS_WITH_ISSUES": 25,
+        "FAIL": 1,
+        "PASS": 14
+      },
+      "metric_means": {
+        "completeness": 0.9774,
+        "fidelity": 0.9846,
+        "structure": 0.9467,
+        "tables": 0.8728,
+        "references": 0.9264,
+        "scans_ocr": 1.0
+      }
+    },
+    "radiology_imaging_complex_scans": {
+      "count": 40,
+      "verdicts": {
+        "PASS": 20,
+        "PASS_WITH_ISSUES": 17,
+        "PASS_WITH_ISSUes": 1,
+        "FAIL": 2
+      },
+      "metric_means": {
+        "completeness": 0.9821,
+        "fidelity": 0.9839,
+        "structure": 0.9563,
+        "tables": 0.7503,
+        "references": 0.9371,
+        "scans_ocr": 1.0
+      }
+    }
+  }
+}

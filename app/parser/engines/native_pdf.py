@@ -19,6 +19,45 @@ from ..parts import RecoveredBlock, RecoveredTable, RecoveredImage
 from .base import NATIVE, PageWorkItem
 
 _TABLE_CAPTION_RE = re.compile(r"\b(table|tab\.)\s+[0-9a-zivx]+", re.IGNORECASE)
+_REPEATING_GLYPH_RE = re.compile(
+    r"^(.)\1{3,}$|"                     # any single repeating char 4+ times (aaaa, 1111)
+    r"^[a-z]?1{4,}[a-z]?$|"            # a1111111111, 111111111a, a1111
+    r"^(a1|1a|01|10){3,}$",            # alternating vector patterns
+    re.IGNORECASE,
+)
+
+
+def _bbox_overlap_ratio(b_bbox: tuple[float, float, float, float] | None,
+                        t_bbox: tuple[float, float, float, float] | None) -> float:
+    """Fraction of b_bbox area that falls inside t_bbox."""
+    if not b_bbox or not t_bbox:
+        return 0.0
+    bx0, by0, bx1, by1 = b_bbox
+    tx0, ty0, tx1, ty1 = t_bbox
+    b_area = max(0.0, bx1 - bx0) * max(0.0, by1 - by0)
+    if b_area <= 0:
+        return 0.0
+    ix0 = max(bx0, tx0)
+    iy0 = max(by0, ty0)
+    ix1 = min(bx1, tx1)
+    iy1 = min(by1, ty1)
+    if ix1 <= ix0 or iy1 <= iy0:
+        return 0.0
+    inter_area = (ix1 - ix0) * (iy1 - iy0)
+    return inter_area / b_area
+
+
+def _is_oversplit_table(rows: list[list[str]]) -> bool:
+    """Check if table was oversplit into single-character or fragmented columns."""
+    if not rows or len(rows) < 2:
+        return True
+    num_cols = max(len(r) for r in rows)
+    if num_cols > 10:
+        total_cells = sum(len(r) for r in rows)
+        short_cells = sum(1 for r in rows for c in r if 0 < len(str(c).strip()) <= 2)
+        if total_cells > 0 and (short_cells / total_cells) > 0.45:
+            return True
+    return False
 
 
 def _image_mime(ext: str) -> str:
@@ -64,6 +103,10 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
         text = "\n".join(s.strip() for s in parts_text).strip()
         if not text:
             continue
+        # Suppress repeated decorative vector glyph noise (e.g. "a1111111111")
+        clean_no_space = text.replace("\n", "").replace(" ", "")
+        if _REPEATING_GLYPH_RE.match(clean_no_space):
+            continue
         all_blocks.append(
             RecoveredBlock(
                 page=page_index, kind="paragraph", text=text, bbox=tuple(bbox),
@@ -71,6 +114,7 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
             )
         )
 
+    valid_tables: list[RecoveredTable] = []
     if config.pdf_extract_tables:
         found_tables = []
         try:
@@ -88,7 +132,7 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
                         for t in finder2.tables:
                             try:
                                 rows = t.extract()
-                                if rows and len(rows) >= 2 and len(rows[0]) >= 2:
+                                if rows and len(rows) >= 2 and len(rows[0]) >= 2 and not _is_oversplit_table(rows):
                                     found_tables.append(t)
                             except Exception:
                                 pass
@@ -100,15 +144,29 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
                 rows = t.extract()
             except Exception:
                 rows = []
-            if not rows:
+            if not rows or len(rows) < 2 or _is_oversplit_table(rows):
                 continue
             header = [str(c).strip() for c in rows[0]]
             data = [[str(c).strip() for c in r] for r in rows[1:]]
+            # Discard ghost / empty tables that have no text in data cells
+            if not any(any(c for c in r) for r in data):
+                continue
             bbox = getattr(t, "bbox", None)
-            all_blocks.append(
+            valid_tables.append(
                 RecoveredTable(page=page_index, bbox=tuple(bbox) if bbox else None,
                                header=header, rows=data, source="native")
             )
+
+    # Filter out paragraph blocks whose bounding box overlaps significantly (>60%)
+    # with an extracted table bounding box, preventing table cell text from duplicating
+    # into the body paragraphs.
+    table_bboxes = [t.bbox for t in valid_tables if t.bbox]
+    extracted_blocks: list[RecoveredBlock] = []
+    for b in all_blocks:
+        if isinstance(b, RecoveredBlock):
+            if any(_bbox_overlap_ratio(b.bbox, tb) > 0.6 for tb in table_bboxes):
+                continue
+            extracted_blocks.append(b)
 
     images: list[RecoveredImage] = []
     try:
@@ -130,10 +188,22 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
     # document-wide `body_med` (parity with legacy `Loaders._pdf`); fall back to
     # a per-page median when none is supplied (standalone helper / test usage).
     if body_med is None:
-        sizes = [b.font_size for b in all_blocks if isinstance(b, RecoveredBlock) and b.font_size]
+        sizes = [b.font_size for b in extracted_blocks if b.font_size]
         body_med = sorted(sizes)[len(sizes) // 2] if sizes else 12.0
-    for b in all_blocks:
-        if isinstance(b, RecoveredBlock) and b.font_size and b.font_size > body_med * config.pdf_heading_threshold_ratio:
+    try:
+        page_h = float(page.rect.height)
+    except Exception:
+        page_h = 792.0
+    for b in extracted_blocks:
+        if b.bbox and page_h > 0:
+            y_mid = (b.bbox[1] + b.bbox[3]) / 2.0
+            if y_mid < page_h * 0.06:
+                b.kind = "header"
+                continue
+            elif y_mid > page_h * 0.94:
+                b.kind = "footer"
+                continue
+        if b.font_size and b.font_size > body_med * config.pdf_heading_threshold_ratio:
             b.kind = "heading"
 
     # D6: supply this page's geometry keyed 0-based (== `page_index` == the
@@ -148,8 +218,8 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
 
     return PageResult(
         doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.OK,
-        blocks=[b for b in all_blocks if isinstance(b, RecoveredBlock)],
-        tables=[t for t in all_blocks if isinstance(t, RecoveredTable)],
+        blocks=extracted_blocks,
+        tables=valid_tables,
         images=images,
         page_sizes=page_sizes,
     )

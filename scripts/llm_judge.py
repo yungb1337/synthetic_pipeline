@@ -36,14 +36,23 @@ import fitz
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DEFAULT_MODEL = "gemini-3.1-flash-lite"
-FALLBACK_MODELS = ("gemini-3.1-flash-lite-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash")
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
+FALLBACK_MODELS = (
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3-flash-preview",
+    "gemma-4-26b-a4b-it",
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+)
 
 # Gemini free-tier can return transient 429/resource-exhausted. We honor the
 # retry_delay the API reports and retry a bounded number of times, then exit 4
 # ("transient rate limit") so the batch driver can skip this doc and continue
 # instead of aborting the whole run (exit 3 stays reserved for fatal: key/auth).
-_MAX_ATTEMPTS = 8
+_MAX_ATTEMPTS = 2
 _RATE_LIMIT_MARKERS = ("429", "RESOURCE_EXHAUSTED", "rate limit", "quota",
                        "TooManyRequests")
 
@@ -106,7 +115,7 @@ def resolve_key(cli_key: str | None) -> str | None:
         try:
             ns: dict = {}
             exec(k.read_text(encoding="utf-8"), ns)  # noqa: S102 — local, gitignored
-            for name in ("GEMINI_API_KEY", "API_KEY", "KEY", "key"):
+            for name in ("key1", "GEMINI_API_KEY", "API_KEY", "KEY", "key"):
                 if isinstance(ns.get(name), str) and ns[name]:
                     return ns[name]
         except Exception as exc:  # noqa: BLE001
@@ -177,7 +186,10 @@ def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
     for p in sorted(pages, key=lambda x: x.get("index", 0)):
         p_idx = p.get("index", 0)
         p_blocks = p.get("blocks", [])
-        for b in p_blocks[:3]:
+        # Prefer sampling body content blocks rather than repetitive margin headers/footers
+        body_blocks = [b for b in p_blocks if b.get("kind") not in ("header", "footer")]
+        sample_candidates = body_blocks if body_blocks else p_blocks
+        for b in sample_candidates[:3]:
             txt = (b.get("text") or "").strip()
             if txt:
                 snippet = f"[p{p_idx}:{b.get('kind', 'block')}] {txt[:200]}"
@@ -353,18 +365,18 @@ def main() -> int:
                     break
                 except Exception as exc:  # noqa: BLE001 — classify rate-limit vs fatal
                     last_exc = exc
-                    # If daily/per-model quota is exhausted (limit: 500 or 429), immediately switch to next model
                     err_msg = str(exc)
-                    if "Quota exceeded" in err_msg or "429" in err_msg or "ResourceExhausted" in type(exc).__name__:
-                        print(f"  [judge] model {current_model_name} quota/rate limit hit -> falling back to next candidate model...", file=sys.stderr)
+                    # If daily quota is exhausted (PerDay), switch to next model immediately
+                    if "PerDay" in err_msg or "per day" in err_msg.lower():
+                        print(f"  [judge] model {current_model_name} daily quota exhausted -> trying next model...", file=sys.stderr)
                         break
                     if not _rate_limited(exc):
                         print(f"  [judge] model {current_model_name} call failed: {exc}", file=sys.stderr)
                         break  # try next fallback model
-                    delay = _retry_delay(exc)
+                    delay = min(25.0, max(3.0, _retry_delay(exc)))
                     if attempt < _MAX_ATTEMPTS:
                         print(f"  [judge] {current_model_name} rate-limited (retry {attempt}/{_MAX_ATTEMPTS}); "
-                              f"waiting {delay:.0f}s", file=sys.stderr)
+                              f"waiting {delay:.1f}s", file=sys.stderr)
                         time.sleep(delay)
             if resp is not None:
                 break

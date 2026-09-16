@@ -24,7 +24,7 @@ class TableDetector(Detector):
                                      evidence="table probability unknown"))
             return DetectorResult(self.name, self.version, "ok", signals=sigs)
         if present > 0:
-            prob = round(min(1.0, present / 4.0), 3)
+            prob = round(min(1.0, present / 3.0), 3)
             sigs.append(self._signal("metric_table_present", True,
                                      evidence=f"{present} table(s) found"))
             sigs.append(self._signal("metric_table_probability", prob, confidence=0.9,

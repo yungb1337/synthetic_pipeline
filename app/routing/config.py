@@ -14,24 +14,20 @@ from dataclasses import dataclass, field
 # Gap B); an unknown signal is warned + skipped, never a crash.
 _DEFAULT_WEIGHTS: dict[str, float] = {
     # --- complexity-driving signals (value 0..1; higher = more complex) ---
-    # Calibrated 2026-09-14 against PMC benchmark & test_cases:
-    #   * scan cluster (scanned/ocr/low_text/low_char/image) totals ~58 maxed ->
-    #     a purely-scanned doc lands in ENRICHMENT (OCR), per spec §5.
-    #   * font_diversity and multi_column are scaled down (5.0 each) so clean 2-column
-    #     digital academic PDFs with standard typography route to Native.
-    #   * table_probability (30.0), reading_order_ambiguity (12.0), layout_complexity (10.0)
-    #     ensure heavily table-dense and irregular layout docs reach DOCLING.
+    # Calibrated to ensure clean single-column digital text routes to Native (0-30),
+    # scanned/simple OCR documents route to Enrichment (31-60), and
+    # genuinely table-heavy and multi-column irregular layouts reach Docling (61-100).
     "metric_scanned_page_probability": 15.0,
     "metric_low_char_density": 8.0,
     "metric_ocr_required": 18.0,
     "metric_low_text_ratio": 12.0,
     "metric_image_density": 5.0,
-    "metric_table_probability": 30.0,
+    "metric_table_probability": 25.0,
     "metric_form_probability": 5.0,
-    "metric_font_diversity": 5.0,
-    "metric_multi_column_probability": 5.0,
-    "metric_reading_order_ambiguity": 12.0,
-    "metric_layout_complexity": 10.0,
+    "metric_font_diversity": 15.0,
+    "metric_multi_column_probability": 15.0,
+    "metric_reading_order_ambiguity": 20.0,
+    "metric_layout_complexity": 15.0,
     "metric_block_fragmentation": 2.0,
     # --- informational / zero-weight signals (must exist for sign coverage) ---
     "metric_foundation_meta_available": 0.0,

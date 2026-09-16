@@ -9,9 +9,11 @@ only observes. A feature it could not observe is reported explicitly as
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 _LOW_TEXT_CHARS = 30  # a page with fewer printable chars is "text-poor"
+_TABLE_CAPTION_RE = re.compile(r"\b(table|tab\.)\s+[0-9a-zivx]+", re.IGNORECASE)
 
 
 @dataclass
@@ -172,14 +174,24 @@ def _read_metadata(doc, f: InspectorFeatures) -> None:
         pass  # metadata is best-effort; the page geometry still describes the doc
 
 
-# Bound inspection cost: find_tables() is expensive (~200ms/page), so probe only
-# the first pages. Keeps the inspector << processing (spec §14); a table beyond
-# the probe window is a known under-read (calibration caveat, ADR-011).
-_TABLE_PROBE_PAGES = 4
+# Bound inspection cost: find_tables() is expensive (~200ms/page), so probe a
+# distributed sample of up to 5 pages (first, mid, 3/4, last). Keeps the inspector
+# << processing while ensuring tables in mid/late sections are reliably detected.
+_TABLE_PROBE_MAX_PAGES = 5
+
+
+def _probe_page_indices(page_count: int, max_pages: int = _TABLE_PROBE_MAX_PAGES) -> list[int]:
+    """Choose distributed page indices (0-based) across the document to probe."""
+    if page_count <= 0:
+        return []
+    if page_count <= max_pages:
+        return list(range(page_count))
+    indices = {0, 1, page_count // 2, (3 * page_count) // 4, page_count - 1}
+    return sorted(idx for idx in indices if 0 <= idx < page_count)
 
 
 def _find_table_presence(doc) -> int | None:
-    """Probe up to `_TABLE_PROBE_PAGES` pages with PyMuPDF `find_tables`.
+    """Probe distributed pages across the document with PyMuPDF `find_tables`.
 
     Returns the number of tables found. `0` means the probe RAN and found no
     tables — a real measured negative, never a missing (§11). Returns `None`
@@ -187,13 +199,25 @@ def _find_table_presence(doc) -> int | None:
     """
     counts = 0
     probed = 0
-    for pno in range(min(doc.page_count, _TABLE_PROBE_PAGES)):
+    for pno in _probe_page_indices(doc.page_count, max_pages=_TABLE_PROBE_MAX_PAGES):
         try:
-            ft = doc[pno].find_tables()
+            page = doc[pno]
+            ft = page.find_tables()
             tables = getattr(ft, "tables", None)
             probed += 1
             if tables:
                 counts += len(tables)
+            else:
+                # Probe for borderless / 3-line tables via caption or text-strategy
+                txt = page.get_text()
+                caps = _TABLE_CAPTION_RE.findall(txt)
+                if caps:
+                    ft2 = page.find_tables(horizontal_strategy="lines", vertical_strategy="text")
+                    tables2 = getattr(ft2, "tables", None)
+                    if tables2:
+                        counts += len(tables2)
+                    else:
+                        counts += len(caps)
         except Exception:
             continue
     if probed == 0:

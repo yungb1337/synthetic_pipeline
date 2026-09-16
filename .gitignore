@@ -48,12 +48,26 @@ htmlcov/
 # Runtime logs
 logs/
 
+# Evaluation & experimental outputs
+artifacts/
+evaluation/
+model_test_results.txt
+
 # Checkpoint run heavy/regenerable artifacts — repo commits only the .md/.txt docs,
 # never parsed stores, downloaded PDFs, images, or per-doc judge verdict JSONs.
-checkpoints/run/*/parsed/
-checkpoints/run/*/parsed-*/
-checkpoints/run/*/store/
-checkpoints/run/*/input_pdfs/
-checkpoints/run/*/judgment/
-checkpoints/run/*/images/
-checkpoints/run/*/sources/**/*.pdf
+checkpoints/run/**/parsed/
+checkpoints/run/**/parsed-*/
+checkpoints/run/**/store/
+checkpoints/run/**/input_pdfs/
+checkpoints/run/**/judgment/
+checkpoints/run/**/images/
+checkpoints/run/**/judgment_test_cases/
+checkpoints/run/**/parsed_test_cases/
+checkpoints/run/**/sources/**/*.pdf
+checkpoints/run/**/sources/**/*.tmp
+checkpoints/run/**/corpus_*/parsed/
+checkpoints/run/**/corpus_*/judgment/
+checkpoints/run/**/corpus_*/selected_manifest.json
+checkpoints/run/**/selected_manifest.json
+checkpoints/run/**/manifest/
+checkpoints/run/**/test_run/
