@@ -35,7 +35,7 @@ def _route(filename: str) -> tuple[str, int]:
 
 
 @pytest.mark.parametrize("name", [
-    "2503.14023v2.pdf", "2504.12322v2.pdf",
+    "2503.14023v2.pdf", "2504.12322v2.pdf", "PDF v3.pdf",
 ])
 def test_dense_academic_papers_route_docling(name):
     route, cpx = _route(name)
@@ -46,11 +46,6 @@ def test_table_dense_acm_paper_routes_docling():
     """ACM paper with 22 tables across pages 4-8 routes to docling under distributed inspection."""
     route, cpx = _route("3548785.3548793.pdf")
     assert route == "docling", f"3548785.3548793.pdf: {route} (cpx={cpx}) expected docling"
-
-
-def test_pdf_v3_routes_enrichment():
-    route, cpx = _route("PDF v3.pdf")
-    assert route == "enrichment", f"PDF v3: {route} (cpx={cpx}) expected enrichment"
 
 
 def test_electronics_paper_routes_enrichment():
@@ -73,9 +68,10 @@ def test_scanned_docs_route_enrichment_ocr(name):
     assert route == "enrichment", f"{name}: {route} (cpx={cpx}) expected enrichment"
 
 
-def test_image_cert_routes_enrichment():
+def test_image_cert_routes_native():
+    """Digital certificate with clean vector text and high confidence routes to native."""
     route, cpx = _route("AWS Certified AI Practitioner certificate.pdf")
-    assert route == "enrichment", f"cert: {route} (cpx={cpx}) expected enrichment"
+    assert route == "native", f"cert: {route} (cpx={cpx}) expected native"
 
 
 def test_simple_text_pdf_routes_native(tmp_path):

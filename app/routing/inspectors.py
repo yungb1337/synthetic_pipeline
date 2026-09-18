@@ -12,6 +12,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+try:
+    import pdf_inspector
+    _PDF_INSPECTOR_AVAILABLE = True
+except ImportError:
+    _PDF_INSPECTOR_AVAILABLE = False
+
 _LOW_TEXT_CHARS = 30  # a page with fewer printable chars is "text-poor"
 _TABLE_CAPTION_RE = re.compile(r"\b(table|tab\.)\s+[0-9a-zivx]+", re.IGNORECASE)
 
@@ -70,6 +76,15 @@ class FastInspector:
     def inspect(self, data: bytes) -> InspectorFeatures | None:
         if not data:
             return None
+
+        # 1. Rust-level pre-inspection via firecrawl/pdf-inspector (sub-30ms)
+        rust_features = None
+        if _PDF_INSPECTOR_AVAILABLE:
+            try:
+                rust_features = pdf_inspector.process_pdf_bytes(data)
+            except Exception:
+                rust_features = None
+
         try:
             import fitz
         except Exception:
@@ -143,14 +158,28 @@ class FastInspector:
             except Exception:
                 f.images_per_page.append(0)
 
-            if _est_multi_column(page, float(w)):
-                f.est_multi_column_pages.append(pno)
+            # If Rust inspector gave column info, use it; otherwise fallback to PyMuPDF heuristic
+            if rust_features is None:
+                if _est_multi_column(page, float(w)):
+                    f.est_multi_column_pages.append(pno)
+
+        if rust_features is not None:
+            # Multi-column pages from Rust (1-indexed -> 0-indexed)
+            cols = getattr(rust_features, "pages_with_columns", []) or []
+            f.est_multi_column_pages = sorted([p - 1 for p in cols if 0 < p <= doc.page_count])
+
+            # Exact table detection from Rust core
+            tables = getattr(rust_features, "pages_with_tables", None)
+            if tables is not None:
+                f.detected_tables = len(tables)
+            else:
+                f.detected_tables = _find_table_presence(doc)
+        else:
+            f.detected_tables = _find_table_presence(doc)
 
         if total_area > 0:
             f.text_ratio = min(1.0, glyph_area / total_area)
         f.chars_per_page = [float(f.pages_char_count.get(p, 0)) for p in range(f.page_count)]
-
-        f.detected_tables = _find_table_presence(doc)
 
         doc.close()
         return f

@@ -44,7 +44,7 @@ _DEFAULT_WEIGHTS: dict[str, float] = {
     "metric_image_count": 0.0,
     "metric_full_image_page_count": 0.0,
     "metric_images_per_page": 0.0,
-    "metric_table_present": 0.0,
+    "metric_table_present": 8.0,
     "metric_font_embedded": 0.0,
     "metric_unusual_font": 0.0,
     "metric_text_extraction_confidence": 0.0,

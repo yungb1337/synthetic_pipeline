@@ -86,10 +86,45 @@ class Planner:
             band = "enrichment" if config.ocr_enabled else "native"
         return band
 
+    def _page_band(self, manifest: SourceManifest, base_band: str,
+                   decision: "RoutingDecision | None", config: ParserConfig,
+                   page_idx: int, table_pages: set[int] | None = None) -> str:
+        """Determines the per-page execution band.
+
+        If a specific page contains detected tables and Docling is available,
+        escalate that page to single-page Docling TableFormer while allowing
+        clean text pages to remain on the native fast path (~35-45 p/s).
+        """
+        if base_band in ("image", "simple"):
+            return base_band
+
+        # If specific table pages are known (1-indexed from pdf-inspector), check match
+        if table_pages is not None:
+            if (page_idx + 1) in table_pages:
+                if docling_loader.engine_available():
+                    return "docling"
+                return "enrichment" if config.ocr_enabled else "native"
+            # Clean non-table page in a docling-routed document stays on native
+            if base_band == "docling" and not config.ocr_enabled:
+                return "native"
+
+        return base_band
+
     def plan(self, manifest: SourceManifest, route: str | None,
              decision: "RoutingDecision | None", config: ParserConfig,
              resume: bool = False) -> ExecutionPlan:
         band = self._band(manifest, route, decision, config)
+
+        table_pages = None
+        if manifest.slug == "pdf" and manifest.src_path:
+            try:
+                import pdf_inspector
+                res = pdf_inspector.process_pdf(manifest.src_path)
+                p_tables = getattr(res, "pages_with_tables", None)
+                if p_tables:
+                    table_pages = set(p_tables)
+            except Exception:
+                pass
 
         base = ExecutionPlan(
             doc_id=manifest.doc_id,
@@ -140,12 +175,13 @@ class Planner:
         for p in manifest.expected_page_set:
             if p in done:
                 continue
+            p_band = self._page_band(manifest, band, decision, config, p, table_pages)
             base.work_items.append(PageWorkItem(
                 doc_id=manifest.doc_id,
                 source_hash=manifest.source_hash,
                 src_path=manifest.src_path,
                 page_index=p,
-                route=band,
+                route=p_band,
                 decision=decision,
                 models_dir=config.docling_models_dir,
                 ocr_enabled=config.ocr_enabled,
