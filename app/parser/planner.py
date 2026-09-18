@@ -71,9 +71,11 @@ class Planner:
 
     def _band(self, manifest: SourceManifest, route: str | None,
               decision: "RoutingDecision | None", config: ParserConfig) -> str:
-        # Band resolution: explicit route overrides; a present decision carries
-        # its own route (native/enrichment/docling); else auto (image/simple).
-        if route in ("native", "enrichment", "docling"):
+        # Band resolution: explicit layout_backend or route overrides;
+        # a present decision carries its own route (native/enrichment/docling); else auto.
+        if config.layout_backend == "docling" and manifest.slug == "pdf":
+            band = "docling"
+        elif route in ("native", "enrichment", "docling"):
             band = route
         elif decision is not None and getattr(decision, "route", None):
             band = decision.route
@@ -88,27 +90,40 @@ class Planner:
 
     def _page_band(self, manifest: SourceManifest, base_band: str,
                    decision: "RoutingDecision | None", config: ParserConfig,
-                   page_idx: int, table_pages: set[int] | None = None) -> str:
+                   page_idx: int, table_pages: set[int] | None = None,
+                   ocr_pages: set[int] | None = None) -> str:
         """Determines the per-page execution band.
 
         If a specific page contains detected tables and Docling is available,
         escalate that page to single-page Docling TableFormer while allowing
         clean text pages to remain on the native fast path (~35-45 p/s).
+        Pages requiring OCR route to the enrichment tier.
         """
         if base_band in ("image", "simple"):
             return base_band
 
-        # If specific table pages are known (1-indexed from pdf-inspector), check match
-        if table_pages is not None:
-            if (page_idx + 1) in table_pages:
-                if docling_loader.engine_available():
-                    return "docling"
-                return "enrichment" if config.ocr_enabled else "native"
-            # Clean non-table page in a docling-routed document stays on native
-            if base_band == "docling" and not config.ocr_enabled:
-                return "native"
+        # If user explicitly configured layout_backend="docling", execute docling
+        if config.layout_backend == "docling":
+            return "docling" if docling_loader.engine_available() else ("enrichment" if config.ocr_enabled else "native")
 
-        return base_band
+        # If route was explicitly forced (no routing decision), respect base_band
+        if decision is None:
+            return base_band
+
+        p_num = page_idx + 1
+
+        # Priority 1: Table-bearing pages escalate to single-page Docling TableFormer
+        if table_pages is not None and p_num in table_pages:
+            if docling_loader.engine_available():
+                return "docling"
+            return "enrichment" if config.ocr_enabled else "native"
+
+        # Priority 2: Pages requiring OCR route to enrichment
+        if (ocr_pages is not None and p_num in ocr_pages) or base_band == "enrichment":
+            return "enrichment" if config.ocr_enabled else "native"
+
+        # Priority 3: Clean non-table digital pages stay on native fast path
+        return "native"
 
     def plan(self, manifest: SourceManifest, route: str | None,
              decision: "RoutingDecision | None", config: ParserConfig,
@@ -116,6 +131,7 @@ class Planner:
         band = self._band(manifest, route, decision, config)
 
         table_pages = None
+        ocr_pages = None
         if manifest.slug == "pdf" and manifest.src_path:
             try:
                 import pdf_inspector
@@ -123,6 +139,14 @@ class Planner:
                 p_tables = getattr(res, "pages_with_tables", None)
                 if p_tables:
                     table_pages = set(p_tables)
+                p_ocr = getattr(res, "pages_needing_ocr", None)
+                enc = getattr(res, "has_encoding_issues", False)
+                ptype = getattr(res, "pdf_type", "text_based")
+                if p_ocr or enc or ptype in ("scanned", "image_based"):
+                    if p_ocr:
+                        ocr_pages = set(p_ocr)
+                    if enc or ptype in ("scanned", "image_based"):
+                        ocr_pages = set(range(1, manifest.page_count + 1))
             except Exception:
                 pass
 
@@ -175,7 +199,7 @@ class Planner:
         for p in manifest.expected_page_set:
             if p in done:
                 continue
-            p_band = self._page_band(manifest, band, decision, config, p, table_pages)
+            p_band = self._page_band(manifest, band, decision, config, p, table_pages, ocr_pages)
             base.work_items.append(PageWorkItem(
                 doc_id=manifest.doc_id,
                 source_hash=manifest.source_hash,
