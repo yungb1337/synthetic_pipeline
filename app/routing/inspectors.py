@@ -9,7 +9,6 @@ only observes. A feature it could not observe is reported explicitly as
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
 try:
@@ -19,7 +18,6 @@ except ImportError:
     _PDF_INSPECTOR_AVAILABLE = False
 
 _LOW_TEXT_CHARS = 30  # a page with fewer printable chars is "text-poor"
-_TABLE_CAPTION_RE = re.compile(r"\b(table|tab\.)\s+[0-9a-zivx]+", re.IGNORECASE)
 
 
 @dataclass
