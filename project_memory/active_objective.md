@@ -33,11 +33,14 @@ Promote the validated 3-tier per-page smart routing architecture from experiment
 - Verified single-page PyMuPDF byte slicing in `docling_loader.convert_path` (`page_range=(page+1, page+1)`). Zero whole-document Docling calls.
 - Verified worker pool recycling with `heavy_pool_max_tasks_per_child = 10` in `app/parser/scheduler.py` (peak host RAM < 2.5 GB RSS).
 
-### Phase 4: Architecture Decision Record
-- Authored `docs/adr/001-pdf-inspector-smart-routing.md` documenting the 3-tier routing architecture, empirical evidence from 2,017 documents, and zero-silent-loss defensive invariants.
+### Phase 4: Architecture Decision Record & Comparative Validation
+- Authored `docs/adr/001-pdf-inspector-smart-routing.md` and ADR-014 in `project_memory/architecture_decisions.md` documenting the 3-tier routing architecture, empirical evidence from 2,017 documents, and zero-silent-loss defensive invariants.
+- Executed production calibration on exact 40 documents (432 pages) with Gemini LLM Judge (`gemini-3.5-flash-lite`): 97.8% Fidelity (+1.4pp), 95.3% Structure (+1.4pp), 100% Pass Rate (0 FAILs), 2.04 p/s batch throughput, and 0 whole-doc Docling calls.
+- Executed 100-document mixed evaluation (1,302 pages): 355 tables extracted, 715 OCR blocks, 80.0% Rust native fast path, 0 silent drops.
 
 ## 3. Definition of Done: ALL PASSED
 1. Production `FastInspector` leverages `pdf-inspector` with PyMuPDF fallback: **PASSED**
 2. Routing policy and planner execute per-page TableFormer slicing: **PASSED**
 3. Pytest suite across all routing, parser, and architecture modules: **PASSED**
-4. ADR-001 authored and recorded in `docs/adr/`: **PASSED**
+4. ADR-001 / ADR-014 authored and recorded: **PASSED**
+5. Full calibration and mixed evaluation benchmarks executed and verified: **PASSED**
