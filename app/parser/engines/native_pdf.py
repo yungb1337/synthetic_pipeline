@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+import string
 import threading
+import unicodedata
 
 from ..config import ParserConfig
 from ..mime import MIME as _MIME
@@ -25,6 +27,55 @@ _REPEATING_GLYPH_RE = re.compile(
     r"^(a1|1a|01|10){3,}$",            # alternating vector patterns
     re.IGNORECASE,
 )
+_JOURNAL_MARGIN_BOILERPLATE_RE = re.compile(
+    r"^(open\s+access|citation:|received:|accepted:|published:|copyright\b|all\s+rights\s+reserved|"
+    r"creative\s+commons|https?://|doi:10\.|doi\.org/|page\s+\d+\s+of\s+\d+|\d+\s*/\s*\d+|"
+    r"vol\.\s*\d+|volume\s+\d+|issue\s+\d+|issn\s*\d+|isbn\s*\d+)",
+    re.IGNORECASE,
+)
+
+
+def _is_probable_heading(b: RecoveredBlock, body_med: float, threshold_ratio: float) -> bool:
+    """Classify if a block is genuinely a section heading or body paragraph (P1)."""
+    if not b.font_size or b.font_size <= body_med * threshold_ratio:
+        return False
+
+    raw = b.text.strip()
+    if not raw:
+        return False
+
+    # Filter 1: Too short / single punctuation / non-alphabetic tokens
+    if len(raw) <= 2 and not any(c.isalpha() for c in raw):
+        return False
+
+    # Filter 2: Punctuation density (decorative symbols, lines, separators)
+    punct_count = sum(1 for c in raw if c in string.punctuation)
+    if punct_count / max(len(raw), 1) > 0.5:
+        return False
+
+    words = raw.split()
+    word_count = len(words)
+
+    # Filter 3: Long blocks (> 25 words) are paragraphs or multi-sentence body text
+    if word_count > 25:
+        return False
+
+    # Filter 4: Sentence termination check
+    last_char = raw[-1]
+    if last_char in ('.', '?', '!'):
+        # Headings rarely end in full sentence terminators unless short section number
+        if word_count > 6:
+            return False
+        # Multiple sentences inside text
+        if ". " in raw:
+            return False
+
+    # Filter 5: Multi-line blocks with substantial word count
+    lines = [line.strip() for line in raw.split("\n") if line.strip()]
+    if len(lines) > 2 and word_count > 12:
+        return False
+
+    return True
 
 
 def _bbox_overlap_ratio(b_bbox: tuple[float, float, float, float] | None,
@@ -139,6 +190,12 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
         except Exception:
             pass
 
+        def _clean_cell(v: object) -> str:
+            if v is None:
+                return ""
+            s = unicodedata.normalize("NFC", str(v).strip())
+            return " ".join(s.split())
+
         for t in found_tables:
             try:
                 rows = t.extract()
@@ -146,8 +203,8 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
                 rows = []
             if not rows or len(rows) < 2 or _is_oversplit_table(rows):
                 continue
-            header = [str(c).strip() for c in rows[0]]
-            data = [[str(c).strip() for c in r] for r in rows[1:]]
+            header = [_clean_cell(c) for c in rows[0]]
+            data = [[_clean_cell(c) for c in r] for r in rows[1:]]
             # Discard ghost / empty tables that have no text in data cells
             if not any(any(c for c in r) for r in data):
                 continue
@@ -194,6 +251,7 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
         page_h = float(page.rect.height)
     except Exception:
         page_h = 792.0
+    last_was_heading = False
     for b in extracted_blocks:
         if b.bbox and page_h > 0:
             y_mid = (b.bbox[1] + b.bbox[3]) / 2.0
@@ -203,8 +261,22 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
             elif y_mid > page_h * 0.94:
                 b.kind = "footer"
                 continue
-        if b.font_size and b.font_size > body_med * config.pdf_heading_threshold_ratio:
-            b.kind = "heading"
+            elif (y_mid < page_h * 0.10 or y_mid > page_h * 0.90) and _JOURNAL_MARGIN_BOILERPLATE_RE.search(b.text.strip()):
+                b.kind = "header" if y_mid < page_h * 0.10 else "footer"
+                continue
+
+        if _is_probable_heading(b, body_med, config.pdf_heading_threshold_ratio):
+            # Hierarchy smoothing: if previous block was already heading with >= size,
+            # and current block is long or ends in period, demote current to paragraph
+            if last_was_heading and (b.text.strip().endswith('.') or len(b.text.split()) > 8):
+                b.kind = "paragraph"
+                last_was_heading = False
+            else:
+                b.kind = "heading"
+                last_was_heading = True
+        else:
+            b.kind = "paragraph"
+            last_was_heading = False
 
     # D6: supply this page's geometry keyed 0-based (== `page_index` == the
     # `page` field on every block/table/image this engine emits). The assembler

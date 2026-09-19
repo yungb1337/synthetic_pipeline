@@ -91,13 +91,15 @@ class Planner:
     def _page_band(self, manifest: SourceManifest, base_band: str,
                    decision: "RoutingDecision | None", config: ParserConfig,
                    page_idx: int, table_pages: set[int] | None = None,
-                   ocr_pages: set[int] | None = None) -> str:
+                   ocr_pages: set[int] | None = None,
+                   simple_table_pages: set[int] | None = None) -> str:
         """Determines the per-page execution band.
 
-        If a specific page contains detected tables and Docling is available,
-        escalate that page to single-page Docling TableFormer while allowing
-        clean text pages to remain on the native fast path (~35-45 p/s).
-        Pages requiring OCR route to the enrichment tier.
+        Two-Tier Table Routing (P2):
+        - Clean non-table digital pages stay on native fast path (~35-45 p/s).
+        - Simple bordered table pages (in simple_table_pages) stay on native path (~30-40 p/s).
+        - Complex / borderless table pages escalate to single-page Docling TableFormer.
+        - Pages requiring OCR route to enrichment.
         """
         if base_band in ("image", "simple"):
             return base_band
@@ -112,8 +114,12 @@ class Planner:
 
         p_num = page_idx + 1
 
-        # Priority 1: Table-bearing pages escalate to single-page Docling TableFormer
+        # Priority 1: Table-bearing pages
         if table_pages is not None and p_num in table_pages:
+            # If table is a simple bordered grid, native path handles it with find_tables
+            if simple_table_pages is not None and p_num in simple_table_pages:
+                return "native"
+            # Complex/borderless tables escalate to single-page Docling TableFormer
             if docling_loader.engine_available():
                 return "docling"
             return "enrichment" if config.ocr_enabled else "native"
@@ -131,6 +137,7 @@ class Planner:
         band = self._band(manifest, route, decision, config)
 
         table_pages = None
+        simple_table_pages = set()
         ocr_pages = None
         if manifest.slug == "pdf" and manifest.src_path:
             try:
@@ -149,6 +156,39 @@ class Planner:
                         ocr_pages = set(range(1, manifest.page_count + 1))
             except Exception:
                 pass
+
+            # Two-tier table probe: test if detected tables are simple bordered grids
+            if table_pages:
+                try:
+                    import fitz
+                    with fitz.open(manifest.src_path) as doc:
+                        for p_num in table_pages:
+                            p_idx = p_num - 1
+                            if 0 <= p_idx < len(doc):
+                                page = doc[p_idx]
+                                finder = page.find_tables(strategy="lines")
+                                if finder and finder.tables:
+                                    all_simple = True
+                                    for t in finder.tables:
+                                        try:
+                                            rows = t.extract()
+                                            if not rows or len(rows) < 2 or len(rows[0]) < 2:
+                                                all_simple = False
+                                                break
+                                            ncols = len(rows[0])
+                                            if ncols > 10:
+                                                all_simple = False
+                                                break
+                                            if not all(len(r) == ncols for r in rows):
+                                                all_simple = False
+                                                break
+                                        except Exception:
+                                            all_simple = False
+                                            break
+                                    if all_simple:
+                                        simple_table_pages.add(p_num)
+                except Exception:
+                    pass
 
         base = ExecutionPlan(
             doc_id=manifest.doc_id,
@@ -199,7 +239,7 @@ class Planner:
         for p in manifest.expected_page_set:
             if p in done:
                 continue
-            p_band = self._page_band(manifest, band, decision, config, p, table_pages, ocr_pages)
+            p_band = self._page_band(manifest, band, decision, config, p, table_pages, ocr_pages, simple_table_pages=simple_table_pages)
             base.work_items.append(PageWorkItem(
                 doc_id=manifest.doc_id,
                 source_hash=manifest.source_hash,

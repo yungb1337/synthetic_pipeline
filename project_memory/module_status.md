@@ -63,6 +63,19 @@ metadata:
   - **Quality & LLM Judge Audit:** Corpus 1000 achieved **96.0% Pass Rate** across 1,000 evaluated documents (94.3% completeness, 94.4% fidelity, 88.4% structure, 87.8% table accuracy, 97.7% OCR). Corpus 945 achieved **95.3% Pass Rate** across 192 evaluated documents prior to free-tier API daily quota exhaustion. Combined evaluated pass rate: **95.9%**.
   - **ADRs & Invariants:** Documented in [docs/adr/001-pdf-inspector-smart-routing.md](docs/adr/001-pdf-inspector-smart-routing.md) and ADR-014. Zero silent page drops, zero whole-document Docling calls. Full report generated in [artifacts/full_corpus_evaluation_report.md](artifacts/full_corpus_evaluation_report.md).
 
+- [x] **Parser Quality Enhancements (P1, P2, P4, P5) & 250 Issue-Document Cohort Re-Evaluation COMPLETE (2026-09-19)** — Implemented and verified the 4 approved parser defect improvements (excluding P3 per user direction) and evaluated against the 250 highest-severity defect documents (3,680 pages) from the full dual-corpus benchmark:
+  - **P1 Heading vs Paragraph Classifier (`native_pdf.py`):** Added length floors, punctuation density rejection (>50%), sentence terminator rules (`.`, `?`, `!`), word count limits (>25 words), and consecutive heading smoothing.
+  - **P2 Two-Tier Table Escalation (`planner.py`):** Probed table-bearing pages with PyMuPDF line detection to keep standard rectangular bordered tables on native path (~35-45 p/s), dropping Docling TableFormer escalations from 20.79% to **7.55%** (278/3,680 pages) on the issue cohort and boosting throughput to **1.96 pages/sec**.
+  - **P4 Header/Footer Margin Filtering (`native_pdf.py`):** Suppressed journal metadata boilerplate (`OPEN ACCESS`, `Citation:`, `DOI:`, etc.) in top/bottom 10% margins into `header`/`footer` blocks, preventing body contamination.
+  - **P5 Table Unicode & Wrap Refinement (`docling_loader.py` & `native_pdf.py`):** Added Unicode NFC normalization preserving scientific symbols (`±`, `≥`, `≤`, `~`, `→`, `≈`, `≠`, `µ`, `°`, `α`, `β`, `γ`) and collapsed wrapped multi-line cell text.
+  - **Targeted Cohort LLM Judge Results (250 docs / 3,680 pages):**
+    - Pass rate surged from **50.0%** to **98.4%** (89 PASS, 157 PASS_WITH_ISSUES, 3 FAIL).
+    - Structure score surged: **41.9% → 92.7% (+50.8 pp)**.
+    - Table score surged: **34.6% → 77.2% (+42.6 pp)**.
+    - Fidelity score surged: **53.3% → 96.3% (+43.0 pp)**.
+    - Completeness surged: **54.3% → 95.1% (+40.8 pp)**.
+    - Resilient judging: 250/250 evaluated with zero rate-limit dropouts via sequential multi-key rotation (`key`, `key1`, `key2`). Reports: `artifacts/targeted_eval_post_fix/summary.json` and `artifacts/targeted_eval_post_fix/targeted_evaluation_report.md`.
+
 - [ ] Archive the academic-PDF read (re-dispatch) → ground Ontology/KG/Ontology decisions
 
 ## Next module

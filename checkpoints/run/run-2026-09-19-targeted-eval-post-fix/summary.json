@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-09-19T03:25:04.866528+00:00",
+  "cohort_size": 250,
+  "evaluated_docs": 249,
+  "total_pages": 3680,
+  "parse_throughput_pps": 1.96,
+  "parse_time_sec": 1881.58,
+  "routing": {
+    "native_pages": 3394,
+    "native_pct": 92.23,
+    "docling_pages": 278,
+    "docling_pct": 7.55
+  },
+  "verdicts_before": {
+    "PASS_WITH_ISSUES": 125,
+    "FAIL": 125
+  },
+  "verdicts_after": {
+    "PASS_WITH_ISSUES": 157,
+    "PASS": 89,
+    "FAIL": 3,
+    "UNKNOWN": 1
+  },
+  "pass_rate_before": 50.0,
+  "pass_rate_after": 98.4,
+  "metrics_before": {
+    "completeness": 54.3,
+    "fidelity": 53.3,
+    "structure": 41.9,
+    "tables": 34.6,
+    "references": 53.6,
+    "scans_ocr": 61.8
+  },
+  "metrics_after": {
+    "completeness": 95.1,
+    "fidelity": 96.3,
+    "structure": 92.7,
+    "tables": 77.2,
+    "references": 94.1,
+    "scans_ocr": 99.2
+  },
+  "metric_deltas": {
+    "completeness": 40.8,
+    "fidelity": 43.0,
+    "structure": 50.8,
+    "tables": 42.6,
+    "references": 40.5,
+    "scans_ocr": 37.4
+  },
+  "elements": {
+    "blocks": 47563,
+    "tables": 1012,
+    "images": 2559,
+    "references": 8853
+  }
+}

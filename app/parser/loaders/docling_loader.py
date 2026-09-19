@@ -24,6 +24,7 @@ import os
 import re
 import tempfile
 import threading
+import unicodedata
 from typing import Optional
 
 # Docling's layout model runs through torch.compile, which needs Triton — not
@@ -766,7 +767,17 @@ def _map_table_via_dataframe(item, rec: RecoveredDocument, page: int, bbox,
 # ids, page numbers, or document-specific text.
 
 def _clean_cell(value) -> str:
-    return "" if value is None else str(value).strip()
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    # NFC normalization composes characters consistently while preserving mathematical
+    # and statistical symbols (±, ≥, ≤, ~, →, ≈, ≠, µ, °, etc.)
+    text = unicodedata.normalize("NFC", text)
+    # Join multi-line wrapped text within cells and collapse whitespace
+    text = " ".join(text.split())
+    return text
 
 
 def _is_continuation(later: RecoveredTable, earlier: RecoveredTable) -> bool:
