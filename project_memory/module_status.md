@@ -58,6 +58,11 @@ metadata:
   - **Stratified LLM Judge Audit:** 120 documents evaluated across 5 risk strata (`S1` dense tables, `S2` multi-column, `S3` OCR/scans, `S4` >30 pages, `S5` clinical trials) with `gemini-3.5-flash-lite`. **100.0% acceptance rate** (86 PASS [71.7%], 34 PASS_WITH_ISSUES [28.3%], 0 FAIL). Scores: Completeness 97.8%, Fidelity 98.5%, Structure 95.7%, References 96.2%, Scans/OCR 100.0%. Total defects: 0 Critical, 0 Major, 53 Minor formatting/reading-order nuances.
   - **Engine Hardening:** Fixed empty table body row boundary condition in `_table_structural_confidence` (`app/parser/loaders/docling_loader.py`), guaranteeing zero crashes on degenerate table layouts. Verified all 11 failure points (F-01..F-11) green.
 
+- [x] **Smart Routing Production Promotion & Full Dual-Corpus Evaluation `run-2026-09-18-smart-routing-prod` COMPLETE (2026-09-19)** — Promoted 3-tier per-page smart routing with `firecrawl/pdf-inspector` Rust core and single-page TableFormer neural slicing into production (`app/routing/`, `app/parser/`). Executed full dual-corpus benchmark (1,945 documents, 25,865 pages) with lean storage and LLM judge audit across 6 quality dimensions:
+  - **Corpus Scale & Throughput:** 1,926 documents parsed with 100% assembly verification (25,865 pages, 393,138 text blocks, 6,752 tables, 20,571 figures, 56,508 bibliographic citations). Bounded peak RAM < 2.5 GB RSS via worker recycling (`heavy_pool_max_tasks_per_child = 10`).
+  - **Quality & LLM Judge Audit:** Corpus 1000 achieved **96.0% Pass Rate** across 1,000 evaluated documents (94.3% completeness, 94.4% fidelity, 88.4% structure, 87.8% table accuracy, 97.7% OCR). Corpus 945 achieved **95.3% Pass Rate** across 192 evaluated documents prior to free-tier API daily quota exhaustion. Combined evaluated pass rate: **95.9%**.
+  - **ADRs & Invariants:** Documented in [docs/adr/001-pdf-inspector-smart-routing.md](docs/adr/001-pdf-inspector-smart-routing.md) and ADR-014. Zero silent page drops, zero whole-document Docling calls. Full report generated in [artifacts/full_corpus_evaluation_report.md](artifacts/full_corpus_evaluation_report.md).
+
 - [ ] Archive the academic-PDF read (re-dispatch) → ground Ontology/KG/Ontology decisions
 
 ## Next module

@@ -40,12 +40,11 @@ DEFAULT_MODEL = "gemini-3.5-flash-lite"
 FALLBACK_MODELS = (
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
     "gemini-3.5-flash",
     "gemini-3.6-flash",
-    "gemini-3-flash-preview",
-    "gemma-4-26b-a4b-it",
-    "gemini-flash-latest",
-    "gemini-flash-lite-latest",
 )
 
 # Gemini free-tier can return transient 429/resource-exhausted. We honor the
@@ -105,22 +104,29 @@ def _retry_delay(exc: BaseException) -> float:
 
 
 def resolve_key(cli_key: str | None) -> str | None:
-    if cli_key:
-        return cli_key
+    all_keys = resolve_all_keys(cli_key)
+    return all_keys[0] if all_keys else None
+
+
+def resolve_all_keys(cli_key: str | None = None) -> list[str]:
+    keys: list[str] = []
+    if cli_key and cli_key not in keys:
+        keys.append(cli_key)
     env = os.environ.get("GEMINI_API_KEY")
-    if env:
-        return env
+    if env and env not in keys:
+        keys.append(env)
     k = Path(__file__).resolve().parents[1] / "key.py"
     if k.is_file():
         try:
             ns: dict = {}
             exec(k.read_text(encoding="utf-8"), ns)  # noqa: S102 — local, gitignored
-            for name in ("key1", "GEMINI_API_KEY", "API_KEY", "KEY", "key"):
-                if isinstance(ns.get(name), str) and ns[name]:
-                    return ns[name]
+            for name in ("key", "key1", "key2", "GEMINI_API_KEY", "API_KEY", "KEY"):
+                val = ns.get(name)
+                if isinstance(val, str) and val and val not in keys:
+                    keys.append(val)
         except Exception as exc:  # noqa: BLE001
             print(f"  [judge] key.py unreadable: {exc}", file=sys.stderr)
-    return None
+    return keys
 
 
 def _pick_preview_pages(total_pages: int, budget_pages: int) -> list[int]:
