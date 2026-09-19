@@ -10,6 +10,7 @@ Persistent checkpoint + context files for this project.
 - [Module Status](module_status.md) — build order + live status (Parser/Normalizer/batch done; real GPU embeddings).
 - [Questions](questions.md) — open decisions gating code (stack now resolved; the deferred KG contradiction).
 - [ADR-001 Smart Routing](../docs/adr/001-pdf-inspector-smart-routing.md) — 3-tier per-page routing with sub-30ms Rust stream inspection and single-page TableFormer slicing (+19.6pp table quality gain).
+- [Targeted Issue Cohort Re-Evaluation](../checkpoints/run/run-2026-09-19-targeted-eval-post-fix/final-report.md) — 250 high-priority defect docs re-evaluated post-P1/P2/P4/P5 fixes: pass rate surged from 50.0% to 98.4%, structure +50.8pp, tables +42.6pp, Docling escalation dropped to 7.55%.
 - [Experimentation Plan](../docs/pdf-inspector-experimentation-plan.md) — empirical evaluation across 2,017 documents (27,914 pages) with Gemini 3.5 Flash Lite LLM Judge scorecards.
 - **Docs (design):** `docs/parser-module-spec.md` (Module #1) · `docs/normalizer-module-spec.md` (Module #2) · `docs/scale-batch-spec.md` (batch/throughput) · `docs/universal-document-understanding-engine.md` (earlier platform design).
 - **GPU/local models:** `requirements-gpu.txt` (torch cu126 + sentence-transformers) · `models/bge-m3` (BGE-M3 1024-dim) · `scripts/download_models.py` · `scripts/check_embedder.py` · `app/embedding/sbert.py`.

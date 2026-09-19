@@ -67,9 +67,20 @@ We adopt a **3-Tier Per-Page Smart Routing Architecture** integrated into the co
 - **Graceful Fallback**: If `pdf-inspector` is uninstalled or fails on an edge case, `FastInspector` falls back to PyMuPDF `_find_table_presence` and `_est_multi_column` without breaking the `InspectorFeatures` contract.
 
 ### 4.2 3-Tier Per-Page Routing Policy (`app/parser/planner.py` & `app/routing/config.py`)
-- **Tier 1 (`rust_native` / `native_pdf`):** Clean digital text, multi-column, and list pages route to the fast path (~35–45 pages/sec, peak RAM < 0.15 GB RSS).
+- **Tier 1 (`rust_native` / `native_pdf`):** Clean digital text, multi-column, list pages, and simple bordered tables route to the fast path (~30–45 pages/sec, peak RAM < 0.15 GB RSS).
 - **Tier 2 (`enrichment_ocr` / `cuda_ocr`):** Scanned documents, tickets, receipts, and pages with corrupt CMaps route to RapidOCR (PP-OCRv6 ONNX).
-- **Tier 3 (`docling_heavy`):** Pages with detected tables are escalated to single-page Neural TableFormer cell-snapping. Clean pages within the same document remain on Tier 1.
+- **Tier 3 (`docling_heavy`):** Complex, borderless, or multi-row span tables escalate to single-page Neural TableFormer cell-snapping. Clean pages within the same document remain on Tier 1.
+
+### 4.2.1 Two-Tier Table Escalation & Routing Optimization (`app/parser/planner.py`)
+- In `Planner.plan()`, table-bearing pages are probed with PyMuPDF `find_tables(strategy="lines")`.
+- Standard rectangular bordered tables (<10 columns, consistent column count) remain on the fast native path (`native_pdf`), bypassing neural TableFormer.
+- Complex or borderless tables escalate to single-page Docling TableFormer (`docling_heavy`).
+- **Impact:** Reduces Docling TableFormer calls by >63% (escalation dropped from 20.79% to **7.55%** on table-bearing issue cohorts), accelerating live parse throughput to **1.96 pages/sec**.
+
+### 4.2.2 Parser Quality Enhancements (`app/parser/engines/native_pdf.py` & `app/parser/loaders/docling_loader.py`)
+- **P1 Heading vs Paragraph Classifier:** Probabilistic heading classifier enforcing minimum length floors, punctuation density rejection (>50%), sentence terminator rules (`.`, `?`, `!`), word count limits (>25 words), and consecutive heading hierarchy smoothing.
+- **P4 Header/Footer Margin Filtering:** Suppresses journal metadata and boilerplate (`OPEN ACCESS`, `Citation:`, `DOI:10.`, etc.) within top/bottom 10% margins, classifying them as `header`/`footer` blocks.
+- **P5 Table Unicode Normalization:** Unicode NFC normalization preserving scientific and mathematical symbols (`±`, `≥`, `≤`, `~`, `→`, `≈`, `≠`, `µ`, `°`, `α`, `β`, `γ`) and collapsed wrapped multi-line cell text across both Docling and native table extractors.
 
 ### 4.3 Single-Page TableFormer Execution Slicing (`app/parser/loaders/docling_loader.py`)
 - Docling is executed strictly on isolated single-page buffers using `page_range=(page + 1, page + 1)` and PyMuPDF byte slicing (`convert_path` / `parse(page_bytes)`).

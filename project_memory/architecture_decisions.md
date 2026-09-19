@@ -445,3 +445,43 @@ largest edge in pixels we hand to the OCR engine.)
   - Production commits every page to the `PageStore`, writes immutable audit trails to `plan.json` in the `Ledger`, and performs strict validation (guaranteeing 0 silent page drops and 0 dead-letter pages across all 432 calibration pages and 1,302 mixed corpus pages).
 - **Summary:**
   - Compared to the legacy whole-document Docling approach (~0.3 p/s), the `smart_routing` production pipeline delivers a **~5.5x to 8x throughput acceleration (2.04 p/s vs 0.3 p/s)** while preserving **~35–45 p/s** on clean pages and achieving **100% PASS** on hard documents.
+
+---
+
+## ADR-015 — Parser Quality Enhancements & Two-Tier Table Escalation (2026-09-19, run-2026-09-19-targeted-eval-post-fix)
+
+**Decision:** Implement 4 targeted parser defect improvements (P1, P2, P4, P5) across heading classification, table escalation, margin filtering, and Unicode normalization, excluding P3 (Author-Year reference extraction) per user instruction:
+
+1. **P1 — Probabilistic Heading vs Paragraph Classifier (`app/parser/engines/native_pdf.py`):**
+   - Disambiguate large-font headings from body paragraphs using:
+     - Minimum token length floor and non-alphabetic token rejection.
+     - Punctuation density limits (>50% punctuation rejected from heading classification).
+     - Sentence termination check: blocks ending in `.`, `?`, or `!` with >6 words or internal `. ` demoted to `paragraph`.
+     - Word count cap: blocks with >25 words forced to `paragraph`.
+     - Consecutive heading hierarchy smoothing: demote sequential large-font blocks to `paragraph`.
+
+2. **P2 — Two-Tier Table Escalation (`app/parser/planner.py`):**
+   - Table-bearing pages are probed during planning with PyMuPDF `find_tables(strategy="lines")`.
+   - Simple rectangular bordered tables (<10 columns, consistent column count) remain on the fast native path (`native_pdf`, ~30–40 p/s), bypassing neural TableFormer.
+   - Only complex, irregular, or borderless tables escalate to single-page Docling TableFormer (`docling_heavy`).
+   - Slashes Docling heavy calls by >63% (escalation rate dropped from 20.8% to 7.55% on table-heavy cohorts), increasing live parse throughput to **1.96 pages/sec**.
+
+3. **P4 — Header/Footer Margin Filtering Enhancement (`app/parser/engines/native_pdf.py`):**
+   - Expanded margin bands (top/bottom 10% page height) coupled with `_JOURNAL_MARGIN_BOILERPLATE_RE` regex (`OPEN ACCESS`, `Citation:`, `Received:`, `Accepted:`, `Published:`, `DOI:10.`, etc.).
+   - Matches classified as `header`/`footer` blocks, preventing publisher metadata from polluting body text reading order.
+
+4. **P5 — Table Unicode & Multi-Line Wrap Normalization (`app/parser/loaders/docling_loader.py` & `app/parser/engines/native_pdf.py`):**
+   - Standardized `_clean_cell()` using Unicode NFC normalization (`unicodedata.normalize("NFC", ...)`), preserving mathematical and statistical symbols (`±`, `≥`, `≤`, `~`, `→`, `≈`, `≠`, `µ`, `°`, `α`, `β`, `γ`).
+   - Unified multi-line wrapped text within table cells across both Docling and native table extractors.
+
+**Fact** (adopted on branch `smart_routing`).
+
+**Verification on 250 High-Priority Defect Documents (3,680 Pages):**
+- **Pass Rate:** surged from **50.0%** to **98.4%** (89 PASS, 157 PASS_WITH_ISSUES, 3 FAIL).
+- **Structure Score:** 41.9% → **92.7%** (+50.8 pp).
+- **Table Quality Score:** 34.6% → **77.2%** (+42.6 pp).
+- **Fidelity Score:** 53.3% → **96.3%** (+43.0 pp).
+- **Completeness Score:** 54.3% → **95.1%** (+40.8 pp).
+- **Scans / OCR Score:** 61.8% → **99.2%** (+37.4 pp).
+- **Docling Heavy Escalation:** reduced from 20.79% to **7.55%** of pages (278 / 3,680 pages).
+
