@@ -81,21 +81,25 @@ class ArtifactManager:
         return p_out, p_err
 
     def save_evaluation_manifest(self, manifest: list[dict[str, Any]]) -> Path:
+        self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "manifest.json"
         p.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
         return p
 
     def save_evaluation_results(self, results: list[dict[str, Any]]) -> Path:
+        self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "results.json"
         p.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
         return p
 
     def save_judge_results(self, judge_results: dict[str, Any]) -> Path:
+        self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "judge_results.json"
         p.write_text(json.dumps(judge_results, indent=2, ensure_ascii=False), encoding="utf-8")
         return p
 
     def save_summary_report(self, report_dict: dict[str, Any]) -> Path:
+        self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "report.json"
         p.write_text(json.dumps(report_dict, indent=2, ensure_ascii=False), encoding="utf-8")
         return p
