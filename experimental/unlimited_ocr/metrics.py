@@ -1,5 +1,5 @@
-"""Deterministic structural and performance metrics for document extraction.
-"""
+"""Deterministic structural and performance metrics for document extraction."""
+
 from __future__ import annotations
 
 import collections

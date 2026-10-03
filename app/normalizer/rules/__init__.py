@@ -3,9 +3,11 @@
 Provides pure, deterministic, idempotent transformation rules with support
 for runtime extension without core modifications.
 """
+
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Optional
 
 from .base import RuleContext, RuleFunction, RuleResult
 from .dehyphenate import dehyphenate
@@ -37,7 +39,7 @@ RULE_MAP: dict[str, RuleFunction] = {
 }
 
 
-def register_rule(rule_id: str, fn: RuleFunction, index: Optional[int] = None) -> None:
+def register_rule(rule_id: str, fn: RuleFunction, index: int | None = None) -> None:
     """Register a custom normalization rule at runtime.
 
     Allows future domain-specific enhancements without modifying core files.
@@ -53,24 +55,26 @@ def register_rule(rule_id: str, fn: RuleFunction, index: Optional[int] = None) -
 def get_rule(rule_id: str) -> RuleFunction:
     """Retrieve a rule function by its identifier."""
     if rule_id not in RULE_MAP:
-        raise KeyError(f"Unknown normalizer rule ID: '{rule_id}'. Available: {list(RULE_MAP.keys())}")
+        raise KeyError(
+            f"Unknown normalizer rule ID: '{rule_id}'. Available: {list(RULE_MAP.keys())}"
+        )
     return RULE_MAP[rule_id]
 
 
 __all__ = [
-    "RuleContext",
-    "RuleResult",
-    "RuleFunction",
-    "strip_controls",
-    "unicode",
-    "nfc",
-    "nfkc",
-    "expand_ligatures",
-    "dehyphenate",
-    "collapse_whitespace",
-    "typography",
     "RULE_MAP",
     "RULE_ORDER",
-    "register_rule",
+    "RuleContext",
+    "RuleFunction",
+    "RuleResult",
+    "collapse_whitespace",
+    "dehyphenate",
+    "expand_ligatures",
     "get_rule",
+    "nfc",
+    "nfkc",
+    "register_rule",
+    "strip_controls",
+    "typography",
+    "unicode",
 ]

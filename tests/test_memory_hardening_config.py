@@ -1,4 +1,5 @@
 """Tests for memory hardening configuration and scheduler recycling."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -35,7 +36,9 @@ def test_parser_config_custom_values():
 
 def test_make_pipeline_options_honors_generate_picture_images():
     class DummyPipelineOptions:
-        def __init__(self, do_ocr=True, do_code_formula=False, generate_picture_images=True):
+        def __init__(
+            self, do_ocr=True, do_code_formula=False, generate_picture_images=True
+        ):
             self.do_ocr = do_ocr
             self.do_code_formula = do_code_formula
             self.generate_picture_images = generate_picture_images
@@ -64,7 +67,9 @@ def test_scheduler_passes_max_tasks_per_child():
         mock_pool = MagicMock()
         return mock_pool
 
-    with patch("app.parser.scheduler.ProcessPoolExecutor", side_effect=mock_pool_constructor):
+    with patch(
+        "app.parser.scheduler.ProcessPoolExecutor", side_effect=mock_pool_constructor
+    ):
         pool = sched._get_heavy_pool()
         assert pool is not None
         assert captured_kwargs.get("max_tasks_per_child") == 7

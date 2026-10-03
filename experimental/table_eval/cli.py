@@ -1,12 +1,11 @@
-"""CLI entrypoint for the Table + Layout Model Benchmark.
-"""
+"""CLI entrypoint for the Table + Layout Model Benchmark."""
+
 from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-from .config import BenchmarkConfig, PERMUTATIONS
+from .config import PERMUTATIONS, BenchmarkConfig
 from .runner import BenchmarkRunner
 
 
@@ -57,7 +56,9 @@ def main() -> None:
 
     if args.list_strategies:
         print("\n=== Table & Layout Benchmark Strategy Registry ===")
-        print(f"{'ID':<6} | {'Strategy Name':<28} | {'VRAM / GPU':<10} | {'Description'}")
+        print(
+            f"{'ID':<6} | {'Strategy Name':<28} | {'VRAM / GPU':<10} | {'Description'}"
+        )
         print("-" * 90)
         for s_id, s in sorted(PERMUTATIONS.items()):
             gpu_str = "GPU Req" if s.requires_gpu else "CPU Safe"
@@ -73,7 +74,9 @@ def main() -> None:
 
     if args.corpus == "smoke":
         # 2 representative PDFs: 2302.04143 (3-page multi-table paper) and PMC10234567 (single-page)
-        pdf_paths = [p for p in all_pdfs if p.name in ("2302.04143.pdf", "PMC10234567.pdf")]
+        pdf_paths = [
+            p for p in all_pdfs if p.name in ("2302.04143.pdf", "PMC10234567.pdf")
+        ]
         if not pdf_paths and all_pdfs:
             pdf_paths = all_pdfs[:2]
     elif args.corpus == "reference":
@@ -97,7 +100,9 @@ def main() -> None:
         else:
             strat_ids = ["P002", "P003", "P008", "P010", "P014"]
 
-    print(f"Starting Benchmark: Stage='{args.stage}', Corpus='{args.corpus}' ({len(pdf_paths)} docs), Strategies={strat_ids}")
+    print(
+        f"Starting Benchmark: Stage='{args.stage}', Corpus='{args.corpus}' ({len(pdf_paths)} docs), Strategies={strat_ids}"
+    )
     runner.run_stage(stage=args.stage, strategy_ids=strat_ids, pdf_paths=pdf_paths)
 
 

@@ -11,10 +11,10 @@ Exit code:
     0: All checks passed
     1: One or more checks failed (insufficient headroom)
 """
+
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 try:
@@ -79,7 +79,9 @@ def check_swap() -> tuple[bool, str]:
         return True, f"[INFO] Swap check error: {exc}"
 
 
-def run_preflight(min_ram_gb: float = 3.0, min_disk_gb: float = 5.0, path: str = ".") -> bool:
+def run_preflight(
+    min_ram_gb: float = 3.0, min_disk_gb: float = 5.0, path: str = "."
+) -> bool:
     """Run all preflight checks and print formatted results. Returns True if all pass."""
     print("=== Pre-flight System Headroom Check ===")
     ram_ok, ram_msg = check_ram(min_ram_gb=min_ram_gb)
@@ -100,12 +102,29 @@ def run_preflight(min_ram_gb: float = 3.0, min_disk_gb: float = 5.0, path: str =
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--min-ram-gb", type=float, default=3.0, help="Min available RAM in GB (default: 3.0)")
-    parser.add_argument("--min-disk-gb", type=float, default=5.0, help="Min free disk in GB (default: 5.0)")
-    parser.add_argument("--path", type=str, default=".", help="Target directory for disk check (default: .)")
+    parser.add_argument(
+        "--min-ram-gb",
+        type=float,
+        default=3.0,
+        help="Min available RAM in GB (default: 3.0)",
+    )
+    parser.add_argument(
+        "--min-disk-gb",
+        type=float,
+        default=5.0,
+        help="Min free disk in GB (default: 5.0)",
+    )
+    parser.add_argument(
+        "--path",
+        type=str,
+        default=".",
+        help="Target directory for disk check (default: .)",
+    )
     args = parser.parse_args()
 
-    ok = run_preflight(min_ram_gb=args.min_ram_gb, min_disk_gb=args.min_disk_gb, path=args.path)
+    ok = run_preflight(
+        min_ram_gb=args.min_ram_gb, min_disk_gb=args.min_disk_gb, path=args.path
+    )
     return 0 if ok else 1
 
 

@@ -11,6 +11,7 @@ Extracts per-batch: wall time, pages, ms/page (=> pages/s), peak tree RSS,
 peak worker RSS, OK/failed/dead counts and extraction yield, then prints a
 markdown table with delta columns vs the baseline.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -78,7 +79,10 @@ def main() -> int:
 
     header = (
         "| metric | baseline (b100, pre-fix) "
-        + " ".join(f"| {r['file'].replace('benchmark-', '').replace('.md', '')} (post-fix)" for r in runs)
+        + " ".join(
+            f"| {r['file'].replace('benchmark-', '').replace('.md', '')} (post-fix)"
+            for r in runs
+        )
         + " |"
     )
     sep = "|---|" + "---|" * len(runs)
@@ -86,14 +90,29 @@ def main() -> int:
 
     rows = [
         ("docs OK / issued", lambda r: f"{r['ok']}/{r['issued']}"),
-        ("failed/dead/unparsed", lambda r: f"{r['failed']}/{r['dead']}/{r['unparsed']}"),
-        ("wall time (min)", lambda r: f"{r['wall_s']/60:.2f}" if r['wall_s'] else "-"),
+        (
+            "failed/dead/unparsed",
+            lambda r: f"{r['failed']}/{r['dead']}/{r['unparsed']}",
+        ),
+        (
+            "wall time (min)",
+            lambda r: f"{r['wall_s'] / 60:.2f}" if r["wall_s"] else "-",
+        ),
         ("pages parsed", lambda r: str(r["pages"])),
-        ("mean ms/page", lambda r: f"{r['ms_per_page']:.0f}" if r['ms_per_page'] else "-"),
+        (
+            "mean ms/page",
+            lambda r: f"{r['ms_per_page']:.0f}" if r["ms_per_page"] else "-",
+        ),
         ("pages/s (per-doc mean)", lambda r: str(r["pages_per_s_doc"])),
         ("pages/s (batch wall)", lambda r: str(r["pages_per_s_wall"])),
-        ("peak tree RSS (MB)", lambda r: f"{r['peak_tree_mb']:.0f}" if r['peak_tree_mb'] else "-"),
-        ("peak worker RSS (MB)", lambda r: f"{r['peak_worker_mb']:.0f}" if r['peak_worker_mb'] else "-"),
+        (
+            "peak tree RSS (MB)",
+            lambda r: f"{r['peak_tree_mb']:.0f}" if r["peak_tree_mb"] else "-",
+        ),
+        (
+            "peak worker RSS (MB)",
+            lambda r: f"{r['peak_worker_mb']:.0f}" if r["peak_worker_mb"] else "-",
+        ),
         ("blocks", lambda r: str(r["blocks"])),
         ("tables", lambda r: str(r["tables"])),
         ("references", lambda r: str(r["refs"])),
@@ -104,8 +123,13 @@ def main() -> int:
 
     # Delta lines (vs baseline) for the key metrics.
     lines.append("\n## Deltas vs baseline\n")
-    lines.append("| metric | " + " | ".join(
-        r["file"].replace("benchmark-", "").replace(".md", "") for r in runs) + " |")
+    lines.append(
+        "| metric | "
+        + " | ".join(
+            r["file"].replace("benchmark-", "").replace(".md", "") for r in runs
+        )
+        + " |"
+    )
     lines.append(sep)
     for label, key, better in [
         ("pages/s (per-doc mean)", "pages_per_s_doc", "higher"),

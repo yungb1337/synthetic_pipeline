@@ -111,7 +111,11 @@ if chain:
 * **Table Filtering:** In [`app/parser/engines/native_pdf.py:160-170`](app/parser/engines/native_pdf.py#L160-L170), text blocks overlapping extracted tables by $>60\%$ are removed:
   ```python
   table_bboxes = [t.bbox for t in valid_tables if t.bbox]
-  extracted_blocks = [b for b in all_blocks if not any(_bbox_overlap_ratio(b.bbox, tb) > 0.6 for tb in table_bboxes)]
+  extracted_blocks = [
+      b
+      for b in all_blocks
+      if not any(_bbox_overlap_ratio(b.bbox, tb) > 0.6 for tb in table_bboxes)
+  ]
   ```
 * **Impact:** Table rows and cells in `doc.pages[i].tables` are **never flattened, serialized to markdown, or converted into chunks**.
 * **Finding:** While tables are preserved in the DOM (`dom-v0.1.0.docJSON`), the retrieval layer (`chunks-v1.json` and `vectors.npy`) contains **zero table content**.

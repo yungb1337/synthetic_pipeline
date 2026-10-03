@@ -10,12 +10,12 @@ Disagreement policy: return the strongest probe's result; keep an explicit
 `unresolved` state rather than guessing. `declared_extension` is always
 carried for lineage + security (e.g. MIME-smuggling detection).
 """
+
 from __future__ import annotations
 
 import io
 import json
 import zipfile
-
 from dataclasses import dataclass
 
 from .mime import MIME as _MIME
@@ -29,6 +29,7 @@ class Detected:
     confidence: float
     declared_extension: str
     unresolved: bool = False
+
 
 _MAGIC = (
     (b"%PDF-", "pdf", _MIME["pdf"]),
@@ -118,17 +119,23 @@ def _is_text(data: bytes) -> bool:
 def detect(data: bytes, filename: str = "") -> Detected:
     declared = _declared_extension(filename)
     if not data:
-        return Detected("unknown", _MIME["unknown"], "empty", 0.0, declared, unresolved=True)
+        return Detected(
+            "unknown", _MIME["unknown"], "empty", 0.0, declared, unresolved=True
+        )
 
     for sig, slug, mime in _MAGIC:
         if data.startswith(sig):
             return Detected(slug, mime, "magic", 0.99, declared)
 
     if data.startswith(_ZIP_HEADERS):
-        return _probe_zip(data) or Detected("zip", _MIME["zip"], "container", 0.7, declared)
+        return _probe_zip(data) or Detected(
+            "zip", _MIME["zip"], "container", 0.7, declared
+        )
 
     if _is_text(data):
         d = _sniff_text(data)
         return Detected(d.slug, d.mime, d.probe, d.confidence, declared, d.unresolved)
 
-    return Detected("unknown", _MIME["unknown"], "unknown", 0.0, declared, unresolved=True)
+    return Detected(
+        "unknown", _MIME["unknown"], "unknown", 0.0, declared, unresolved=True
+    )

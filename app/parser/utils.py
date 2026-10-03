@@ -1,4 +1,5 @@
 """Parser utilities: atomic writes, structured logging, and common helpers."""
+
 from __future__ import annotations
 
 import json
@@ -79,14 +80,14 @@ def get_logger(name: str) -> logging.Logger:
     if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         console = logging.StreamHandler(sys.stdout)
         console.setLevel(logging.INFO)
-        console.setFormatter(
-            logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
-        )
+        console.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
         logger.addHandler(console)
 
     # File handler (JSON format) if env var set
     log_file = os.environ.get("PARSER_LOG_FILE")
-    if log_file and not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+    if log_file and not any(
+        isinstance(h, logging.FileHandler) for h in logger.handlers
+    ):
         file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(JsonFormatter())
@@ -114,10 +115,27 @@ class JsonFormatter(logging.Formatter):
         # Add any extra fields from record.__dict__
         for key, value in record.__dict__.items():
             if key not in (
-                "name", "msg", "args", "created", "filename", "funcName",
-                "levelname", "levelno", "lineno", "module", "msecs",
-                "message", "pathname", "process", "processName", "relativeCreated",
-                "thread", "threadName", "exc_info", "exc_text", "stack_info",
+                "name",
+                "msg",
+                "args",
+                "created",
+                "filename",
+                "funcName",
+                "levelname",
+                "levelno",
+                "lineno",
+                "module",
+                "msecs",
+                "message",
+                "pathname",
+                "process",
+                "processName",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "exc_info",
+                "exc_text",
+                "stack_info",
             ):
                 log_obj[key] = value
 
@@ -126,4 +144,3 @@ class JsonFormatter(logging.Formatter):
 
 class LedgerCorruptionError(Exception):
     """Raised when a ledger file is corrupted and cannot be recovered."""
-    pass

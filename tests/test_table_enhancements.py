@@ -1,7 +1,7 @@
 """Unit tests for table Unicode preservation and two-tier table planner escalation."""
-import unicodedata
-from app.parser.loaders.docling_loader import _clean_cell
+
 from app.parser.config import ParserConfig
+from app.parser.loaders.docling_loader import _clean_cell
 from app.parser.planner import Planner
 from app.parser.source import SourceManifest
 
@@ -41,9 +41,25 @@ def test_planner_simple_table_routes_to_native():
     simple_table_pages = {1}
 
     # Page 0 (1st page) -> simple table -> native
-    b0 = planner._page_band(manifest, "native", "smart_routed", config, 0, table_pages, simple_table_pages=simple_table_pages)
+    b0 = planner._page_band(
+        manifest,
+        "native",
+        "smart_routed",
+        config,
+        0,
+        table_pages,
+        simple_table_pages=simple_table_pages,
+    )
     assert b0 == "native"
 
     # Page 1 (2nd page) -> complex table -> docling (if available) or native fallback
-    b1 = planner._page_band(manifest, "native", "smart_routed", config, 1, table_pages, simple_table_pages=simple_table_pages)
+    b1 = planner._page_band(
+        manifest,
+        "native",
+        "smart_routed",
+        config,
+        1,
+        table_pages,
+        simple_table_pages=simple_table_pages,
+    )
     assert b1 in ("docling", "native", "enrichment")

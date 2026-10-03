@@ -7,19 +7,17 @@ A4: Batch concurrency capped for heavy corpora (concurrency_cap_heavy)
 A5: calibrate_f helper in ResourceGovernor
 A6: Batch page-store ledger journal writes (update_pages_batch)
 """
+
 from __future__ import annotations
 
-import os
-from unittest.mock import MagicMock, patch
-import pytest
+from unittest.mock import MagicMock
 
 from app.parser.config import ParserConfig
 from app.parser.engines.heavy_docling import HeavyDoclingEngine
-from app.parser.engines.base import PageWorkItem
-from app.parser.scheduler import ResourceGovernor, Scheduler
-from app.parser.storage_pages import Ledger, PageStore
+from app.parser.scheduler import ResourceGovernor
+from app.parser.storage_pages import Ledger
 from app.processing.config import ProcessingConfig
-from app.processing.executor import BatchWorker, ParseNormalizePipeline
+from app.processing.executor import BatchWorker
 
 
 def test_a1_a2_heavy_docling_item_indexing_and_src_cache(tmp_path):
@@ -48,14 +46,18 @@ def test_a3_heavy_pool_recycling_config():
 
 def test_a4_batch_concurrency_cap():
     """A4: Batch concurrency is bounded when heavy_concurrency is set."""
-    pcfg = ProcessingConfig(concurrency=16, heavy_concurrency=4, concurrency_cap_heavy=2)
+    pcfg = ProcessingConfig(
+        concurrency=16, heavy_concurrency=4, concurrency_cap_heavy=2
+    )
     mock_pipeline = MagicMock()
     worker = BatchWorker(pcfg, mock_pipeline)
     # Effective concurrency is min(16, 4 * 2) = 8
     assert worker._effective_concurrency() == 8
 
     # When cap is disabled (0), base concurrency is returned
-    pcfg_uncapped = ProcessingConfig(concurrency=16, heavy_concurrency=4, concurrency_cap_heavy=0)
+    pcfg_uncapped = ProcessingConfig(
+        concurrency=16, heavy_concurrency=4, concurrency_cap_heavy=0
+    )
     worker_uncapped = BatchWorker(pcfg_uncapped, mock_pipeline)
     assert worker_uncapped._effective_concurrency() == 16
 

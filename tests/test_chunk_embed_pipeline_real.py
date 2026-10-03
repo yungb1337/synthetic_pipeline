@@ -5,6 +5,7 @@ the `test_sbert_embedder.py` skip pattern. Verifies the ADR-010 guarantee
 end-to-end: two independent pipeline runs over the same DOM yield chunk[0]
 vectors with cosine >= 0.9999, dim 1024, stored float32.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,12 +25,18 @@ def _available() -> bool:
     try:
         import sentence_transformers  # noqa: F401
         import torch  # noqa: F401
-        return Path("models/bge-m3/tokenizer.json").exists() and Path("models/bge-m3/config.json").exists()
+
+        return (
+            Path("models/bge-m3/tokenizer.json").exists()
+            and Path("models/bge-m3/config.json").exists()
+        )
     except Exception:
         return False
 
 
-pytestmark = pytest.mark.skipif(not _available(), reason="sentence-transformers/torch/bge-m3 unavailable")
+pytestmark = pytest.mark.skipif(
+    not _available(), reason="sentence-transformers/torch/bge-m3 unavailable"
+)
 
 
 @pytest.fixture(scope="module")
@@ -47,15 +54,23 @@ def _blocks():
 
 def _write_norm_dom(root: str, blocks) -> None:
     doc = Document(
-        version="dom-schema-v0.1.0", document_id=DID, source_hash="00", metadata=Metadata(),
-        provenance=Provenance(parser_version="p", dom_schema_version="dom-schema-v0.1.0",
-                              normalizer_version="normalizer-v0.1.0"),
+        version="dom-schema-v0.1.0",
+        document_id=DID,
+        source_hash="00",
+        metadata=Metadata(),
+        provenance=Provenance(
+            parser_version="p",
+            dom_schema_version="dom-schema-v0.1.0",
+            normalizer_version="normalizer-v0.1.0",
+        ),
         reading_order=[b.id for b in blocks],
         pages=[Page(index=0, blocks=blocks)],
     )
     d = Path(root) / "dom" / DID
     d.mkdir(parents=True, exist_ok=True)
-    (d / "norm-v0.1.0.docJSON").write_text(doc.model_dump_json(indent=2), encoding="utf-8")
+    (d / "norm-v0.1.0.docJSON").write_text(
+        doc.model_dump_json(indent=2), encoding="utf-8"
+    )
 
 
 def test_cosine_stable_across_runs(tmp_path, embedder):

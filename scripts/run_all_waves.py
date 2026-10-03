@@ -16,6 +16,7 @@ Resilience pattern:
   Once all documents in a wave are parsed, it runs the benchmark post-analysis
   to produce `reports/benchmark-<batch>.md` and advances to the next wave.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -32,8 +33,17 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ["TORCHDYNAMO_DISABLE"] = "1"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SOURCES_PDF = REPO_ROOT / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "sources" / "pdf"
-REPORTS_DIR = REPO_ROOT / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "reports"
+SOURCES_PDF = (
+    REPO_ROOT
+    / "checkpoints"
+    / "run"
+    / "run-2026-09-04-parser-reliability"
+    / "sources"
+    / "pdf"
+)
+REPORTS_DIR = (
+    REPO_ROOT / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "reports"
+)
 RUN_DIR = REPO_ROOT / "checkpoints" / "run" / "run-2026-09-04-parser-reliability"
 
 WAVES = [
@@ -104,9 +114,13 @@ def main() -> int:
     all_pdfs = sorted(SOURCES_PDF.glob("*.pdf"))
     total_files = len(all_pdfs)
 
-    print(f"[{_now()}] [pipeline] Starting 5-wave corpus parse run ({total_files} PDFs total)")
+    print(
+        f"[{_now()}] [pipeline] Starting 5-wave corpus parse run ({total_files} PDFs total)"
+    )
     with progress_log.open("a", encoding="utf-8") as pf:
-        pf.write(f"\n[{_now()}] === Starting resilient 5-wave corpus run ({total_files} total) ===\n")
+        pf.write(
+            f"\n[{_now()}] === Starting resilient 5-wave corpus run ({total_files} total) ===\n"
+        )
 
     t_start = time.monotonic()
 
@@ -115,7 +129,10 @@ def main() -> int:
         parsed_out = RUN_DIR / f"parsed-{batch_id}"
         parsed_out.mkdir(parents=True, exist_ok=True)
 
-        print(f"\n{'='*70}\n[{_now()}] [pipeline] Wave {batch_id}: offset={offset}, limit={limit} ({len(batch_pdfs)} files) -> {parsed_out.name}\n{'='*70}", flush=True)
+        print(
+            f"\n{'=' * 70}\n[{_now()}] [pipeline] Wave {batch_id}: offset={offset}, limit={limit} ({len(batch_pdfs)} files) -> {parsed_out.name}\n{'=' * 70}",
+            flush=True,
+        )
 
         wave_t0 = time.monotonic()
         pass_num = 0
@@ -130,17 +147,26 @@ def main() -> int:
                 pf.write(f"{status_line}\n")
 
             if unparsed == 0 and other == 0:
-                print(f"[{_now()}] [{batch_id}] All {len(batch_pdfs)} documents parsed successfully!", flush=True)
+                print(
+                    f"[{_now()}] [{batch_id}] All {len(batch_pdfs)} documents parsed successfully!",
+                    flush=True,
+                )
                 break
 
             prev_unparsed = unparsed
             cmd = [
-                py, str(parse_folder_script),
-                "--in", str(SOURCES_PDF),
-                "--out", str(parsed_out),
-                "--offset", str(offset),
-                "--limit", str(limit),
-                "--heavy-concurrency", "1",
+                py,
+                str(parse_folder_script),
+                "--in",
+                str(SOURCES_PDF),
+                "--out",
+                str(parsed_out),
+                "--offset",
+                str(offset),
+                "--limit",
+                str(limit),
+                "--heavy-concurrency",
+                "1",
             ]
 
             t_run0 = time.monotonic()
@@ -158,7 +184,10 @@ def main() -> int:
             if progress_made <= 0:
                 consecutive_zero_progress += 1
                 if consecutive_zero_progress >= 8:
-                    print(f"[{_now()}] [{batch_id}] WARNING: 8 consecutive passes with zero progress. Advancing to benchmark.", flush=True)
+                    print(
+                        f"[{_now()}] [{batch_id}] WARNING: 8 consecutive passes with zero progress. Advancing to benchmark.",
+                        flush=True,
+                    )
                     break
                 time.sleep(2)
             else:
@@ -167,25 +196,32 @@ def main() -> int:
         # Run benchmark post-analysis for this batch
         print(f"[{_now()}] [{batch_id}] Running benchmark post-analysis...", flush=True)
         bench_cmd = [
-            py, str(bench_script),
-            "--in", str(SOURCES_PDF),
-            "--out", str(parsed_out),
-            "--batch", batch_id,
-            "--reports", str(REPORTS_DIR),
-            "--offset", str(offset),
-            "--limit", str(limit),
+            py,
+            str(bench_script),
+            "--in",
+            str(SOURCES_PDF),
+            "--out",
+            str(parsed_out),
+            "--batch",
+            batch_id,
+            "--reports",
+            str(REPORTS_DIR),
+            "--offset",
+            str(offset),
+            "--limit",
+            str(limit),
             "--analyze-only",
         ]
         subprocess.call(bench_cmd)
         wave_elapsed = time.monotonic() - wave_t0
-        done_msg = f"[{_now()}] [pipeline] Wave {batch_id} fully analyzed in {wave_elapsed/60:.1f} mins"
+        done_msg = f"[{_now()}] [pipeline] Wave {batch_id} fully analyzed in {wave_elapsed / 60:.1f} mins"
         print(done_msg, flush=True)
         with progress_log.open("a", encoding="utf-8") as pf:
             pf.write(f"{done_msg}\n")
 
     total_elapsed = time.monotonic() - t_start
-    final_msg = f"[{_now()}] [pipeline] All 5 waves completed in {total_elapsed/3600:.2f} hours"
-    print(f"\n{'='*70}\n{final_msg}\n{'='*70}", flush=True)
+    final_msg = f"[{_now()}] [pipeline] All 5 waves completed in {total_elapsed / 3600:.2f} hours"
+    print(f"\n{'=' * 70}\n{final_msg}\n{'=' * 70}", flush=True)
     with progress_log.open("a", encoding="utf-8") as pf:
         pf.write(f"{final_msg}\n")
 

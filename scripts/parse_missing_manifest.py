@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """parse_missing_manifest.py — Parse any manifest records that have not been parsed yet."""
+
 from __future__ import annotations
 
 import json
@@ -81,10 +82,14 @@ def main() -> int:
                 data = pdf_path.read_bytes()
                 outcome = extractor.extract(data, filename=pdf_path.name, resume=True)
                 if outcome.ok:
-                    print(f"[{i}/{total}] OK: {pdf_path.name:24} pages={len(outcome.document.pages)} blocks={outcome.report['blocks']}")
+                    print(
+                        f"[{i}/{total}] OK: {pdf_path.name:24} pages={len(outcome.document.pages)} blocks={outcome.report['blocks']}"
+                    )
                     success += 1
                 else:
-                    print(f"[{i}/{total}] SKIP/FAIL: {pdf_path.name:24} {outcome.status}")
+                    print(
+                        f"[{i}/{total}] SKIP/FAIL: {pdf_path.name:24} {outcome.status}"
+                    )
                     failed += 1
             except Exception as exc:
                 print(f"[{i}/{total}] ERROR: {pdf_path.name} -> {exc}")

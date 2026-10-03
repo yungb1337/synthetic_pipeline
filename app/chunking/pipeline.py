@@ -11,6 +11,7 @@ Embedder: `factory.default_embedder` (real BGE-M3 when available,
 `DummyEmbedder` otherwise). Block-level `embed_document_blocks` is NEVER used
 for chunks (architecture §3.8).
 """
+
 from __future__ import annotations
 
 import math
@@ -34,7 +35,7 @@ from .tokenize import TokenCounter
 @dataclass
 class ChunkEmbedResult:
     doc_id: str
-    status: str = "ok"            # "ok" | "failed"
+    status: str = "ok"  # "ok" | "failed"
     error: str = ""
     dom_storage_key: str = ""
     chunks_created: int = 0
@@ -57,10 +58,14 @@ class ChunkEmbedPipeline:
         events: EventPublisher | None = None,
     ):
         self.store_root = store_root
-        self.chunk_store = chunk_store if chunk_store is not None else FilesystemChunkStore(store_root)
+        self.chunk_store = (
+            chunk_store if chunk_store is not None else FilesystemChunkStore(store_root)
+        )
         self._embedder = embedder  # resolved lazily via `embedder` — see property
         self.config = config if config is not None else ChunkingConfig()
-        self.events = events if events is not None else EventPublisher(sink=silent_sink())
+        self.events = (
+            events if events is not None else EventPublisher(sink=silent_sink())
+        )
         # one counter per pipeline instance — all chunking + batching share it
         self.counter = TokenCounter(
             mode=self.config.tokenizer_mode,
@@ -85,27 +90,36 @@ class ChunkEmbedPipeline:
         doc, dom_key = self._resolve_dom(doc_id, dom_storage_key)
         if doc is None:
             return ChunkEmbedResult(
-                doc_id=doc_id, status="failed",
+                doc_id=doc_id,
+                status="failed",
                 error="no normalized DOM found (norm-v*.docJSON)",
-                dom_storage_key=dom_key, ms=int((time.time() - t0) * 1000),
+                dom_storage_key=dom_key,
+                ms=int((time.time() - t0) * 1000),
             )
         try:
             return self._run_ok(doc_id, doc, dom_key, t0)
         except Exception as e:  # never crash a batch on a bad doc (mirror DocResult)
             return ChunkEmbedResult(
-                doc_id=doc_id, status="failed", error=str(e),
-                dom_storage_key=dom_key, ms=int((time.time() - t0) * 1000),
+                doc_id=doc_id,
+                status="failed",
+                error=str(e),
+                dom_storage_key=dom_key,
+                ms=int((time.time() - t0) * 1000),
             )
 
-    def chunk_only(self, doc_id: str, dom_storage_key: str | None = None) -> ChunkEmbedResult:
+    def chunk_only(
+        self, doc_id: str, dom_storage_key: str | None = None
+    ) -> ChunkEmbedResult:
         """Chunk + persist chunks WITHOUT touching the embedder (CLI chunk-only mode)."""
         t0 = time.time()
         doc, dom_key = self._resolve_dom(doc_id, dom_storage_key)
         if doc is None:
             return ChunkEmbedResult(
-                doc_id=doc_id, status="failed",
+                doc_id=doc_id,
+                status="failed",
                 error="no normalized DOM found (norm-v*.docJSON)",
-                dom_storage_key=dom_key, ms=int((time.time() - t0) * 1000),
+                dom_storage_key=dom_key,
+                ms=int((time.time() - t0) * 1000),
             )
         result = SemanticChunker(self.config, self.counter).chunk(doc, dom_key)
         artifact = ChunksArtifact(
@@ -118,27 +132,37 @@ class ChunkEmbedPipeline:
         )
         self.chunk_store.put_chunks(doc_id, artifact)
         return ChunkEmbedResult(
-            doc_id=doc_id, dom_storage_key=dom_key,
-            chunks_created=len(result.chunks), ms=int((time.time() - t0) * 1000),
+            doc_id=doc_id,
+            dom_storage_key=dom_key,
+            chunks_created=len(result.chunks),
+            ms=int((time.time() - t0) * 1000),
         )
 
-    def _resolve_dom(self, doc_id: str, dom_storage_key: str | None) -> tuple[Document | None, str]:
+    def _resolve_dom(
+        self, doc_id: str, dom_storage_key: str | None
+    ) -> tuple[Document | None, str]:
         """Resolve the latest normalized DOM; returns (doc, storage key)."""
         if dom_storage_key:
             p = Path(self.store_root) / dom_storage_key
             if not p.exists():
                 return None, dom_storage_key
-            return Document.model_validate_json(p.read_text(encoding="utf-8")), dom_storage_key
+            return Document.model_validate_json(
+                p.read_text(encoding="utf-8")
+            ), dom_storage_key
         matches = sorted(
             (Path(self.store_root) / "dom" / doc_id).glob("norm-v*.docJSON"),
-            key=lambda p: _version_key(p.stem[len("norm-v"):]),
+            key=lambda p: _version_key(p.stem[len("norm-v") :]),
         )
         if not matches:
             return None, ""
         p = matches[-1]
-        return Document.model_validate_json(p.read_text(encoding="utf-8")), f"dom/{doc_id}/{p.name}"
+        return Document.model_validate_json(
+            p.read_text(encoding="utf-8")
+        ), f"dom/{doc_id}/{p.name}"
 
-    def _run_ok(self, doc_id: str, doc: Document, dom_key: str, t0: float) -> ChunkEmbedResult:
+    def _run_ok(
+        self, doc_id: str, doc: Document, dom_key: str, t0: float
+    ) -> ChunkEmbedResult:
         config = self.config
         chunker = SemanticChunker(config, self.counter)
         result: ChunkResult = chunker.chunk(doc, dom_key)
@@ -151,21 +175,28 @@ class ChunkEmbedPipeline:
             chunks=chunks,
             report=result.report,
         )
-        self.chunk_store.put_chunks(doc_id, artifact)     # persist before embedding
+        self.chunk_store.put_chunks(doc_id, artifact)  # persist before embedding
 
         if not chunks:
             return ChunkEmbedResult(
-                doc_id=doc_id, dom_storage_key=dom_key, chunks_created=0,
+                doc_id=doc_id,
+                dom_storage_key=dom_key,
+                chunks_created=0,
                 ms=int((time.time() - t0) * 1000),
             )
 
         groups = group_by_token_budget(
-            chunks, self.counter, config.max_tokens_per_call, config.max_texts_per_call,
+            chunks,
+            self.counter,
+            config.max_tokens_per_call,
+            config.max_texts_per_call,
         )
         embedder_id = _sanitize_embedder_id(self.embedder.name)
 
         # never embed twice: presence keyed on content-addressed chunk_id
-        existing = self.chunk_store.get_embeddings(doc_id, config.chunker_version, embedder_id)
+        existing = self.chunk_store.get_embeddings(
+            doc_id, config.chunker_version, embedder_id
+        )
         existing_map: dict = {}
         if existing is not None:
             existing_ids, existing_matrix, _ = existing
@@ -198,7 +229,11 @@ class ChunkEmbedPipeline:
         validation: dict = {}
         sample_vec = batch_embed(self.embedder.embed, [chunks[0].text], batch_size=1)[0]
         cosine = _cosine(sample_vec, [float(x) for x in matrix[0]])
-        validation = {"sample_chunk_id": chunks[0].chunk_id, "cosine": round(cosine, 6), "ok": cosine >= 0.9999}
+        validation = {
+            "sample_chunk_id": chunks[0].chunk_id,
+            "cosine": round(cosine, 6),
+            "ok": cosine >= 0.9999,
+        }
 
         dim = matrix.shape[1]
         dtype = str(matrix.dtype)
@@ -214,28 +249,39 @@ class ChunkEmbedPipeline:
             "validation": validation,
         }
         sidecar_key = self.chunk_store.put_embeddings(
-            doc_id, config.chunker_version, embedder_id,
-            [c.chunk_id for c in chunks], matrix, meta,
+            doc_id,
+            config.chunker_version,
+            embedder_id,
+            [c.chunk_id for c in chunks],
+            matrix,
+            meta,
         )
 
         # rewrite the chunks artifact with embedding_ref filled (chunk_id unchanged)
         filled = artifact.model_copy(
-            update={"chunks": [c.model_copy(update={"embedding_ref": sidecar_key}) for c in chunks]}
+            update={
+                "chunks": [
+                    c.model_copy(update={"embedding_ref": sidecar_key}) for c in chunks
+                ]
+            }
         )
         self.chunk_store.put_chunks(doc_id, filled)
 
         ms = int((time.time() - t0) * 1000)
-        self.events.emit("chunk_embedded.v1", {
-            "doc_id": doc_id,
-            "chunker_version": config.chunker_version,
-            "embedder_id": embedder_id,
-            "chunks": len(chunks),
-            "embedded": len(missing),
-            "skipped": len(chunks) - len(missing),
-            "dim": dim,
-            "dtype": dtype,
-            "ms": ms,
-        })
+        self.events.emit(
+            "chunk_embedded.v1",
+            {
+                "doc_id": doc_id,
+                "chunker_version": config.chunker_version,
+                "embedder_id": embedder_id,
+                "chunks": len(chunks),
+                "embedded": len(missing),
+                "skipped": len(chunks) - len(missing),
+                "dim": dim,
+                "dtype": dtype,
+                "ms": ms,
+            },
+        )
         return ChunkEmbedResult(
             doc_id=doc_id,
             dom_storage_key=dom_key,

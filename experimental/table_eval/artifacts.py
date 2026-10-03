@@ -1,5 +1,5 @@
-"""Artifact storage, experiment registry, and JSON export utilities.
-"""
+"""Artifact storage, experiment registry, and JSON export utilities."""
+
 from __future__ import annotations
 
 import json
@@ -27,13 +27,17 @@ class BenchmarkArtifactManager:
         (p / "logs").mkdir(exist_ok=True)
         return p
 
-    def save_document_dom(self, strategy_id: str, document_id: str, dom: Document) -> Path:
+    def save_document_dom(
+        self, strategy_id: str, document_id: str, dom: Document
+    ) -> Path:
         s_dir = self.get_strategy_dir(strategy_id)
         out_path = s_dir / "normalized_output" / f"{document_id}.parsed.v1.docJSON"
         out_path.write_text(dom.model_dump_json(indent=2), encoding="utf-8")
         return out_path
 
-    def save_runtime_telemetry(self, strategy_id: str, document_id: str, data: dict[str, Any]) -> None:
+    def save_runtime_telemetry(
+        self, strategy_id: str, document_id: str, data: dict[str, Any]
+    ) -> None:
         s_dir = self.get_strategy_dir(strategy_id)
         out_path = s_dir / "raw_output" / f"{document_id}.runtime.json"
         out_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -75,7 +79,9 @@ class BenchmarkArtifactManager:
         existing[strategy_id] = judge_data
         j_file.write_text(json.dumps(existing, indent=2), encoding="utf-8")
 
-    def record_failure(self, strategy_id: str, document_id: str, error_msg: str) -> None:
+    def record_failure(
+        self, strategy_id: str, document_id: str, error_msg: str
+    ) -> None:
         f_file = self.eval_base / "failures.json"
         failures = []
         if f_file.exists():
@@ -84,9 +90,11 @@ class BenchmarkArtifactManager:
             except Exception:
                 failures = []
 
-        failures.append({
-            "strategy_id": strategy_id,
-            "document_id": document_id,
-            "error": error_msg,
-        })
+        failures.append(
+            {
+                "strategy_id": strategy_id,
+                "document_id": document_id,
+                "error": error_msg,
+            }
+        )
         f_file.write_text(json.dumps(failures, indent=2), encoding="utf-8")

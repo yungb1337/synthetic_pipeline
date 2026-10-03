@@ -1,10 +1,9 @@
-"""Aggregates and formats live benchmarking metrics across Curated Hard and Curated Easy runs.
-"""
+"""Aggregates and formats live benchmarking metrics across Curated Hard and Curated Easy runs."""
+
 from __future__ import annotations
 
 import glob
 import json
-import time
 from pathlib import Path
 from typing import Any
 
@@ -51,8 +50,7 @@ def collect_run_metrics(run_dir: Path) -> dict[str, Any]:
                 page_routes[r_k] = page_routes.get(r_k, 0) + r_v
 
             rss = d.get("hardware", {}).get("ram_rss_gb", 0.0)
-            if rss > max_ram_rss_gb:
-                max_ram_rss_gb = rss
+            max_ram_rss_gb = max(max_ram_rss_gb, rss)
         except Exception:
             pass
 
@@ -84,7 +82,7 @@ def print_comprehensive_metrics():
     print("CALIBRATED HYBRID PIPELINE EVALUATION: COMPREHENSIVE METRICS")
     print("=" * 80)
 
-    print(f"\n1. CURATED EASY CORPUS (Clean Text Baseline)")
+    print("\n1. CURATED EASY CORPUS (Clean Text Baseline)")
     print(f"  - Total Documents Processed : {easy_m.get('total_documents', 0)}")
     print(f"  - Total Pages Parsed        : {easy_m.get('total_pages', 0)}")
     print(f"  - Total Blocks Extracted    : {easy_m.get('total_blocks', 0)}")
@@ -94,13 +92,15 @@ def print_comprehensive_metrics():
     print(f"  - Peak Memory (RAM RSS)     : {easy_m.get('peak_ram_rss_gb', 0.0)} GB")
     print(f"  - Page Route Breakdown      : {easy_m.get('page_routes', {})}")
 
-    print(f"\n2. CURATED HARD CORPUS (Table-Heavy Calibrated Single-Page Docling)")
+    print("\n2. CURATED HARD CORPUS (Table-Heavy Calibrated Single-Page Docling)")
     print(f"  - Total Documents Processed : {hard_m.get('total_documents', 0)}")
     print(f"  - Total Pages Parsed        : {hard_m.get('total_pages', 0)}")
     print(f"  - Total Blocks Extracted    : {hard_m.get('total_blocks', 0)}")
     print(f"  - Total Tables Extracted    : {hard_m.get('total_tables', 0)}")
     print(f"  - Total References Extracted: {hard_m.get('total_references', 0)}")
-    print(f"  - Cumulative Elapsed Time   : {hard_m.get('total_wall_seconds', 0.0):.1f} s ({hard_m.get('total_wall_seconds', 0.0) / 60.0:.2f} min)")
+    print(
+        f"  - Cumulative Elapsed Time   : {hard_m.get('total_wall_seconds', 0.0):.1f} s ({hard_m.get('total_wall_seconds', 0.0) / 60.0:.2f} min)"
+    )
     print(f"  - Average Throughput        : {hard_m.get('pages_per_sec', 0.0)} p/s")
     print(f"  - Peak Memory (RAM RSS)     : {hard_m.get('peak_ram_rss_gb', 0.0)} GB")
     print(f"  - Page Route Breakdown      : {hard_m.get('page_routes', {})}")

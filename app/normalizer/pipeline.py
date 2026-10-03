@@ -6,10 +6,10 @@ tracking per-rule execution and returning the normalized text with a change map.
 Guarantees idempotency across all supported rule compositions:
     apply(apply(x)) == apply(x)
 """
+
 from __future__ import annotations
 
 import inspect
-from typing import Optional
 
 from . import rules
 from .rules.base import RuleContext, RuleResult
@@ -18,7 +18,7 @@ from .rules.base import RuleContext, RuleResult
 def apply(
     text: str,
     rule_ids: list[str],
-    context: Optional[RuleContext] = None,
+    context: RuleContext | None = None,
 ) -> tuple[str, dict[str, bool]]:
     """Execute a list of rule IDs in order over the input text.
 
@@ -67,7 +67,7 @@ def apply(
 def is_idempotent(
     text: str,
     rule_ids: list[str],
-    context: Optional[RuleContext] = None,
+    context: RuleContext | None = None,
 ) -> bool:
     """Verify that applying the pipeline twice produces identical output."""
     once, _ = apply(text, rule_ids, context=context)

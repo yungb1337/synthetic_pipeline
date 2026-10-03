@@ -11,6 +11,7 @@ no-op), never a crash and never a fabricated negative (§11). Reading order stay
 non-authoritative so the native heuristic reorders every block (incl. the OCR
 ones) — page-level orchestration is explicitly out of v1 (§16).
 """
+
 from __future__ import annotations
 
 from .. import ocr
@@ -67,6 +68,7 @@ def enrich_scanned_pages(
         return rec
 
     import time as _time
+
     engine = ocr.engine_name()
     done = 0
     t_ocr = _time.time()
@@ -75,7 +77,7 @@ def enrich_scanned_pages(
             break
         try:
             page = doc[pno]
-            pix = page.get_pixmap()          # ONE render per page, only here
+            pix = page.get_pixmap()  # ONE render per page, only here
             png = pix.tobytes("png")
             for text, bbox, conf in ocr_fn(png):
                 clean = text.strip()
@@ -95,7 +97,7 @@ def enrich_scanned_pages(
                 )
             done += 1
         except Exception:
-            continue                     # page failed; keep going (§11)
+            continue  # page failed; keep going (§11)
 
     # observability: OCR wall-time (render + engine) + how many pages OCR'd
     rec.timings["ocr_ms"] = round((_time.time() - t_ocr) * 1000, 1)

@@ -9,13 +9,19 @@ deterministic for tests and small-scale demos today.
 
 __version__ = "0.1.0"
 
-from .runner import batch_embed, embed_document_blocks
-from .embedder import Embedder
 from .dummy import DummyEmbedder
+from .embedder import Embedder
+from .factory import EmbeddingOptions, default_embedder
+from .runner import batch_embed, embed_document_blocks
 from .sbert import SentenceTransformerEmbedder, cuda_available
-from .factory import default_embedder, EmbeddingOptions
 
 __all__ = [
-    "Embedder", "DummyEmbedder", "SentenceTransformerEmbedder", "cuda_available",
-    "default_embedder", "EmbeddingOptions", "batch_embed", "embed_document_blocks",
+    "DummyEmbedder",
+    "Embedder",
+    "EmbeddingOptions",
+    "SentenceTransformerEmbedder",
+    "batch_embed",
+    "cuda_available",
+    "default_embedder",
+    "embed_document_blocks",
 ]

@@ -1,4 +1,5 @@
 """Tests for the batch processing layer (worker pool + incremental manifest)."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -50,7 +51,9 @@ def test_incremental_manifest_skips_done(tmp_path):
     assert r2.ok == 0 and r2.skipped == 3
 
     # a new file appears -> only it is processed (manifest persisted across runs)
-    (tmp_path / "inputs" / "extra.md").write_text("# Extra\nmore  text\n", encoding="utf-8")
+    (tmp_path / "inputs" / "extra.md").write_text(
+        "# Extra\nmore  text\n", encoding="utf-8"
+    )
     refs2 = _refs(str(tmp_path / "inputs"), cfg)
     r3 = worker.run(refs2)
     assert r3.ok == 1 and r3.skipped == 3
@@ -58,7 +61,9 @@ def test_incremental_manifest_skips_done(tmp_path):
 
 def test_failed_docs_do_not_crash_batch(tmp_path):
     (tmp_path / "inputs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "inputs" / "good.md").write_text("# Good\nfine text\n", encoding="utf-8")
+    (tmp_path / "inputs" / "good.md").write_text(
+        "# Good\nfine text\n", encoding="utf-8"
+    )
     (tmp_path / "inputs" / "bad.pdf").write_bytes(b"\x00\x01\x02 corrupt-not-a-pdf")
     cfg = _cfg(manifest_path=str(tmp_path / "manifest.json"))
     store = FilesystemStore(str(tmp_path / "store"))
@@ -82,4 +87,5 @@ def test_batch_crosses_flush_boundary(tmp_path):
     rep = worker.run(refs)
     assert rep.ok == 300 and rep.failed == 0
     from app.processing.corpus import load_manifest
+
     assert len(load_manifest(cfg.manifest_path)) == 300

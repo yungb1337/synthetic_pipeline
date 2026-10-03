@@ -6,6 +6,7 @@ plugin-discovery framework; spec §5, §16).
 add a detector without touching the router or pipeline. Registry stays a plain
 list — no auto-discovery.
 """
+
 from __future__ import annotations
 
 from .base import Detector, DetectorResult
@@ -50,9 +51,9 @@ def get_detectors() -> list[Detector]:
 
 
 __all__ = [
+    "DETECTOR_PRIORITY",
     "Detector",
     "DetectorResult",
     "get_detectors",
     "register_detector",
-    "DETECTOR_PRIORITY",
 ]

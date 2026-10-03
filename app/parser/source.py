@@ -10,6 +10,7 @@ every later stage validates against (no silent page loss).
 This module is additive: it does not touch `Extractor`, `FilesystemStore`, or
 the router.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -49,7 +50,7 @@ class SourceManifest:
     mime: str
     declared_extension: str
     probe: str
-    page_sizes: dict = field(default_factory=dict)   # page_index -> (w, h)
+    page_sizes: dict = field(default_factory=dict)  # page_index -> (w, h)
     src_path: str = ""
     metadata: dict = field(default_factory=dict)
 
@@ -58,9 +59,13 @@ class SourceScan:
     """Detect + count pages + write ONE reusable source file."""
 
     @staticmethod
-    def scan(data: bytes, filename: str, store: "FilesystemStore",
-             detected: "detection.Detected | None" = None,
-             source_hash: str | None = None) -> SourceManifest:
+    def scan(
+        data: bytes,
+        filename: str,
+        store: FilesystemStore,
+        detected: detection.Detected | None = None,
+        source_hash: str | None = None,
+    ) -> SourceManifest:
         """Scan the source. I-06: callers that already detected the type and/or
         hashed the bytes (`Extractor.extract` always has both) pass them in so
         the full file is not re-hashed and detection is not run twice (three
@@ -106,6 +111,7 @@ class SourceScan:
                 # page-centric path carries the same provenance the legacy
                 # native loader did (constraint #2 behaviour preserved).
                 from ._pdfmeta import fitz_metadata
+
                 metadata = dict(fitz_metadata(doc))
             finally:
                 doc.close()

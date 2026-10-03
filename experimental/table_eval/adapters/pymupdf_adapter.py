@@ -1,9 +1,9 @@
-"""PyMuPDF table extraction adapter supporting multiple strategies (lines, text, hybrid).
-"""
+"""PyMuPDF table extraction adapter supporting multiple strategies (lines, text, hybrid)."""
+
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 import fitz
 
@@ -36,21 +36,25 @@ class PyMuPDFTableExtractor(BaseTableExtractor):
         self,
         fitz_page: fitz.Page,
         page_index: int,
-        page_image: Optional[Any] = None,
-        layout_regions: Optional[list[LayoutRegion]] = None,
+        page_image: Any | None = None,
+        layout_regions: list[LayoutRegion] | None = None,
     ) -> list[RawTable]:
         tables: list[RawTable] = []
         found_mupdf_tables = []
 
         try:
             if self.strategy == "lines":
-                finder = fitz_page.find_tables(strategy="lines", snap_tolerance=self.snap_tolerance)
+                finder = fitz_page.find_tables(
+                    strategy="lines", snap_tolerance=self.snap_tolerance
+                )
                 if finder and finder.tables:
                     found_mupdf_tables = list(finder.tables)
 
             elif self.strategy == "hybrid":
                 # First try explicit lines
-                finder = fitz_page.find_tables(strategy="lines", snap_tolerance=self.snap_tolerance)
+                finder = fitz_page.find_tables(
+                    strategy="lines", snap_tolerance=self.snap_tolerance
+                )
                 if finder and finder.tables:
                     found_mupdf_tables = list(finder.tables)
 
@@ -84,19 +88,33 @@ class PyMuPDFTableExtractor(BaseTableExtractor):
             except Exception:
                 extracted = []
 
-            if not extracted or len(extracted) < 2 or self._is_oversplit_table(extracted):
+            if (
+                not extracted
+                or len(extracted) < 2
+                or self._is_oversplit_table(extracted)
+            ):
                 continue
 
             # Check if table has any non-empty cell
-            has_content = any(any(str(c or "").strip() for c in row) for row in extracted)
+            has_content = any(
+                any(str(c or "").strip() for c in row) for row in extracted
+            )
             if not has_content:
                 continue
 
             t_bbox = getattr(t, "bbox", None)
-            bbox = BoundingBox(
-                x0=float(t_bbox[0]), y0=float(t_bbox[1]),
-                x1=float(t_bbox[2]), y1=float(t_bbox[3])
-            ) if t_bbox else BoundingBox(0, 0, float(fitz_page.rect.width), float(fitz_page.rect.height))
+            bbox = (
+                BoundingBox(
+                    x0=float(t_bbox[0]),
+                    y0=float(t_bbox[1]),
+                    x1=float(t_bbox[2]),
+                    y1=float(t_bbox[3]),
+                )
+                if t_bbox
+                else BoundingBox(
+                    0, 0, float(fitz_page.rect.width), float(fitz_page.rect.height)
+                )
+            )
 
             header = [str(c or "").strip() for c in extracted[0]]
             data_rows = [[str(c or "").strip() for c in r] for r in extracted[1:]]
@@ -106,7 +124,9 @@ class PyMuPDFTableExtractor(BaseTableExtractor):
             if hasattr(t, "cells") and t.cells:
                 for c in t.cells:
                     try:
-                        c_bbox = BoundingBox(float(c[0]), float(c[1]), float(c[2]), float(c[3]))
+                        c_bbox = BoundingBox(
+                            float(c[0]), float(c[1]), float(c[2]), float(c[3])
+                        )
                         # Fitz cells format may vary or be tuples
                         raw_cells.append(
                             RawCell(

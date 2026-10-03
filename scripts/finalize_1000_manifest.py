@@ -11,6 +11,7 @@ Ensures:
   - All 1,000 PDF files exist on disk, are valid PDFs (>1KB, starting with %PDF)
   - Exact SHA256 checksums, byte sizes, form types, and complexities recorded
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -74,7 +75,10 @@ def sha256_file(path: Path) -> str:
 
 def main() -> int:
     print("Collecting and validating physical PDF files...")
-    all_files = sorted([f for f in PDF_DIR.glob("*.pdf") if f.stat().st_size > 1000], key=lambda x: x.name)
+    all_files = sorted(
+        [f for f in PDF_DIR.glob("*.pdf") if f.stat().st_size > 1000],
+        key=lambda x: x.name,
+    )
     print(f"Total valid physical PDF files: {len(all_files)}")
 
     # Index existing files by DOI / ID
@@ -89,7 +93,16 @@ def main() -> int:
         print(f"\nResolving category: {cat} (target: 200)...")
 
         # Fetch candidate DOIs
-        r = requests.get("http://api.plos.org/search", params={"q": query, "fl": "id,title,journal,publication_date", "rows": 300, "wt": "json"}, timeout=20)
+        r = requests.get(
+            "http://api.plos.org/search",
+            params={
+                "q": query,
+                "fl": "id,title,journal,publication_date",
+                "rows": 300,
+                "wt": "json",
+            },
+            timeout=20,
+        )
         docs = r.json().get("response", {}).get("docs", [])
         for d in docs:
             doi = d.get("id")
@@ -108,21 +121,25 @@ def main() -> int:
                 with pdf_file.open("rb") as f:
                     if f.read(len(MAGIC)) == MAGIC:
                         sha = sha256_file(pdf_file)
-                        manifest_by_cat[cat].append({
-                            "id": doc_id,
-                            "doi": doi,
-                            "url": f"https://journals.plos.org/plosone/article/file?id={doi}&type=printable",
-                            "category": cat,
-                            "source": meta["source"],
-                            "form_type": meta["form_type"],
-                            "complexity": meta["complexity"],
-                            "title": (d.get("title") or "")[:250],
-                            "pub_year": str((d.get("publication_date") or "2024")[:4]),
-                            "sha256": sha,
-                            "size_bytes": pdf_file.stat().st_size,
-                            "local_path": str(pdf_file),
-                            "status": "ok",
-                        })
+                        manifest_by_cat[cat].append(
+                            {
+                                "id": doc_id,
+                                "doi": doi,
+                                "url": f"https://journals.plos.org/plosone/article/file?id={doi}&type=printable",
+                                "category": cat,
+                                "source": meta["source"],
+                                "form_type": meta["form_type"],
+                                "complexity": meta["complexity"],
+                                "title": (d.get("title") or "")[:250],
+                                "pub_year": str(
+                                    (d.get("publication_date") or "2024")[:4]
+                                ),
+                                "sha256": sha,
+                                "size_bytes": pdf_file.stat().st_size,
+                                "local_path": str(pdf_file),
+                                "status": "ok",
+                            }
+                        )
                         seen_ids.add(doc_id)
                         if len(manifest_by_cat[cat]) >= 200:
                             break
@@ -139,20 +156,22 @@ def main() -> int:
             rf = remaining_files.pop(0)
             doc_id = rf.stem
             sha = sha256_file(rf)
-            manifest_by_cat[cat].append({
-                "id": doc_id,
-                "url": f"local://{rf.name}",
-                "category": cat,
-                "source": meta["source"],
-                "form_type": meta["form_type"],
-                "complexity": meta["complexity"],
-                "title": f"Medical document {doc_id} ({cat})",
-                "pub_year": "2024",
-                "sha256": sha,
-                "size_bytes": rf.stat().st_size,
-                "local_path": str(rf),
-                "status": "ok",
-            })
+            manifest_by_cat[cat].append(
+                {
+                    "id": doc_id,
+                    "url": f"local://{rf.name}",
+                    "category": cat,
+                    "source": meta["source"],
+                    "form_type": meta["form_type"],
+                    "complexity": meta["complexity"],
+                    "title": f"Medical document {doc_id} ({cat})",
+                    "pub_year": "2024",
+                    "sha256": sha,
+                    "size_bytes": rf.stat().st_size,
+                    "local_path": str(rf),
+                    "status": "ok",
+                }
+            )
             seen_ids.add(doc_id)
 
     # Combine exactly 200 per category

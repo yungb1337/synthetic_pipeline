@@ -8,6 +8,7 @@ signals with a confidence derived from measurement coverage.
 The scorer knows NOTHING about bands — bands are applied by the policy outside
 this module (architecture §5). It never reads `routing_config.layout_backend`.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -22,8 +23,8 @@ _Value = TypeVar("_Value")
 
 @dataclass
 class Score:
-    complexity: float        # 0..100
-    confidence: float        # 0..1
+    complexity: float  # 0..100
+    confidence: float  # 0..1
     reasons: list[str] = field(default_factory=list)
 
 
@@ -86,7 +87,11 @@ class WeightedHeuristicScorer:
         confidence = solid_measured / self._pos_total if self._pos_total else 0.0
 
         reasons = self._reasons(signals)
-        return Score(complexity=round(complexity, 3), confidence=round(confidence, 4), reasons=reasons)
+        return Score(
+            complexity=round(complexity, 3),
+            confidence=round(confidence, 4),
+            reasons=reasons,
+        )
 
     def _reasons(self, signals: list[Signal]) -> list[str]:
         out: list[str] = []
@@ -106,11 +111,19 @@ class WeightedHeuristicScorer:
 class _DummyScorer:
     """Test seam that yields a deterministic fixed score (used by router tests)."""
 
-    def __init__(self, complexity: float = 40.0, confidence: float = 0.9,
-                 reasons: list[str] | None = None):
+    def __init__(
+        self,
+        complexity: float = 40.0,
+        confidence: float = 0.9,
+        reasons: list[str] | None = None,
+    ):
         self._complexity = complexity
         self._confidence = confidence
         self._reasons = reasons or ["dummy scorer"]
 
     def score(self, signals: list[Signal], features: InspectorFeatures) -> Score:
-        return Score(complexity=self._complexity, confidence=self._confidence, reasons=self._reasons)
+        return Score(
+            complexity=self._complexity,
+            confidence=self._confidence,
+            reasons=self._reasons,
+        )

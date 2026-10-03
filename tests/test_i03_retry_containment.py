@@ -13,16 +13,13 @@ prevent. These tests pin the new contract:
    the stale failed results; untouched pages keep their original results.
 4. Backward compat: no scheduler → legacy in-process path still works.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
-import pytest
-
+from app.parser.assembler import Assembler, AssemblyReport
 from app.parser.config import ParserConfig
 from app.parser.page_result import PageResult, PageStatus
 from app.parser.planner import ExecutionPlan
-from app.parser.assembler import Assembler, AssemblyReport
 
 
 def _plan(page_indexes: list[int], band: str = "docling") -> ExecutionPlan:
@@ -30,17 +27,29 @@ def _plan(page_indexes: list[int], band: str = "docling") -> ExecutionPlan:
 
     items = [
         PageWorkItem(
-            doc_id="d-x", source_hash="sha", src_path=f"/tmp/x.pdf",
-            page_index=i, route=band,
+            doc_id="d-x",
+            source_hash="sha",
+            src_path="/tmp/x.pdf",
+            page_index=i,
+            route=band,
         )
         for i in page_indexes
     ]
     return ExecutionPlan(
-        doc_id="d-x", source_hash="sha", sha="sha", route=band,
-        decision=None, detected_type="pdf", mime="application/pdf",
-        declared_extension="pdf", probe="magic",
-        expected_page_set=page_indexes, page_count=len(page_indexes),
-        page_sizes={}, metadata={}, config_snapshot={},
+        doc_id="d-x",
+        source_hash="sha",
+        sha="sha",
+        route=band,
+        decision=None,
+        detected_type="pdf",
+        mime="application/pdf",
+        declared_extension="pdf",
+        probe="magic",
+        expected_page_set=page_indexes,
+        page_count=len(page_indexes),
+        page_sizes={},
+        metadata={},
+        config_snapshot={},
         work_items=items,
     )
 
@@ -50,9 +59,14 @@ def _res(idx: int, status: PageStatus, band: str = "docling") -> PageResult:
 
 
 def _report(failed: list[int], missing: list[int]) -> AssemblyReport:
-    return AssemblyReport(doc_id="d-x", status="partial",
-                          expected_pages=3, actual_pages=0,
-                          failed_pages=failed, missing_pages=missing)
+    return AssemblyReport(
+        doc_id="d-x",
+        status="partial",
+        expected_pages=3,
+        actual_pages=0,
+        failed_pages=failed,
+        missing_pages=missing,
+    )
 
 
 class _RecordingScheduler:
@@ -73,7 +87,14 @@ def test_i03_retry_dispatches_through_scheduler_pools():
     sched = _RecordingScheduler()
     a = Assembler(ParserConfig(), store=None, ledger=None, scheduler=sched)
     plan = _plan([0, 1, 2])
-    results = [_res(0, PageStatus.FAILED), _res(1, PageStatus.OK), _res(2, PageStatus.MISSING if hasattr(PageStatus, "MISSING") else PageStatus.FAILED)]
+    results = [
+        _res(0, PageStatus.FAILED),
+        _res(1, PageStatus.OK),
+        _res(
+            2,
+            PageStatus.MISSING if hasattr(PageStatus, "MISSING") else PageStatus.FAILED,
+        ),
+    ]
 
     out = a._retry_pages(plan, results, _report(failed=[0, 2], missing=[]))
 
@@ -93,11 +114,17 @@ def test_i03_engine_unavailable_pages_are_not_retried():
     a = Assembler(ParserConfig(), store=None, ledger=None, scheduler=sched)
     plan = _plan([0, 1])
     failed_plain = _res(0, PageStatus.FAILED)
-    failed_plain.errors = [{"page_no": 1, "category": "docling_convert", "message": "boom"}]
+    failed_plain.errors = [
+        {"page_no": 1, "category": "docling_convert", "message": "boom"}
+    ]
     failed_unavail = _res(1, PageStatus.FAILED)
-    failed_unavail.errors = [{"page_no": 2, "category": "engine_unavailable", "message": "no engine"}]
+    failed_unavail.errors = [
+        {"page_no": 2, "category": "engine_unavailable", "message": "no engine"}
+    ]
 
-    out = a._retry_pages(plan, [failed_plain, failed_unavail], _report(failed=[0, 1], missing=[]))
+    out = a._retry_pages(
+        plan, [failed_plain, failed_unavail], _report(failed=[0, 1], missing=[])
+    )
 
     # Only the genuinely-failed page went to the pool
     assert sched.dispatched_pages == [0]
@@ -133,12 +160,13 @@ def test_i03_no_scheduler_falls_back_to_inprocess(monkeypatch, tmp_path):
             calls.append(f"native:{item.page_index}")
             return _res(item.page_index, PageStatus.OK, band="native")
 
-    monkeypatch.setattr(
-        "app.parser.engines.native_pdf.NativePdfEngine", FakeNative
-    )
+    monkeypatch.setattr("app.parser.engines.native_pdf.NativePdfEngine", FakeNative)
     a = Assembler(ParserConfig(), store=None, ledger=None, scheduler=None)
     plan = _plan([0], band="native")
-    out = a._retry_pages(plan, [_res(0, PageStatus.FAILED, band="native")],
-                         _report(failed=[0], missing=[]))
+    out = a._retry_pages(
+        plan,
+        [_res(0, PageStatus.FAILED, band="native")],
+        _report(failed=[0], missing=[]),
+    )
     assert calls == ["native:0"]
     assert out[0].status == PageStatus.OK

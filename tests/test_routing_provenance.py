@@ -1,4 +1,5 @@
 """Wave F: routing provenance persistence (additive, old-DOM-safe, §9)."""
+
 from __future__ import annotations
 
 from app.parser.config import default_config
@@ -18,7 +19,7 @@ def _extractor(tmp_path):
 
 def test_provenance_routing_field_defaults_none():
     p = Provenance(parser_version="p", dom_schema_version="d")
-    assert p.routing is None              # old DOMs without routing stay valid
+    assert p.routing is None  # old DOMs without routing stay valid
 
 
 def test_auto_pdf_records_full_routing_decision(tmp_path):
@@ -34,8 +35,8 @@ def test_auto_pdf_records_full_routing_decision(tmp_path):
     assert r.router_version == "router-v0.1.0"
     assert r.policy_version == "policy-v0.1.0"
     assert r.scoring_version == "scoring-v0.1.0"
-    assert r.detector_versions                       # per-detector versions (§10)
-    assert r.bands                                   # band audit co-ordinates
+    assert r.detector_versions  # per-detector versions (§10)
+    assert r.bands  # band audit co-ordinates
     assert out.report.get("route") == r.route
     # serializes for provenance audit
     prov.model_dump_json()
@@ -44,8 +45,12 @@ def test_auto_pdf_records_full_routing_decision(tmp_path):
 def test_old_dom_without_routing_roundtrips():
     from app.parser.dom.models import Document, Metadata
 
-    doc = Document(version="dom-schema-v0.1.0", document_id="d", source_hash="h",
-                   metadata=Metadata(mime="application/pdf", detected_type="pdf"))
+    doc = Document(
+        version="dom-schema-v0.1.0",
+        document_id="d",
+        source_hash="h",
+        metadata=Metadata(mime="application/pdf", detected_type="pdf"),
+    )
     payload = doc.model_dump_json()
     back = Document.model_validate_json(payload)
     assert back.provenance is None

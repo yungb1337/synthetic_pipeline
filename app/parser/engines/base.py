@@ -9,15 +9,15 @@ the loader→builder contract (`Recovered*` parts).
 share one type. The route band one engine serves is advertised via
 `route_band` (one of `native|enrichment|docling|image|simple`).
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..page_result import PageResult, PageStatus
 
 if TYPE_CHECKING:
-    from ..config import ParserConfig
     from ..parts import RoutingDecision
 
 
@@ -41,10 +41,10 @@ class PageWorkItem:
     source_hash: str = ""
     src_path: str = ""
     page_index: int = 0
-    route: str = ""              # the band this page belongs to
+    route: str = ""  # the band this page belongs to
     # Optional routing decision (kept only for provenance / fallback routing);
     # not relied upon for dispatch.
-    decision: "RoutingDecision | None" = None
+    decision: RoutingDecision | None = None
     models_dir: str = ""
     ocr_enabled: bool = True
     attempt: int = 0
@@ -61,13 +61,13 @@ class PageEngine(Protocol):
 
 
 __all__ = [
+    "DOCLING",
+    "ENRICHMENT",
+    "IMAGE",
+    "NATIVE",
+    "SIMPLE",
     "PageEngine",
-    "PageWorkItem",
     "PageResult",
     "PageStatus",
-    "NATIVE",
-    "ENRICHMENT",
-    "DOCLING",
-    "IMAGE",
-    "SIMPLE",
+    "PageWorkItem",
 ]

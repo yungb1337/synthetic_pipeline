@@ -534,6 +534,7 @@ Each module gets: purpose · inputs/outputs · interfaces · algorithms · failu
 ```python
 # app/parser/dom/builder.py — proposed structure
 
+
 class DocumentBuilder:
     def build(self, page_results, document_id):
         # STAGE 1: Physical/layout pass (existing, unchanged)
@@ -548,10 +549,12 @@ class DocumentBuilder:
             pages=pages,
             reading_order=reading_order,
         )
-        self._extract_references(semantic_context)       # D3 → Document.references
-        self._build_reading_order_full(semantic_context)  # D4 → Document.reading_order_full
-        self._extract_entities(semantic_context)          # Future: Stage 3 entities
-        self._resolve_footnotes(semantic_context)         # Future: footnote归属
+        self._extract_references(semantic_context)  # D3 → Document.references
+        self._build_reading_order_full(
+            semantic_context
+        )  # D4 → Document.reading_order_full
+        self._extract_entities(semantic_context)  # Future: Stage 3 entities
+        self._resolve_footnotes(semantic_context)  # Future: footnote归属
 
         return Document(...)
 ```
@@ -578,6 +581,7 @@ class DocumentBuilder:
 ```python
 # app/parser/dom/models.py — confidence threshold in Document
 
+
 class Document(BaseModel):
     version: str
     document_id: str
@@ -599,6 +603,7 @@ class Document(BaseModel):
 
 ```python
 # app/parser/assembler.py — gate that routes low-confidence to verification
+
 
 class DocumentValidator:
     def verify(self, doc: Document) -> VerificationResult:
@@ -628,12 +633,13 @@ class DocumentValidator:
 ```python
 # app/parser/dom/models.py — document-level versioning
 
+
 class Document(BaseModel):
-    version: str                    # DOM schema version (existing)
+    version: str  # DOM schema version (existing)
     document_id: str
     source_hash: str
-    document_version: int = 1        # NEW: increments on each re-parse
-    parent_version: int | None = None # NEW: points to previous version for diff
+    document_version: int = 1  # NEW: increments on each re-parse
+    parent_version: int | None = None  # NEW: points to previous version for diff
 
     def changed_sections(self, prev: Document) -> list[str]:
         """Return section IDs that differ from prev."""
@@ -662,6 +668,7 @@ class Document(BaseModel):
 
 ```python
 # app/kg/entity_registry.py (new module)
+
 
 class EntityRegistry:
     """Maps entity text → stable entity_id across documents."""
@@ -692,13 +699,16 @@ class EntityRegistry:
 ```python
 # app/parser/dom/models.py — add Region model
 
+
 class Region(BaseModel):
     """A semantic region of a page (column, sidebar, footnote area, figure region)."""
+
     id: str
     page: int
     bbox: BBox
     kind: str = "column"  # "column" | "sidebar" | "footnote" | "figure" | "table"
     block_ids: list[str] = Field(default_factory=list)
+
 
 class Document(BaseModel):
     # ... existing fields ...
@@ -707,6 +717,7 @@ class Document(BaseModel):
 
 ```python
 # app/parser/dom/reading_order.py — build regions from column partition
+
 
 def build_regions(page) -> list[Region]:
     """Partition page blocks into regions using geometric analysis."""
@@ -733,10 +744,13 @@ def build_regions(page) -> list[Region]:
 ```python
 # app/chunking/chunker.py — semantic unit joiner
 
+
 class SemanticUnitJoiner:
     """Joins blocks that form a single semantic unit across node boundaries."""
 
-    def join(self, blocks: list[Block], footnotes: list[Footnote]) -> list[SemanticUnit]:
+    def join(
+        self, blocks: list[Block], footnotes: list[Footnote]
+    ) -> list[SemanticUnit]:
         """
         For each block, check if it has an attached footnote.
         If so, merge the block text + footnote into one SemanticUnit.
@@ -815,6 +829,7 @@ class SemanticUnitJoiner:
 
 ```python
 # app/chunking/chunker.py — validate DOM version before processing
+
 
 class SemanticChunker:
     SUPPORTED_DOM_VERSIONS = {"v0.1.0", "v0.2.0"}  # pin what we accept

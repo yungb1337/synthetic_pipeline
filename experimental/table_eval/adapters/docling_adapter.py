@@ -1,10 +1,11 @@
-"""Docling Heron layout and TableFormer FAST / ACCURATE isolated crop adapters.
-"""
+"""Docling Heron layout and TableFormer FAST / ACCURATE isolated crop adapters."""
+
 from __future__ import annotations
 
-from typing import Any, Optional
-from PIL import Image
+from typing import Any
+
 import torch
+from PIL import Image
 
 from .base import BaseTableExtractor, BoundingBox, LayoutRegion, RawCell, RawTable
 
@@ -13,19 +14,28 @@ class DoclingHeronLayoutDetector:
     """Runs Docling Heron layout detection model to identify tables and layout regions."""
 
     def __init__(self, device: str = "cuda"):
-        self.device = device if (torch.cuda.is_available() and device == "cuda") else "cpu"
+        self.device = (
+            device if (torch.cuda.is_available() and device == "cuda") else "cpu"
+        )
         self._model = None
 
     def _ensure_loaded(self) -> None:
         if self._model is None:
+            from docling.datamodel.pipeline_options import (
+                AcceleratorOptions,
+                LayoutOptions,
+            )
             from docling.models.stages.layout.layout_model import LayoutModel
-            from docling.datamodel.pipeline_options import LayoutOptions, AcceleratorOptions
 
             acc_opts = AcceleratorOptions(device=self.device)
             layout_opts = LayoutOptions()
-            self._model = LayoutModel(artifacts_path=None, accelerator_options=acc_opts, options=layout_opts)
+            self._model = LayoutModel(
+                artifacts_path=None, accelerator_options=acc_opts, options=layout_opts
+            )
 
-    def detect_layout(self, page_image: Image.Image, page_index: int) -> list[LayoutRegion]:
+    def detect_layout(
+        self, page_image: Image.Image, page_index: int
+    ) -> list[LayoutRegion]:
         self._ensure_loaded()
         if self._model is None:
             return []
@@ -65,15 +75,27 @@ class DoclingTableFormerExtractor(BaseTableExtractor):
 
     def __init__(self, mode: str = "fast", device: str = "cuda"):
         self.mode_str = mode
-        self.device = device if (torch.cuda.is_available() and device == "cuda") else "cpu"
+        self.device = (
+            device if (torch.cuda.is_available() and device == "cuda") else "cpu"
+        )
         self._model = None
 
     def _ensure_loaded(self) -> None:
         if self._model is None:
-            from docling.models.stages.table_structure.table_structure_model import TableStructureModel
-            from docling.datamodel.pipeline_options import TableStructureOptions, TableFormerMode, AcceleratorOptions
+            from docling.datamodel.pipeline_options import (
+                AcceleratorOptions,
+                TableFormerMode,
+                TableStructureOptions,
+            )
+            from docling.models.stages.table_structure.table_structure_model import (
+                TableStructureModel,
+            )
 
-            mode = TableFormerMode.FAST if self.mode_str == "fast" else TableFormerMode.ACCURATE
+            mode = (
+                TableFormerMode.FAST
+                if self.mode_str == "fast"
+                else TableFormerMode.ACCURATE
+            )
             opts = TableStructureOptions(mode=mode, do_cell_matching=False)
             acc_opts = AcceleratorOptions(device=self.device)
             self._model = TableStructureModel(
@@ -87,9 +109,9 @@ class DoclingTableFormerExtractor(BaseTableExtractor):
         self,
         fitz_page: Any,
         page_index: int,
-        page_image: Optional[Image.Image] = None,
-        layout_regions: Optional[list[LayoutRegion]] = None,
-        candidate_bboxes: Optional[list[BoundingBox]] = None,
+        page_image: Image.Image | None = None,
+        layout_regions: list[LayoutRegion] | None = None,
+        candidate_bboxes: list[BoundingBox] | None = None,
     ) -> list[RawTable]:
         if page_image is None:
             return []

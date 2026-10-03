@@ -1,25 +1,29 @@
-"""Strategy factory & pipeline orchestrator for P000-P016 permutations and hybrid cascades.
-"""
+"""Strategy factory & pipeline orchestrator for P000-P016 permutations and hybrid cascades."""
+
 from __future__ import annotations
 
 import io
 import time
 import warnings
-from typing import Any, Optional
+from typing import Any
+
+import fitz
 import numpy as np
 from PIL import Image
-import fitz
 
 warnings.filterwarnings("ignore")
 
-from .adapters.base import BaseTableExtractor, BoundingBox, LayoutRegion, RawTable
-from .adapters.docling_adapter import DoclingHeronLayoutDetector, DoclingTableFormerExtractor
+from .adapters.base import BaseTableExtractor, LayoutRegion, RawTable
+from .adapters.docling_adapter import (
+    DoclingHeronLayoutDetector,
+    DoclingTableFormerExtractor,
+)
 from .adapters.pdfplumber_adapter import PDFPlumberTableExtractor
 from .adapters.pymupdf_adapter import PyMuPDFTableExtractor
 from .adapters.slanet_adapter import SLANetTableExtractor
 from .adapters.tatr_adapter import TATRTableExtractor
 from .cell_matcher import CellMatcher
-from .config import PERMUTATIONS, PermutationSpec
+from .config import PermutationSpec
 
 
 class ExecutionStrategy:
@@ -27,10 +31,10 @@ class ExecutionStrategy:
 
     def __init__(self, spec: PermutationSpec):
         self.spec = spec
-        self.layout_detector: Optional[Any] = None
-        self.table_extractor: Optional[BaseTableExtractor] = None
-        self.tsr_extractor: Optional[BaseTableExtractor] = None
-        self.ocr_engine: Optional[Any] = None
+        self.layout_detector: Any | None = None
+        self.table_extractor: BaseTableExtractor | None = None
+        self.tsr_extractor: BaseTableExtractor | None = None
+        self.ocr_engine: Any | None = None
 
         self._setup_components()
 
@@ -39,7 +43,9 @@ class ExecutionStrategy:
 
         # Setup Layout Detector
         if self.spec.layout_detector == "docling_heron":
-            self.layout_detector = DoclingHeronLayoutDetector(device="cuda" if self.spec.requires_gpu else "cpu")
+            self.layout_detector = DoclingHeronLayoutDetector(
+                device="cuda" if self.spec.requires_gpu else "cpu"
+            )
 
         # Setup Table Extractor / TSR based on permutation
         if p_id in ("P002", "P003"):
@@ -91,13 +97,7 @@ class ExecutionStrategy:
                 device="cuda" if self.spec.requires_gpu else "cpu", crop_only=True
             )
 
-        elif p_id == "P015":  # H2: Confidence-Gated Geometry Cascade
-            self.table_extractor = PyMuPDFTableExtractor(strategy="hybrid")
-            self.tsr_extractor = TATRTableExtractor(
-                device="cuda" if self.spec.requires_gpu else "cpu", crop_only=True
-            )
-
-        elif p_id == "P016":  # H3: Tri-Band Router
+        elif p_id == "P015" or p_id == "P016":  # H2: Confidence-Gated Geometry Cascade
             self.table_extractor = PyMuPDFTableExtractor(strategy="hybrid")
             self.tsr_extractor = TATRTableExtractor(
                 device="cuda" if self.spec.requires_gpu else "cpu", crop_only=True
@@ -107,8 +107,10 @@ class ExecutionStrategy:
         if self.ocr_engine is not None:
             return
         from rapidocr import RapidOCR
+
         if self.spec.requires_gpu:
             from rapidocr.utils.typings import EngineType
+
             params = {
                 "Det.engine_type": EngineType.TORCH,
                 "Cls.engine_type": EngineType.TORCH,
@@ -177,9 +179,13 @@ class ExecutionStrategy:
 
         elif p_id in ("P008", "P010"):
             # PyMuPDF detects candidate table bounding boxes -> Neural TSR processes crop
-            candidate_tables = self.table_extractor.extract_tables_from_page(
-                fitz_page, page_index, img, layout_regions
-            ) if self.table_extractor else []
+            candidate_tables = (
+                self.table_extractor.extract_tables_from_page(
+                    fitz_page, page_index, img, layout_regions
+                )
+                if self.table_extractor
+                else []
+            )
             bboxes = [t.bbox for t in candidate_tables]
             if bboxes and self.tsr_extractor:
                 extracted_tables = self.tsr_extractor.extract_tables_from_page(
@@ -198,9 +204,13 @@ class ExecutionStrategy:
 
         elif p_id == "P014":
             # H1: Vector lines -> PyMuPDF; if no lines found, try TATR on full page or suspected region
-            candidate_tables = self.table_extractor.extract_tables_from_page(
-                fitz_page, page_index, img, layout_regions
-            ) if self.table_extractor else []
+            candidate_tables = (
+                self.table_extractor.extract_tables_from_page(
+                    fitz_page, page_index, img, layout_regions
+                )
+                if self.table_extractor
+                else []
+            )
             if candidate_tables:
                 extracted_tables = candidate_tables
             elif self.tsr_extractor:
@@ -208,15 +218,22 @@ class ExecutionStrategy:
                 page_text = fitz_page.get_text("text")
                 if "Table " in page_text or "TABLE " in page_text:
                     tatr_full = TATRTableExtractor(
-                        device="cuda" if self.spec.requires_gpu else "cpu", crop_only=False
+                        device="cuda" if self.spec.requires_gpu else "cpu",
+                        crop_only=False,
                     )
-                    extracted_tables = tatr_full.extract_tables_from_page(fitz_page, page_index, img)
+                    extracted_tables = tatr_full.extract_tables_from_page(
+                        fitz_page, page_index, img
+                    )
 
         elif p_id == "P015":
             # H2: Confidence-gated cascade
-            candidate_tables = self.table_extractor.extract_tables_from_page(
-                fitz_page, page_index, img, layout_regions
-            ) if self.table_extractor else []
+            candidate_tables = (
+                self.table_extractor.extract_tables_from_page(
+                    fitz_page, page_index, img, layout_regions
+                )
+                if self.table_extractor
+                else []
+            )
             high_conf = [t for t in candidate_tables if t.confidence >= 0.9]
             low_conf = [t for t in candidate_tables if t.confidence < 0.9]
 
@@ -230,9 +247,13 @@ class ExecutionStrategy:
 
         elif p_id == "P016":
             # H3: Tri-Band Router
-            candidate_tables = self.table_extractor.extract_tables_from_page(
-                fitz_page, page_index, img, layout_regions
-            ) if self.table_extractor else []
+            candidate_tables = (
+                self.table_extractor.extract_tables_from_page(
+                    fitz_page, page_index, img, layout_regions
+                )
+                if self.table_extractor
+                else []
+            )
             extracted_tables = candidate_tables
 
         # 4. OCR Extraction
@@ -251,11 +272,21 @@ class ExecutionStrategy:
             ocr_res = self.ocr_engine(img_np)
             if ocr_res is not None:
                 if hasattr(ocr_res, "boxes") and ocr_res.boxes is not None:
-                    ocr_boxes = [b.tolist() if hasattr(b, "tolist") else list(b) for b in ocr_res.boxes]
+                    ocr_boxes = [
+                        b.tolist() if hasattr(b, "tolist") else list(b)
+                        for b in ocr_res.boxes
+                    ]
                     ocr_texts = [str(t) for t in (ocr_res.txts or [])]
                     ocr_scores = [float(s) for s in (ocr_res.scores or [])]
-                elif isinstance(ocr_res, tuple) and len(ocr_res) >= 3 and ocr_res[0] is not None:
-                    ocr_boxes = [b.tolist() if hasattr(b, "tolist") else list(b) for b in ocr_res[0]]
+                elif (
+                    isinstance(ocr_res, tuple)
+                    and len(ocr_res) >= 3
+                    and ocr_res[0] is not None
+                ):
+                    ocr_boxes = [
+                        b.tolist() if hasattr(b, "tolist") else list(b)
+                        for b in ocr_res[0]
+                    ]
                     ocr_texts = [str(t) for t in (ocr_res[1] or [])]
                     ocr_scores = [float(s) for s in (ocr_res[2] or [])]
         except Exception:
@@ -264,15 +295,25 @@ class ExecutionStrategy:
         # 5. Cell Text Assignment for Neural / BBox tables lacking text
         for tbl in extracted_tables:
             # If table cells have no text or headers are empty, assign from OCR / digital page
-            needs_assignment = not tbl.rows or not any(any(c for c in r) for r in tbl.rows)
+            needs_assignment = not tbl.rows or not any(
+                any(c for c in r) for r in tbl.rows
+            )
             if needs_assignment and tbl.cells:
                 CellMatcher.assign_ocr_text_to_cells(
-                    tbl, ocr_boxes, ocr_texts, ocr_scores, scale_x, scale_y, fitz_page=fitz_page
+                    tbl,
+                    ocr_boxes,
+                    ocr_texts,
+                    ocr_scores,
+                    scale_x,
+                    scale_y,
+                    fitz_page=fitz_page,
                 )
 
         # 6. Suppress OCR text inside table bboxes from becoming paragraph blocks
-        filtered_boxes, filtered_texts, filtered_scores = CellMatcher.filter_occluded_ocr_blocks(
-            ocr_boxes, ocr_texts, ocr_scores, extracted_tables, scale_x, scale_y
+        filtered_boxes, filtered_texts, filtered_scores = (
+            CellMatcher.filter_occluded_ocr_blocks(
+                ocr_boxes, ocr_texts, ocr_scores, extracted_tables, scale_x, scale_y
+            )
         )
 
         page_duration_ms = (time.perf_counter() - t_start) * 1000.0

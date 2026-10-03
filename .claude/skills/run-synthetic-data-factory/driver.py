@@ -13,6 +13,7 @@ Run from the repo root with the venv python:
     --test    also run the full pytest suite (≈60 s)
     --keep    keep the _skill_work scratch dir (default: delete on success)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -80,14 +81,19 @@ def write_workspace() -> None:
     (samples / "discharge.json").write_text(SAMPLE_JSON, encoding="utf-8")
     for i in range(1, 6):
         (corpus / f"doc_{i}.md").write_text(
-            f"# Progress Note {i}\n\nPatient {i} improving with stable vitals.\n\n- BP: 118/74\n", encoding="utf-8"
+            f"# Progress Note {i}\n\nPatient {i} improving with stable vitals.\n\n- BP: 118/74\n",
+            encoding="utf-8",
         )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Synthetic Data Factory smoke driver")
-    ap.add_argument("--embed", action="store_true", help="also run GPU embedder check (slow)")
-    ap.add_argument("--test", action="store_true", help="also run the pytest suite (~60s)")
+    ap.add_argument(
+        "--embed", action="store_true", help="also run GPU embedder check (slow)"
+    )
+    ap.add_argument(
+        "--test", action="store_true", help="also run the pytest suite (~60s)"
+    )
     ap.add_argument("--keep", action="store_true", help="keep the scratch workspace")
     args = ap.parse_args()
 
@@ -97,8 +103,10 @@ def main() -> int:
     write_workspace()
 
     # 1. Parser — directory of three formats.
-    run(["app.parser.cli", "--in", str(WORK / "samples"), "--out", str(store)],
-        check_in="parsed 3/3 documents")
+    run(
+        ["app.parser.cli", "--in", str(WORK / "samples"), "--out", str(store)],
+        check_in="parsed 3/3 documents",
+    )
     # versioned layout: dom/<doc_id>/dom-v{version}.docJSON
     dom_files = sorted((store / "dom").rglob("dom-v*.docJSON"))
     if len(dom_files) != 3:
@@ -107,8 +115,10 @@ def main() -> int:
 
     # 2. Normalizer — parse output -> normalized DOM.
     norm_out = WORK / "note.norm.json"
-    run(["app.normalizer.cli", "--dom", str(dom_files[0]), "--out", str(norm_out)],
-        check_in="normalized")
+    run(
+        ["app.normalizer.cli", "--dom", str(dom_files[0]), "--out", str(norm_out)],
+        check_in="normalized",
+    )
     if not norm_out.exists():
         print("FAIL: normalized DOM not written")
         return 1
@@ -116,21 +126,50 @@ def main() -> int:
     # 3. Batch processing — whole corpus parse+normalize in parallel.
     manifest = WORK / "manifest.json"
     batch = WORK / "batch_out"
-    run(["app.processing.cli", "--in", str(WORK / "corpus"), "--out", str(batch),
-         "--concurrency", "2", "--manifest", str(manifest)],
-        check_in="parsed+norm : 5")
+    run(
+        [
+            "app.processing.cli",
+            "--in",
+            str(WORK / "corpus"),
+            "--out",
+            str(batch),
+            "--concurrency",
+            "2",
+            "--manifest",
+            str(manifest),
+        ],
+        check_in="parsed+norm : 5",
+    )
 
     # 4. Re-run: incremental manifest must skip everything.
-    run(["app.processing.cli", "--in", str(WORK / "corpus"), "--out", str(batch),
-         "--concurrency", "2", "--manifest", str(manifest)],
-        check_in="skipped: 5")
+    run(
+        [
+            "app.processing.cli",
+            "--in",
+            str(WORK / "corpus"),
+            "--out",
+            str(batch),
+            "--concurrency",
+            "2",
+            "--manifest",
+            str(manifest),
+        ],
+        check_in="skipped: 5",
+    )
 
     # 5. Library import-and-call smoke (no CLI).
     lib = subprocess.run(
-        [sys.executable, "-c",
-         "from app.parser.detection import detect; from app.normalizer.normalizer import Normalizer; "
-         "print('imports ok'); print(detect(b'%PDF-1.7 x').slug)"],
-        cwd=REPO, capture_output=True, text=True, timeout=60)
+        [
+            sys.executable,
+            "-c",
+            "from app.parser.detection import detect; from app.normalizer.normalizer import Normalizer; "
+            "print('imports ok'); print(detect(b'%PDF-1.7 x').slug)",
+        ],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
     assert "pdf" in lib.stdout, lib.stdout + lib.stderr
     print(f"[PASS] $ library import + detect  ({lib.stdout.strip()!r})")
 
@@ -138,21 +177,43 @@ def main() -> int:
         # scripts/ is not a package and the script needs `app` importable,
         # so run it directly with PYTHONPATH=repo (its own dir is sys.path[0]).
         env = {**os.environ, "PYTHONPATH": str(REPO)}
-        proc = subprocess.run([sys.executable, str(REPO / "scripts" / "check_embedder.py")],
-                              cwd=REPO, env=env, capture_output=True, text=True, timeout=600)
+        proc = subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "check_embedder.py")],
+            cwd=REPO,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
         out = proc.stdout + proc.stderr
         ok = proc.returncode == 0 and "vec dims" in out
-        print(f"[{'PASS' if ok else 'FAIL'}] $ python scripts/check_embedder.py  (rc={proc.returncode})")
+        print(
+            f"[{'PASS' if ok else 'FAIL'}] $ python scripts/check_embedder.py  (rc={proc.returncode})"
+        )
         if not ok:
             print(out)
             return 1
-        print("   " + "\n   ".join(l for l in out.splitlines() if "embedder" in l or "device" in l or "dim" in l))
+        print(
+            "   "
+            + "\n   ".join(
+                l
+                for l in out.splitlines()
+                if "embedder" in l or "device" in l or "dim" in l
+            )
+        )
 
     if args.test:
-        proc = subprocess.run([sys.executable, "-m", "pytest"], cwd=REPO,
-                              capture_output=True, text=True, timeout=600)
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
         tail = proc.stdout.splitlines()[-1] if proc.stdout else ""
-        print(f"[{'PASS' if proc.returncode == 0 else 'FAIL'}] $ python -m pytest  ({tail})")
+        print(
+            f"[{'PASS' if proc.returncode == 0 else 'FAIL'}] $ python -m pytest  ({tail})"
+        )
         if proc.returncode != 0:
             print(proc.stdout + proc.stderr)
             return 1
@@ -160,6 +221,7 @@ def main() -> int:
     print("\n== smoke driver OK — all pipeline stages green ==")
     if not args.keep:
         import shutil
+
         shutil.rmtree(WORK, ignore_errors=True)
     return 0
 

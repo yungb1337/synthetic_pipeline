@@ -1,5 +1,6 @@
 """Wave C: detector contract + failure isolation + registry + sign coverage
 (spec §4, §5, §11; Gap B)."""
+
 from __future__ import annotations
 
 from app.routing.config import RoutingConfig
@@ -14,10 +15,10 @@ class _RaisingDetector(Detector):
     name = "boom"
     version = "1.0.0"
 
-    def can_evaluate(self, feats):  # noqa: ANN001
+    def can_evaluate(self, feats):
         return True
 
-    def _evaluate(self, feats):  # noqa: ANN001
+    def _evaluate(self, feats):
         raise RuntimeError("evaluation exploded")
 
 
@@ -25,10 +26,10 @@ class _NeverApplicable(Detector):
     name = "never"
     version = "1.0.0"
 
-    def can_evaluate(self, feats):  # noqa: ANN001
+    def can_evaluate(self, feats):
         return False
 
-    def _evaluate(self, feats):  # noqa: ANN001
+    def _evaluate(self, feats):
         raise AssertionError("must not run when can_evaluate is False")
 
 
@@ -36,10 +37,10 @@ class _Extra(Detector):
     name = "extra"
     version = "1.0.0"
 
-    def can_evaluate(self, feats):  # noqa: ANN001
+    def can_evaluate(self, feats):
         return True
 
-    def _evaluate(self, feats):  # noqa: ANN001
+    def _evaluate(self, feats):
         return DetectorResult(self.name, self.version, "ok")
 
 
@@ -76,7 +77,7 @@ def test_certificate_with_text_is_not_spuriously_scanned():
     feats = FastInspector().inspect(certificate_pdf())
     res = ImageDetector().evaluate(feats)
     scan = next(s for s in res.signals if s.name == "metric_scanned_page_probability")
-    assert float(scan.value) < 0.05     # text present => not scanned
+    assert float(scan.value) < 0.05  # text present => not scanned
     # image density still reflects the large decorative raster (auditable ratio)
     density = next(s for s in res.signals if s.name == "metric_image_density")
     assert float(density.value) > 0.5

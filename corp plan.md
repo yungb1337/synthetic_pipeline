@@ -124,6 +124,7 @@ from typing import Protocol, Optional, Tuple
 import httpx
 import asyncio
 
+
 @dataclass
 class OCRResult:
     text: str
@@ -131,65 +132,74 @@ class OCRResult:
     layout: list  # Your API's block/line/word structure
     engine_version: str = "corporate-ocr-v1"
 
+
 class OCRProvider(Protocol):
     def ocr_bytes(self, data: bytes, lang: str = "en") -> OCRResult: ...
-    def batch_ocr_bytes(self, images: list[bytes], lang: str = "en") -> list[OCRResult]: ...
+    def batch_ocr_bytes(
+        self, images: list[bytes], lang: str = "en"
+    ) -> list[OCRResult]: ...
+
 
 class CorporateOCREngine:
     """OCR engine using your corporate API."""
-    
+
     def __init__(self, api_url: str, api_key: str, timeout: int = 30):
         self.api_url = api_url
         self.api_key = api_key
         self.timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
-    
+
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(
                 headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=self.timeout
+                timeout=self.timeout,
             )
         return self._client
-    
+
     async def ocr_bytes(self, data: bytes, lang: str = "en") -> OCRResult:
         """Single image OCR via your API."""
         client = await self._get_client()
         response = await client.post(
             f"{self.api_url}/ocr",
             files={"file": ("image", data, "application/octet-stream")},
-            data={"lang": lang}
+            data={"lang": lang},
         )
         response.raise_for_status()
         result = response.json()
-        
+
         return OCRResult(
             text=result["text"],
             confidence=result.get("confidence", 1.0),
             layout=result.get("layout", []),
-            engine_version="corporate-ocr-v1"
+            engine_version="corporate-ocr-v1",
         )
-    
-    async def batch_ocr_bytes(self, images: list[bytes], lang: str = "en") -> list[OCRResult]:
+
+    async def batch_ocr_bytes(
+        self, images: list[bytes], lang: str = "en"
+    ) -> list[OCRResult]:
         """Batch OCR - sends multiple images in one request."""
         client = await self._get_client()
-        files = [(f"image_{i}", ("img.jpg", img, "image/jpeg")) 
-                 for i, img in enumerate(images)]
-        
+        files = [
+            (f"image_{i}", ("img.jpg", img, "image/jpeg"))
+            for i, img in enumerate(images)
+        ]
+
         response = await client.post(
-            f"{self.api_url}/batch-ocr",
-            files=files,
-            data={"lang": lang}
+            f"{self.api_url}/batch-ocr", files=files, data={"lang": lang}
         )
         response.raise_for_status()
         results = response.json()["results"]
-        
-        return [OCRResult(
-            text=r["text"],
-            confidence=r.get("confidence", 1.0),
-            layout=r.get("layout", []),
-            engine_version="corporate-ocr-v1"
-        ) for r in results]
+
+        return [
+            OCRResult(
+                text=r["text"],
+                confidence=r.get("confidence", 1.0),
+                layout=r.get("layout", []),
+                engine_version="corporate-ocr-v1",
+            )
+            for r in results
+        ]
 ```
 
 **Key points:**
@@ -217,50 +227,60 @@ class CorporateOCREngine:
 from app.parser.ocr import CorporateOCREngine
 from app.parser.parts import RecoveredDocument, RecoveredBlock
 
+
 class PDFLoader:
-    def __init__(self, config: ParserConfig, ocr_engine: Optional[CorporateOCREngine] = None):
+    def __init__(
+        self, config: ParserConfig, ocr_engine: Optional[CorporateOCREngine] = None
+    ):
         self.config = config
         self.ocr_engine = ocr_engine  # Your OCR API client
-    
+
     async def load(self, data: bytes, route: str = "native") -> RecoveredDocument:
         import fitz
-        
+
         doc = fitz.open(stream=data, filetype="pdf")
         try:
             pages = []
             for page_num in range(len(doc)):
                 page = doc[page_num]
-                
+
                 # Extract text (native PyMuPDF)
                 text_blocks = self._extract_text_blocks(page)
-                
+
                 # If no text blocks, OCR the page (your corporate API)
                 if not text_blocks and self.ocr_engine:
-                    pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+                    pix = page.get_pixmap(matrix=fitz.Matrix(300 / 72, 300 / 72))
                     img_data = pix.tobytes("png")
                     ocr_result = await self.ocr_engine.ocr_bytes(img_data)
                     text_blocks = self._convert_ocr_to_blocks(ocr_result, page_num)
-                
+
                 # Extract images
                 images = self._extract_images(page, page_num)
-                
+
                 # Extract tables (heuristic or your API)
-                tables = self._extract_tables(page) if self.config.pdf_extract_tables else []
-                
-                pages.append(Page(
-                    index=page_num,
-                    width=page.rect.width,
-                    height=page.rect.height,
-                    blocks=text_blocks + [RecoveredBlock(...) for img in images],  # Combine
-                    images=images,
-                    tables=tables
-                ))
-            
+                tables = (
+                    self._extract_tables(page) if self.config.pdf_extract_tables else []
+                )
+
+                pages.append(
+                    Page(
+                        index=page_num,
+                        width=page.rect.width,
+                        height=page.rect.height,
+                        blocks=text_blocks
+                        + [RecoveredBlock(...) for img in images],  # Combine
+                        images=images,
+                        tables=tables,
+                    )
+                )
+
             return RecoveredDocument(
                 pages=pages,
                 metadata=self._extract_metadata(doc),
                 layout_backend="native",  # No docling for you
-                ocr_engine="corporate-ocr" if any(page.uses_ocr for page in pages) else None
+                ocr_engine="corporate-ocr"
+                if any(page.uses_ocr for page in pages)
+                else None,
             )
         finally:
             doc.close()
@@ -284,42 +304,41 @@ from dataclasses import dataclass
 from typing import Protocol, List
 import httpx
 
+
 class Embedder(Protocol):
     def embed_documents(self, texts: List[str]) -> List[List[float]]: ...
     @property
     def name(self) -> str: ...
 
+
 @dataclass
 class CorporateEmbeddingClient:
     """Client for your corporate embedding API."""
-    
+
     api_url: str
     api_key: str
     timeout: int = 30
-    
+
     async def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Batch embed texts via your API."""
         async with httpx.AsyncClient(
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            timeout=self.timeout
+            headers={"Authorization": f"Bearer {self.api_key}"}, timeout=self.timeout
         ) as client:
-            response = await client.post(
-                f"{self.api_url}/embed",
-                json={"texts": texts}
-            )
+            response = await client.post(f"{self.api_url}/embed", json={"texts": texts})
             response.raise_for_status()
             return response.json()["embeddings"]
-    
+
     @property
     def name(self) -> str:
         return "corporate-embedding-v1"
+
 
 # In embedding/factory.py
 def default_embedder() -> Embedder:
     """Return your corporate embedder."""
     return CorporateEmbeddingClient(
         api_url=os.getenv("CORPORATE_EMBED_API_URL", "https://your-embed-api/v1"),
-        api_key=os.getenv("CORPORATE_EMBED_API_KEY", "")
+        api_key=os.getenv("CORPORATE_EMBED_API_KEY", ""),
     )
 ```
 
@@ -335,17 +354,20 @@ def default_embedder() -> Embedder:
 def _create_sync_embedder(config: ProcessingConfig) -> Embedder:
     """Wrap async embedder for sync batch processing."""
     embedder = factory.default_embedder()
-    if hasattr(embedder, 'embed_documents'):  # Is async
+    if hasattr(embedder, "embed_documents"):  # Is async
         return SyncEmbedderWrapper(embedder)
     return embedder
 
+
 class SyncEmbedderWrapper:
     """Sync wrapper for async embedder."""
+
     def __init__(self, async_embedder):
         self.async_embedder = async_embedder
-    
+
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         import asyncio
+
         return asyncio.run(self.async_embedder.embed_documents(texts))
 ```
 
@@ -446,12 +468,12 @@ Every parse event:
         "load_ms": 45.1,
         "ocr_ms": 890.5,
         "build_ms": 12.3,
-        "total_ms": 950.2
+        "total_ms": 950.2,
     },
     "blocks": 127,
     "tables": 3,
     "images": 5,
-    "pages": 12
+    "pages": 12,
 }
 ```
 

@@ -1,18 +1,15 @@
-"""Batch evaluation pipeline running P003 against Corpus B (eval-1000) with LLM judge scoring.
-"""
+"""Batch evaluation pipeline running P003 against Corpus B (eval-1000) with LLM judge scoring."""
+
 from __future__ import annotations
 
 import argparse
 import concurrent.futures
-import gc
 import hashlib
 import json
-import os
 import sys
 import time
-from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import fitz
 
@@ -21,21 +18,30 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
-from experimental.table_eval.config import BenchmarkConfig, PERMUTATIONS
+from experimental.table_eval.config import PERMUTATIONS
 from experimental.table_eval.converter import TableBenchmarkDOMConverter
 from experimental.table_eval.judge_evaluator import TableBenchmarkJudgeEvaluator
 from experimental.table_eval.profiler import HardwareProfiler
 from experimental.table_eval.strategies import ExecutionStrategy
 
-JUDGMENTS_DIR = WORKSPACE_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "judgment"
-SOURCES_DIR = WORKSPACE_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf"
+JUDGMENTS_DIR = (
+    WORKSPACE_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "judgment"
+)
+SOURCES_DIR = (
+    WORKSPACE_ROOT
+    / "checkpoints"
+    / "run"
+    / "run-2026-09-14-eval-1000"
+    / "sources"
+    / "pdf"
+)
 OUTPUT_BASE = WORKSPACE_ROOT / "artifacts" / "table_eval" / "corpus_b_p003"
 EVAL_DIR = WORKSPACE_ROOT / "evaluation" / "table_benchmark"
 
 # Global worker instance (initialized once per worker process)
-_WORKER_STRATEGY: Optional[ExecutionStrategy] = None
-_WORKER_CONVERTER: Optional[TableBenchmarkDOMConverter] = None
-_WORKER_PROFILER: Optional[HardwareProfiler] = None
+_WORKER_STRATEGY: ExecutionStrategy | None = None
+_WORKER_CONVERTER: TableBenchmarkDOMConverter | None = None
+_WORKER_PROFILER: HardwareProfiler | None = None
 
 
 def _init_worker(strategy_id: str, render_dpi: int) -> None:
@@ -76,6 +82,7 @@ def _process_doc_worker(task: dict[str, Any]) -> dict[str, Any]:
     try:
         source_bytes = pdf_path.read_bytes()
         import hashlib
+
         source_sha = hashlib.sha256(source_bytes).hexdigest()
 
         with fitz.open(pdf_path) as doc:
@@ -101,7 +108,9 @@ def _process_doc_worker(task: dict[str, Any]) -> dict[str, Any]:
         dom_ms = (time.perf_counter() - t_dom0) * 1000.0
 
         out_dom_path.parent.mkdir(parents=True, exist_ok=True)
-        out_dom_path.write_text(canonical_dom.model_dump_json(indent=2), encoding="utf-8")
+        out_dom_path.write_text(
+            canonical_dom.model_dump_json(indent=2), encoding="utf-8"
+        )
 
     except Exception as exc:
         status = "failed"
@@ -184,7 +193,9 @@ class CorpusBatchEvaluator:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         EVAL_DIR.mkdir(parents=True, exist_ok=True)
 
-    def discover_target_documents(self, limit: int = 0, full_corpus: bool = True) -> list[dict[str, Any]]:
+    def discover_target_documents(
+        self, limit: int = 0, full_corpus: bool = True
+    ) -> list[dict[str, Any]]:
         """Discovers target documents from Corpus B manifest (1,000 docs) or historical judgments."""
         pdf_to_j = {}
         for jf in sorted(JUDGMENTS_DIR.glob("*.json")):
@@ -214,13 +225,17 @@ class CorpusBatchEvaluator:
                         if p_name in pdf_to_j:
                             doc_id, prev_file = pdf_to_j[p_name]
                         else:
-                            doc_id = f"d-{hashlib.sha256(item_id.encode()).hexdigest()[:16]}"
+                            doc_id = (
+                                f"d-{hashlib.sha256(item_id.encode()).hexdigest()[:16]}"
+                            )
                             prev_file = None
-                        targets.append({
-                            "doc_id": doc_id,
-                            "pdf_path": str(pdf_path),
-                            "prev_verdict_file": prev_file,
-                        })
+                        targets.append(
+                            {
+                                "doc_id": doc_id,
+                                "pdf_path": str(pdf_path),
+                                "prev_verdict_file": prev_file,
+                            }
+                        )
             except Exception as e:
                 print(f"[WARN] Error loading manifest: {e}")
 
@@ -238,11 +253,13 @@ class CorpusBatchEvaluator:
                         pdf_path = SOURCES_DIR / f"{jf.stem}.pdf"
 
                     if pdf_path.exists():
-                        targets.append({
-                            "doc_id": doc_id,
-                            "pdf_path": str(pdf_path),
-                            "prev_verdict_file": str(jf),
-                        })
+                        targets.append(
+                            {
+                                "doc_id": doc_id,
+                                "pdf_path": str(pdf_path),
+                                "prev_verdict_file": str(jf),
+                            }
+                        )
                 except Exception as e:
                     print(f"[WARN] Error reading judgment file {jf.name}: {e}")
 
@@ -256,10 +273,12 @@ class CorpusBatchEvaluator:
         resume: bool = True,
     ) -> list[dict[str, Any]]:
         """Runs single-process GPU-accelerated extraction across target documents with zero lock contention."""
-        print(f"\n==================================================")
+        print("\n==================================================")
         print(f"Phase 1: Batch Extraction — {len(targets)} Documents")
-        print(f"Strategy: {self.strategy_id} | Execution: Single-Process GPU Warm Engine | DPI: {self.render_dpi}")
-        print(f"==================================================")
+        print(
+            f"Strategy: {self.strategy_id} | Execution: Single-Process GPU Warm Engine | DPI: {self.render_dpi}"
+        )
+        print("==================================================")
 
         spec = PERMUTATIONS.get(self.strategy_id, PERMUTATIONS["P003"])
         strategy = ExecutionStrategy(spec)
@@ -287,7 +306,9 @@ class CorpusBatchEvaluator:
                     p_cnt = res.get("page_count", 0)
                     total_pages += p_cnt
                     total_tables += res.get("tables_extracted", 0)
-                    print(f"[{completed:3d}/{len(targets)}] {doc_id} ({pdf_path.name}) ... (cached: {p_cnt} pgs, {res.get('tables_extracted', 0)} tbls)")
+                    print(
+                        f"[{completed:3d}/{len(targets)}] {doc_id} ({pdf_path.name}) ... (cached: {p_cnt} pgs, {res.get('tables_extracted', 0)} tbls)"
+                    )
                     continue
                 except Exception:
                     pass
@@ -304,6 +325,7 @@ class CorpusBatchEvaluator:
             try:
                 source_bytes = pdf_path.read_bytes()
                 import hashlib
+
                 source_sha = hashlib.sha256(source_bytes).hexdigest()
 
                 with fitz.open(pdf_path) as doc:
@@ -329,7 +351,9 @@ class CorpusBatchEvaluator:
                 dom_ms = (time.perf_counter() - t_dom0) * 1000.0
 
                 out_dom_path.parent.mkdir(parents=True, exist_ok=True)
-                out_dom_path.write_text(canonical_dom.model_dump_json(indent=2), encoding="utf-8")
+                out_dom_path.write_text(
+                    canonical_dom.model_dump_json(indent=2), encoding="utf-8"
+                )
 
             except Exception as exc:
                 status = "failed"
@@ -353,7 +377,9 @@ class CorpusBatchEvaluator:
             }
 
             out_telemetry_path.parent.mkdir(parents=True, exist_ok=True)
-            out_telemetry_path.write_text(json.dumps(runtime_data, indent=2), encoding="utf-8")
+            out_telemetry_path.write_text(
+                json.dumps(runtime_data, indent=2), encoding="utf-8"
+            )
 
             results.append(runtime_data)
             total_pages += page_count
@@ -361,17 +387,31 @@ class CorpusBatchEvaluator:
 
             if status == "failed":
                 failures += 1
-                print(f"[{completed:3d}/{len(targets)}] {doc_id} ({pdf_path.name}) ... FAILED ({error_msg})", flush=True)
+                print(
+                    f"[{completed:3d}/{len(targets)}] {doc_id} ({pdf_path.name}) ... FAILED ({error_msg})",
+                    flush=True,
+                )
             else:
-                pps = (page_count / (total_wall_ms / 1000.0)) if total_wall_ms > 0 else 0.0
-                print(f"[{completed:3d}/{len(targets)}] {doc_id} ({pdf_path.name}) ... OK ({page_count} pgs, {doc_tables_count} tbls, {total_wall_ms:.0f}ms, {pps:.2f} p/s)", flush=True)
+                pps = (
+                    (page_count / (total_wall_ms / 1000.0))
+                    if total_wall_ms > 0
+                    else 0.0
+                )
+                print(
+                    f"[{completed:3d}/{len(targets)}] {doc_id} ({pdf_path.name}) ... OK ({page_count} pgs, {doc_tables_count} tbls, {total_wall_ms:.0f}ms, {pps:.2f} p/s)",
+                    flush=True,
+                )
 
         wall_time_s = time.perf_counter() - t0
         pages_per_sec = total_pages / wall_time_s if wall_time_s > 0 else 0.0
 
-        print(f"\n--- Phase 1 Complete ---")
-        print(f"Processed: {len(results)} docs, {total_pages} pages, {total_tables} tables in {wall_time_s:.1f}s")
-        print(f"Effective Throughput: {pages_per_sec:.3f} pages/sec ({total_pages / max(1, len(results)):.1f} pgs/doc)")
+        print("\n--- Phase 1 Complete ---")
+        print(
+            f"Processed: {len(results)} docs, {total_pages} pages, {total_tables} tables in {wall_time_s:.1f}s"
+        )
+        print(
+            f"Effective Throughput: {pages_per_sec:.3f} pages/sec ({total_pages / max(1, len(results)):.1f} pgs/doc)"
+        )
         print(f"Failures: {failures}", flush=True)
         return results
 
@@ -382,25 +422,31 @@ class CorpusBatchEvaluator:
         pacing: float = 1.0,
     ) -> list[dict[str, Any]]:
         """Runs concurrent LLM Judge evaluations against generated DOMs."""
-        print(f"\n==================================================")
+        print("\n==================================================")
         print(f"Phase 2: LLM Judge Evaluation — {len(targets)} Documents")
-        print(f"Model: {self.judge_model} | Concurrency: {self.judge_workers} workers | Pacing: {pacing}s")
-        print(f"==================================================")
+        print(
+            f"Model: {self.judge_model} | Concurrency: {self.judge_workers} workers | Pacing: {pacing}s"
+        )
+        print("==================================================")
 
         tasks = []
         for t in targets:
             doc_id = t["doc_id"]
             dom_path = self.normalized_dir / f"{doc_id}.parsed.v1.docJSON"
             if dom_path.exists():
-                tasks.append({
-                    "doc_id": doc_id,
-                    "pdf_path": t["pdf_path"],
-                    "dom_path": str(dom_path),
-                    "out_verdict_path": str(self.logs_dir / f"{doc_id}.verdict.json"),
-                    "pacing": pacing,
-                    "model": self.judge_model,
-                    "resume": resume,
-                })
+                tasks.append(
+                    {
+                        "doc_id": doc_id,
+                        "pdf_path": t["pdf_path"],
+                        "dom_path": str(dom_path),
+                        "out_verdict_path": str(
+                            self.logs_dir / f"{doc_id}.verdict.json"
+                        ),
+                        "pacing": pacing,
+                        "model": self.judge_model,
+                        "resume": resume,
+                    }
+                )
 
         t0 = time.perf_counter()
         judgments = []
@@ -409,8 +455,12 @@ class CorpusBatchEvaluator:
         pwi_count = 0
         fail_count = 0
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.judge_workers) as executor:
-            future_to_doc = {executor.submit(_judge_doc_worker, task): task for task in tasks}
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.judge_workers
+        ) as executor:
+            future_to_doc = {
+                executor.submit(_judge_doc_worker, task): task for task in tasks
+            }
 
             for future in concurrent.futures.as_completed(future_to_doc):
                 task = future_to_doc[future]
@@ -422,7 +472,9 @@ class CorpusBatchEvaluator:
                     cached_tag = " (cached)" if res.get("cached") else ""
 
                     v_status = j_data.get("verdict_status") or (
-                        j_data.get("verdict") if isinstance(j_data.get("verdict"), str) else "PASS"
+                        j_data.get("verdict")
+                        if isinstance(j_data.get("verdict"), str)
+                        else "PASS"
                     )
                     metrics = j_data.get("metrics", {})
                     t_score = metrics.get("tables", 0.0)
@@ -435,15 +487,21 @@ class CorpusBatchEvaluator:
                     else:
                         fail_count += 1
 
-                    print(f"[{completed:3d}/{len(tasks)}] {task['doc_id']}{cached_tag} -> {v_status} (Tables: {t_score:.2f}, Fidelity: {f_score:.2f})")
+                    print(
+                        f"[{completed:3d}/{len(tasks)}] {task['doc_id']}{cached_tag} -> {v_status} (Tables: {t_score:.2f}, Fidelity: {f_score:.2f})"
+                    )
                 except Exception as exc:
                     fail_count += 1
-                    print(f"[{completed:3d}/{len(tasks)}] {task['doc_id']} -> ERROR ({exc})")
+                    print(
+                        f"[{completed:3d}/{len(tasks)}] {task['doc_id']} -> ERROR ({exc})"
+                    )
 
         wall_time_s = time.perf_counter() - t0
-        print(f"\n--- Phase 2 Complete ---")
+        print("\n--- Phase 2 Complete ---")
         print(f"Judged {len(judgments)} documents in {wall_time_s:.1f}s")
-        print(f"Verdicts: PASS={pass_count} ({pass_count/max(1, len(judgments))*100:.1f}%), PASS_WITH_ISSUES={pwi_count} ({pwi_count/max(1, len(judgments))*100:.1f}%), FAIL={fail_count} ({fail_count/max(1, len(judgments))*100:.1f}%)")
+        print(
+            f"Verdicts: PASS={pass_count} ({pass_count / max(1, len(judgments)) * 100:.1f}%), PASS_WITH_ISSUES={pwi_count} ({pwi_count / max(1, len(judgments)) * 100:.1f}%), FAIL={fail_count} ({fail_count / max(1, len(judgments)) * 100:.1f}%)"
+        )
         return judgments
 
     def generate_consolidated_report(
@@ -456,9 +514,23 @@ class CorpusBatchEvaluator:
         total_docs = len(extraction_results)
         total_pages = sum(r.get("page_count", 0) for r in extraction_results)
         total_tables = sum(r.get("tables_extracted", 0) for r in extraction_results)
-        total_wall_ms = sum(r.get("telemetry", {}).get("total_wall_ms", 0.0) for r in extraction_results)
-        peak_vram = max((r.get("telemetry", {}).get("peak_vram_reserved_mb", 0.0) for r in extraction_results), default=0.0)
-        peak_ram = max((r.get("telemetry", {}).get("peak_ram_mb", 0.0) for r in extraction_results), default=0.0)
+        total_wall_ms = sum(
+            r.get("telemetry", {}).get("total_wall_ms", 0.0) for r in extraction_results
+        )
+        peak_vram = max(
+            (
+                r.get("telemetry", {}).get("peak_vram_reserved_mb", 0.0)
+                for r in extraction_results
+            ),
+            default=0.0,
+        )
+        peak_ram = max(
+            (
+                r.get("telemetry", {}).get("peak_ram_mb", 0.0)
+                for r in extraction_results
+            ),
+            default=0.0,
+        )
         failures = sum(1 for r in extraction_results if r.get("status") == "failed")
 
         # 2. Quality Metrics (New P003 Run)
@@ -486,7 +558,9 @@ class CorpusBatchEvaluator:
                 metric_sums[k] += m.get(k, 0.0)
             valid_judgments += 1
 
-            v = j.get("verdict_status") or (j.get("verdict") if isinstance(j.get("verdict"), str) else "PASS")
+            v = j.get("verdict_status") or (
+                j.get("verdict") if isinstance(j.get("verdict"), str) else "PASS"
+            )
             verdict_counts[v] = verdict_counts.get(v, 0) + 1
 
             # Check if previous baseline judgment exists
@@ -496,18 +570,28 @@ class CorpusBatchEvaluator:
                 if prev_file.exists():
                     try:
                         prev_data = json.loads(prev_file.read_text(encoding="utf-8"))
-                        if "verdict" in prev_data and isinstance(prev_data["verdict"], dict):
+                        if "verdict" in prev_data and isinstance(
+                            prev_data["verdict"], dict
+                        ):
                             pv_metrics = prev_data["verdict"].get("metrics", {})
                             for k in prev_metric_sums:
                                 prev_metric_sums[k] += pv_metrics.get(k, 0.0)
                             pv_status = prev_data["verdict"].get("verdict", "PASS")
-                            prev_verdicts[pv_status] = prev_verdicts.get(pv_status, 0) + 1
+                            prev_verdicts[pv_status] = (
+                                prev_verdicts.get(pv_status, 0) + 1
+                            )
                             prev_valid += 1
                     except Exception:
                         pass
 
-        avg_metrics = {k: round(v / max(1, valid_judgments), 4) for k, v in metric_sums.items()}
-        prev_avg_metrics = {k: round(v / max(1, prev_valid), 4) for k, v in prev_metric_sums.items()} if prev_valid > 0 else {}
+        avg_metrics = {
+            k: round(v / max(1, valid_judgments), 4) for k, v in metric_sums.items()
+        }
+        prev_avg_metrics = (
+            {k: round(v / max(1, prev_valid), 4) for k, v in prev_metric_sums.items()}
+            if prev_valid > 0
+            else {}
+        )
 
         summary = {
             "strategy_id": self.strategy_id,
@@ -516,8 +600,14 @@ class CorpusBatchEvaluator:
             "total_pages": total_pages,
             "total_tables": total_tables,
             "total_extraction_wall_ms": total_wall_ms,
-            "mean_page_ms": round(total_wall_ms / max(1, total_pages), 2) if total_pages > 0 else 0.0,
-            "effective_pages_per_sec": round((total_pages / (total_wall_ms / 1000.0)), 3) if total_wall_ms > 0 else 0.0,
+            "mean_page_ms": round(total_wall_ms / max(1, total_pages), 2)
+            if total_pages > 0
+            else 0.0,
+            "effective_pages_per_sec": round(
+                (total_pages / (total_wall_ms / 1000.0)), 3
+            )
+            if total_wall_ms > 0
+            else 0.0,
             "peak_vram_mb": peak_vram,
             "peak_ram_mb": peak_ram,
             "failures": failures,
@@ -528,7 +618,7 @@ class CorpusBatchEvaluator:
                 "matched_documents": prev_valid,
                 "baseline_quality_metrics": prev_avg_metrics,
                 "baseline_verdict_distribution": prev_verdicts,
-            }
+            },
         }
 
         # Save to evaluation directory
@@ -554,7 +644,7 @@ class CorpusBatchEvaluator:
         md = f"""# Head-to-Head Benchmark Report: P003 (Hybrid + GPU OCR) vs. Docling Baseline
 
 **Date:** 2026-09-17
-**Corpus:** Corpus B (`eval-1000`, {summary['total_documents']} Total Documents, {summary['total_pages']} Total Pages)
+**Corpus:** Corpus B (`eval-1000`, {summary["total_documents"]} Total Documents, {summary["total_pages"]} Total Pages)
 **Strategy Under Test:** `P003` (PyMuPDF Hybrid Table Extraction + RapidOCR with Block Occlusion Filtering)
 **Baseline Strategy:** Previous Production Docling Run (`2026-09-14-eval-1000`)
 **Judge Model:** `{self.judge_model}` (Google Gemini)
@@ -563,13 +653,13 @@ class CorpusBatchEvaluator:
 
 ## 1. Executive Summary
 
-This benchmark rigorously evaluates the experimental replacement of the heavy Docling pipeline with **`P003` (PyMuPDF Hybrid Table Extraction + RapidOCR GPU with Spatial Block Occlusion Filtering)** across **{summary['judged_documents']} clinical and hospital documents** ({summary['total_pages']} total pages) from Corpus B (`eval-1000`).
+This benchmark rigorously evaluates the experimental replacement of the heavy Docling pipeline with **`P003` (PyMuPDF Hybrid Table Extraction + RapidOCR GPU with Spatial Block Occlusion Filtering)** across **{summary["judged_documents"]} clinical and hospital documents** ({summary["total_pages"]} total pages) from Corpus B (`eval-1000`).
 
 ### Key Takeaways
-1. **Quality Improvement:** Table accuracy increased from **{bq.get('tables', 0.490)*100:.1f}%** (Docling baseline) to **{q.get('tables', 0.0)*100:.1f}%** under `P003`.
-2. **Document Structure & Fidelity:** Overall completeness is **{q.get('completeness', 0.0)*100:.1f}%** and text fidelity is **{q.get('fidelity', 0.0)*100:.1f}%**.
-3. **Hardware Containment & Zero GPU OOM:** Peak VRAM remained bounded at **{summary['peak_vram_mb']:.1f} MB** (far below the 3.2 GB safety limit on the RTX 3050 Laptop GPU).
-4. **Zero-Silent-Loss Integrity:** **{summary['total_documents']} / {summary['total_documents']} documents** processed with **0 failures and 0 dead letters**.
+1. **Quality Improvement:** Table accuracy increased from **{bq.get("tables", 0.490) * 100:.1f}%** (Docling baseline) to **{q.get("tables", 0.0) * 100:.1f}%** under `P003`.
+2. **Document Structure & Fidelity:** Overall completeness is **{q.get("completeness", 0.0) * 100:.1f}%** and text fidelity is **{q.get("fidelity", 0.0) * 100:.1f}%**.
+3. **Hardware Containment & Zero GPU OOM:** Peak VRAM remained bounded at **{summary["peak_vram_mb"]:.1f} MB** (far below the 3.2 GB safety limit on the RTX 3050 Laptop GPU).
+4. **Zero-Silent-Loss Integrity:** **{summary["total_documents"]} / {summary["total_documents"]} documents** processed with **0 failures and 0 dead letters**.
 
 ---
 
@@ -577,22 +667,22 @@ This benchmark rigorously evaluates the experimental replacement of the heavy Do
 
 | Evaluation Dimension | Previous Docling Baseline | New Experimental `P003` Run | Absolute Delta | Relative Change |
 | :--- | :---: | :---: | :---: | :---: |
-| **Completeness** | {bq.get('completeness', 0.842)*100:.1f}% | **{q.get('completeness', 0.0)*100:.1f}%** | {q.get('completeness', 0.0)-bq.get('completeness', 0.842):+.3f} | {((q.get('completeness', 0.0)-bq.get('completeness', 0.842))/max(0.001, bq.get('completeness', 0.842)))*100:+.1f}% |
-| **Fidelity** | {bq.get('fidelity', 0.849)*100:.1f}% | **{q.get('fidelity', 0.0)*100:.1f}%** | {q.get('fidelity', 0.0)-bq.get('fidelity', 0.849):+.3f} | {((q.get('fidelity', 0.0)-bq.get('fidelity', 0.849))/max(0.001, bq.get('fidelity', 0.849)))*100:+.1f}% |
-| **Structure Hierarchy** | {bq.get('structure', 0.693)*100:.1f}% | **{q.get('structure', 0.0)*100:.1f}%** | {q.get('structure', 0.0)-bq.get('structure', 0.693):+.3f} | {((q.get('structure', 0.0)-bq.get('structure', 0.693))/max(0.001, bq.get('structure', 0.693)))*100:+.1f}% |
-| **Table Accuracy** | {bq.get('tables', 0.490)*100:.1f}% | **{q.get('tables', 0.0)*100:.1f}%** | **{q.get('tables', 0.0)-bq.get('tables', 0.490):+.3f}** | **{((q.get('tables', 0.0)-bq.get('tables', 0.490))/max(0.001, bq.get('tables', 0.490)))*100:+.1f}%** |
-| **References** | {bq.get('references', 0.317)*100:.1f}% | **{q.get('references', 0.0)*100:.1f}%** | {q.get('references', 0.0)-bq.get('references', 0.317):+.3f} | {((q.get('references', 0.0)-bq.get('references', 0.317))/max(0.001, bq.get('references', 0.317)))*100:+.1f}% |
-| **Scans / OCR** | {bq.get('scans_ocr', 0.951)*100:.1f}% | **{q.get('scans_ocr', 0.0)*100:.1f}%** | {q.get('scans_ocr', 0.0)-bq.get('scans_ocr', 0.951):+.3f} | {((q.get('scans_ocr', 0.0)-bq.get('scans_ocr', 0.951))/max(0.001, bq.get('scans_ocr', 0.951)))*100:+.1f}% |
+| **Completeness** | {bq.get("completeness", 0.842) * 100:.1f}% | **{q.get("completeness", 0.0) * 100:.1f}%** | {q.get("completeness", 0.0) - bq.get("completeness", 0.842):+.3f} | {((q.get("completeness", 0.0) - bq.get("completeness", 0.842)) / max(0.001, bq.get("completeness", 0.842))) * 100:+.1f}% |
+| **Fidelity** | {bq.get("fidelity", 0.849) * 100:.1f}% | **{q.get("fidelity", 0.0) * 100:.1f}%** | {q.get("fidelity", 0.0) - bq.get("fidelity", 0.849):+.3f} | {((q.get("fidelity", 0.0) - bq.get("fidelity", 0.849)) / max(0.001, bq.get("fidelity", 0.849))) * 100:+.1f}% |
+| **Structure Hierarchy** | {bq.get("structure", 0.693) * 100:.1f}% | **{q.get("structure", 0.0) * 100:.1f}%** | {q.get("structure", 0.0) - bq.get("structure", 0.693):+.3f} | {((q.get("structure", 0.0) - bq.get("structure", 0.693)) / max(0.001, bq.get("structure", 0.693))) * 100:+.1f}% |
+| **Table Accuracy** | {bq.get("tables", 0.490) * 100:.1f}% | **{q.get("tables", 0.0) * 100:.1f}%** | **{q.get("tables", 0.0) - bq.get("tables", 0.490):+.3f}** | **{((q.get("tables", 0.0) - bq.get("tables", 0.490)) / max(0.001, bq.get("tables", 0.490))) * 100:+.1f}%** |
+| **References** | {bq.get("references", 0.317) * 100:.1f}% | **{q.get("references", 0.0) * 100:.1f}%** | {q.get("references", 0.0) - bq.get("references", 0.317):+.3f} | {((q.get("references", 0.0) - bq.get("references", 0.317)) / max(0.001, bq.get("references", 0.317))) * 100:+.1f}% |
+| **Scans / OCR** | {bq.get("scans_ocr", 0.951) * 100:.1f}% | **{q.get("scans_ocr", 0.0) * 100:.1f}%** | {q.get("scans_ocr", 0.0) - bq.get("scans_ocr", 0.951):+.3f} | {((q.get("scans_ocr", 0.0) - bq.get("scans_ocr", 0.951)) / max(0.001, bq.get("scans_ocr", 0.951))) * 100:+.1f}% |
 
 ---
 
 ## 3. Verdict Distribution
 
-| Verdict | Previous Docling Baseline ({b.get('matched_documents', 0)} Docs) | New Experimental `P003` Run ({summary['judged_documents']} Docs) |
+| Verdict | Previous Docling Baseline ({b.get("matched_documents", 0)} Docs) | New Experimental `P003` Run ({summary["judged_documents"]} Docs) |
 | :--- | :---: | :---: |
-| **PASS** | {b_vd.get('PASS', 0)} ({b_vd.get('PASS', 0)/max(1, b.get('matched_documents', 1))*100:.1f}%) | **{vd.get('PASS', 0)} ({vd.get('PASS', 0)/max(1, summary['judged_documents'])*100:.1f}%)** |
-| **PASS_WITH_ISSUES** | {b_vd.get('PASS_WITH_ISSUES', 0)} ({b_vd.get('PASS_WITH_ISSUES', 0)/max(1, b.get('matched_documents', 1))*100:.1f}%) | **{vd.get('PASS_WITH_ISSUES', 0)} ({vd.get('PASS_WITH_ISSUES', 0)/max(1, summary['judged_documents'])*100:.1f}%)** |
-| **FAIL** | {b_vd.get('FAIL', 0)} ({b_vd.get('FAIL', 0)/max(1, b.get('matched_documents', 1))*100:.1f}%) | **{vd.get('FAIL', 0)} ({vd.get('FAIL', 0)/max(1, summary['judged_documents'])*100:.1f}%)** |
+| **PASS** | {b_vd.get("PASS", 0)} ({b_vd.get("PASS", 0) / max(1, b.get("matched_documents", 1)) * 100:.1f}%) | **{vd.get("PASS", 0)} ({vd.get("PASS", 0) / max(1, summary["judged_documents"]) * 100:.1f}%)** |
+| **PASS_WITH_ISSUES** | {b_vd.get("PASS_WITH_ISSUES", 0)} ({b_vd.get("PASS_WITH_ISSUES", 0) / max(1, b.get("matched_documents", 1)) * 100:.1f}%) | **{vd.get("PASS_WITH_ISSUES", 0)} ({vd.get("PASS_WITH_ISSUES", 0) / max(1, summary["judged_documents"]) * 100:.1f}%)** |
+| **FAIL** | {b_vd.get("FAIL", 0)} ({b_vd.get("FAIL", 0) / max(1, b.get("matched_documents", 1)) * 100:.1f}%) | **{vd.get("FAIL", 0)} ({vd.get("FAIL", 0) / max(1, summary["judged_documents"]) * 100:.1f}%)** |
 
 ---
 
@@ -600,10 +690,10 @@ This benchmark rigorously evaluates the experimental replacement of the heavy Do
 
 | Hardware Metric | Previous Docling Baseline | New Experimental `P003` Run | Advantage / Delta |
 | :--- | :---: | :---: | :--- |
-| **GPU VRAM Utilization** | >4.2 GB (OOM on GPU) | **{summary['peak_vram_mb']:.1f} MB** | **Zero GPU OOM** (Safe on 4GB RTX 3050) |
-| **Peak Host RAM RSS** | 14.54 GB (94.3% Host RAM) | **{summary['peak_ram_mb']:.1f} MB** | **~85% less host RAM required** |
-| **Mean Latency per Page** | ~173.6 ms (Native) / ~2,200 ms (Docling) | **{summary['mean_page_ms']:.1f} ms** | Deterministic processing speed |
-| **Total Structured Tables** | 3,981 tables | **{summary['total_tables']} tables** | High-precision 2D grid cells |
+| **GPU VRAM Utilization** | >4.2 GB (OOM on GPU) | **{summary["peak_vram_mb"]:.1f} MB** | **Zero GPU OOM** (Safe on 4GB RTX 3050) |
+| **Peak Host RAM RSS** | 14.54 GB (94.3% Host RAM) | **{summary["peak_ram_mb"]:.1f} MB** | **~85% less host RAM required** |
+| **Mean Latency per Page** | ~173.6 ms (Native) / ~2,200 ms (Docling) | **{summary["mean_page_ms"]:.1f} ms** | Deterministic processing speed |
+| **Total Structured Tables** | 3,981 tables | **{summary["total_tables"]} tables** | High-precision 2D grid cells |
 
 ---
 
@@ -617,14 +707,35 @@ This benchmark rigorously evaluates the experimental replacement of the heavy Do
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Corpus B Batch Evaluator (P003 vs Docling)")
-    parser.add_argument("--workers", type=int, default=4, help="Number of concurrent parser workers")
-    parser.add_argument("--judge-workers", type=int, default=4, help="Number of concurrent judge workers")
-    parser.add_argument("--limit", type=int, default=0, help="Limit number of documents (0=all 471)")
-    parser.add_argument("--dpi", type=int, default=150, help="Rendering DPI (default 150)")
-    parser.add_argument("--pacing", type=float, default=1.0, help="Pacing between LLM judge calls (sec)")
-    parser.add_argument("--no-resume", action="store_true", help="Force re-extraction & re-judging")
-    parser.add_argument("--skip-extract", action="store_true", help="Skip extraction and run judging only")
+    parser = argparse.ArgumentParser(
+        description="Corpus B Batch Evaluator (P003 vs Docling)"
+    )
+    parser.add_argument(
+        "--workers", type=int, default=4, help="Number of concurrent parser workers"
+    )
+    parser.add_argument(
+        "--judge-workers",
+        type=int,
+        default=4,
+        help="Number of concurrent judge workers",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Limit number of documents (0=all 471)"
+    )
+    parser.add_argument(
+        "--dpi", type=int, default=150, help="Rendering DPI (default 150)"
+    )
+    parser.add_argument(
+        "--pacing", type=float, default=1.0, help="Pacing between LLM judge calls (sec)"
+    )
+    parser.add_argument(
+        "--no-resume", action="store_true", help="Force re-extraction & re-judging"
+    )
+    parser.add_argument(
+        "--skip-extract",
+        action="store_true",
+        help="Skip extraction and run judging only",
+    )
     return parser.parse_args()
 
 
@@ -638,7 +749,9 @@ def main() -> None:
     )
 
     targets = evaluator.discover_target_documents(limit=args.limit)
-    print(f"Discovered {len(targets)} target documents matching Corpus B previous judgments.")
+    print(
+        f"Discovered {len(targets)} target documents matching Corpus B previous judgments."
+    )
 
     if not targets:
         print("[ERROR] No target documents found.")
@@ -656,15 +769,21 @@ def main() -> None:
             telemetry_p = evaluator.raw_dir / f"{t['doc_id']}.runtime.json"
             if telemetry_p.exists():
                 try:
-                    extraction_results.append(json.loads(telemetry_p.read_text(encoding="utf-8")))
+                    extraction_results.append(
+                        json.loads(telemetry_p.read_text(encoding="utf-8"))
+                    )
                 except Exception:
                     pass
 
     # Stage 2: Judging
-    judgment_results = evaluator.run_batch_judgment(targets, resume=resume, pacing=args.pacing)
+    judgment_results = evaluator.run_batch_judgment(
+        targets, resume=resume, pacing=args.pacing
+    )
 
     # Stage 3: Aggregation
-    summary = evaluator.generate_consolidated_report(extraction_results, judgment_results)
+    summary = evaluator.generate_consolidated_report(
+        extraction_results, judgment_results
+    )
     print("\n=== Final Benchmark Summary ===")
     print(json.dumps(summary, indent=2))
 

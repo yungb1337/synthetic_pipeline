@@ -118,9 +118,9 @@ class Detector(ABC):
 class DetectorResult:
     detector: str
     version: str
-    status: str            # "ok" | "failed" | "not_applicable"
+    status: str  # "ok" | "failed" | "not_applicable"
     error: str | None = None
-    signals: list[Signal] = field(default_factory=list)   # zero signals on failure
+    signals: list[Signal] = field(default_factory=list)  # zero signals on failure
 ```
 
 `Signal` (the unit of evidence, spec §4):
@@ -128,11 +128,15 @@ class DetectorResult:
 class Signal(BaseModel):
     detector: str
     version: str
-    name: str               # stable, e.g. "metric_page_char_density_none"
-    value: Optional[float | bool | str] = None   # MISSING = None, never 0/False defaulted (spec §4)
-    confidence: Optional[float] = None           # 0..1; None = not established
-    evidence: Optional[str] = None               # short human-readable reason (spec §8 explainability)
-    status: str = "ok"                           # "ok" | "failed" | "missing" | "not_applicable"
+    name: str  # stable, e.g. "metric_page_char_density_none"
+    value: Optional[float | bool | str] = (
+        None  # MISSING = None, never 0/False defaulted (spec §4)
+    )
+    confidence: Optional[float] = None  # 0..1; None = not established
+    evidence: Optional[str] = (
+        None  # short human-readable reason (spec §8 explainability)
+    )
+    status: str = "ok"  # "ok" | "failed" | "missing" | "not_applicable"
 ```
 - A **scanned-page probability**, a **cross-column probability**, a **digit/ratio…**, etc. each
   become a `Signal` (one concern → often many signals). A missing/unevaluable observation →
@@ -161,22 +165,31 @@ never invoked during inspection — inspection is a cheap metadata + text-geomet
 @dataclass
 class InspectorFeatures:
     # metadata-level
-    mime_slug: str; declared_extension: str; pdf_version: str | None
-    encrypted: bool | None; producer: str | None; creator: str
-    outline: bool; tag: bool | None
+    mime_slug: str
+    declared_extension: str
+    pdf_version: str | None
+    encrypted: bool | None
+    producer: str | None
+    creator: str
+    outline: bool
+    tag: bool | None
     page_count: int
-    page_dims: dict[int, (w,h)]
+    page_dims: dict[int, (w, h)]
     # text
-    pages_char_count: dict[int, int]; chars_per_page: list[float]
-    text_ratio: float | None; fragment_count: int | None
+    pages_char_count: dict[int, int]
+    chars_per_page: list[float]
+    text_ratio: float | None
+    fragment_count: int | None
     # image
-    image_count: int; images_per_page: list[int]; covered_pages: int
-    full_image_pages: list[int]   # pages with ~full-area image -> likely scanned
+    image_count: int
+    images_per_page: list[int]
+    covered_pages: int
+    full_image_pages: list[int]  # pages with ~full-area image -> likely scanned
     # layout hints (heuristic, cheap)
-    est_multi_column_pages: list[int]   # block bbox x-overlap clustering, v1 heuristic
-    block_count_per_page: list[int]     # spatial fragmentation
+    est_multi_column_pages: list[int]  # block bbox x-overlap clustering, v1 heuristic
+    block_count_per_page: list[int]  # spatial fragmentation
     # structural
-    detected_tables: int | None         # PyMuPDF find_tables presence (cheap), else None
+    detected_tables: int | None  # PyMuPDF find_tables presence (cheap), else None
 ```
 Inspector computes these into a small `InspectorFeatures` dataclass (deterministic, no hidden
 state). Detector **evaluate()** methods read `InspectorFeatures` and emit `Signal`s; a detector
@@ -213,14 +226,21 @@ v1 impl `WeightedHeuristicScorer` — deterministic:
 `policy.py`: band thresholds are **config**, not constants (spec §6 §17):
 ```python
 class RoutingPolicy:
-    bands: list[tuple[int,int,str]] = [(0,30,"native"),(31,60,"enrichment"),(61,100,"docling")]
-    native_low_confidence_threshold: float   # e.g. 0.50
-    enrichment_low_confidence_threshold: float # e.g. 0.35
+    bands: list[tuple[int, int, str]] = [
+        (0, 30, "native"),
+        (31, 60, "enrichment"),
+        (61, 100, "docling"),
+    ]
+    native_low_confidence_threshold: float  # e.g. 0.50
+    enrichment_low_confidence_threshold: float  # e.g. 0.35
+
     # conservative toward complexity (spec §14)
-    def route(self, complexity:float, confidence:float) -> str:
+    def route(self, complexity: float, confidence: float) -> str:
         band = bounded_band(complexity)
         if confidence < low_conf_threshold[band]:
-            band = escalate_closest_band(band)     # native->enrichment, enrichment->docling
+            band = escalate_closest_band(
+                band
+            )  # native->enrichment, enrichment->docling
         return band
 ```
 Decision: **escalate toward complex on low confidence** — per §14 "conservative toward complex
@@ -239,15 +259,17 @@ never downgrades.
 ```python
 # app/routing/schema.py  (leaf — imports only pydantic)
 class RoutingDecision(BaseModel):
-    route: str                     # "native" | "enrichment" | "docling"
-    complexity_score: int          # 0..100
-    confidence: float              # 0..1
-    reasons: list[str]             # human-readable, from detector+scorer (§8)
-    signals: list[Signal]          # full evidence, incl. failures (§17)
+    route: str  # "native" | "enrichment" | "docling"
+    complexity_score: int  # 0..100
+    confidence: float  # 0..1
+    reasons: list[str]  # human-readable, from detector+scorer (§8)
+    signals: list[Signal]  # full evidence, incl. failures (§17)
     router_version: str
     policy_version: str
     scoring_version: str
-    detector_versions: dict[str, str]  # detector -> version (independently version, §10)
+    detector_versions: dict[
+        str, str
+    ]  # detector -> version (independently version, §10)
     inspection_time_ms: float
     bands: dict[str, tuple[int, int]]  # band -> (lo,hi) repr for regression/audit (§6)
 ```
@@ -264,12 +286,12 @@ The **only** edits in `app/parser/*` are:
    (This preserves ADR-007's existing "native"/"docling" manual overrides; the *default* changes.)
 2. `app/parser/dom/models.py` — add to `Provenance`:
    ```python
-   routing: Optional["RoutingDecision"] = None    # additive; old DOMs keep validating (None)
+   routing: Optional["RoutingDecision"] = None  # additive; old DOMs keep validating (None)
    ```
    (import `RoutingDecision` from `app.routing.schema` — leaf, no cycle.) This is the §9 mutation.
 3. `app/parser/parts.py` — add to `RecoveredDocument`:
    ```python
-   routing: RoutingDecision | None = None      # additive
+   routing: RoutingDecision | None = None  # additive
    ```    
    Builder maps it into `Provenance.routing`.
 4. `app/parser/extraction.py` — compute the route **after** `detection.detect` and **before**
@@ -316,8 +338,9 @@ orchestration is **explicitly out of v1** §16).
 
 ```python
 # app/parser/loaders/enrichment.py (new, reuses ocr)
-def enrich_scanned_pages(rec: RecoveredDocument, config: ParserConfig,
-                          render_fn=... ) -> RecoveredDocument:
+def enrich_scanned_pages(
+    rec: RecoveredDocument, config: ParserConfig, render_fn=...
+) -> RecoveredDocument:
     """After native PDF extraction, OCR pages with zero text blocks."""
     # (1) find pages with no text blocks in rec (blocks with .page == p)
     # (2) render each such page to a raster via fitz ("get_pixmap") — ONE render per page, only here

@@ -9,14 +9,15 @@ Bus-free and deterministic: routing is a pure function of `(bytes, detection,
 RoutingConfig snapshot)`. No means is no route; no module outside this package
 runs any routing logic, and this package never touches the loaders.
 """
+
 from .config import RoutingConfig
 from .router import Router, RoutingStats
 from .schema import RoutingDecision, Signal
 
 __all__ = [
-    "RoutingConfig",
     "Router",
-    "RoutingStats",
+    "RoutingConfig",
     "RoutingDecision",
+    "RoutingStats",
     "Signal",
 ]

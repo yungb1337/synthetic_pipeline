@@ -4,9 +4,9 @@ B1: Single-box multi-process sharding (_shard_files in CLI)
 B2: Remote Docling microservice & engine (docling_service + RemoteDoclingEngine)
 B3: Multi-box cluster sharding (shard_doc_refs in corpus/executor)
 """
+
 from __future__ import annotations
 
-import json
 import threading
 import time
 from pathlib import Path
@@ -88,7 +88,10 @@ def test_b2_remote_docling_service_and_engine(tmp_path):
             route=DOCLING,
         )
 
-        with patch("app.parser.docling_service.HeavyDoclingEngine.process", return_value=mock_page_result):
+        with patch(
+            "app.parser.docling_service.HeavyDoclingEngine.process",
+            return_value=mock_page_result,
+        ):
             res = engine.process(item)
 
         assert res.status == PageStatus.OK
@@ -97,7 +100,10 @@ def test_b2_remote_docling_service_and_engine(tmp_path):
 
         # 3. Test Scheduler routing when docling_service_url is configured
         sched = Scheduler(cfg)
-        assert getattr(sched.config, "docling_service_url", "") == f"http://127.0.0.1:{port}"
+        assert (
+            getattr(sched.config, "docling_service_url", "")
+            == f"http://127.0.0.1:{port}"
+        )
         sched.close()
 
     finally:
@@ -149,7 +155,13 @@ def test_b3_batch_worker_with_sharding():
         for i in range(10)
     ]
 
-    with patch.object(worker, "_run_with_retries", return_value=MagicMock(status="ok", docref=refs[0], document_id="d0", result_type="pdf")) as mock_run:
+    with patch.object(
+        worker,
+        "_run_with_retries",
+        return_value=MagicMock(
+            status="ok", docref=refs[0], document_id="d0", result_type="pdf"
+        ),
+    ) as mock_run:
         with patch("app.processing.executor.load_manifest", return_value=set()):
             with patch("app.processing.executor.save_manifest"):
                 worker.run(refs)

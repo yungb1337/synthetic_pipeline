@@ -22,6 +22,7 @@ Writes:
   <reports>/benchmark.md          (append-only cumulative one-line per batch)
   <reports>/errors.md             (append-only error-class signals)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,8 +44,15 @@ except ImportError:
     psutil = None
 
 PARSE_FOLDER = Path(__file__).resolve().parent / "parse_folder.py"
-ERROR_SIGNALS = ("std::bad_alloc", "ONNX", "Traceback", "Error", "FAILED",
-                 "DEAD", "dead-letter")
+ERROR_SIGNALS = (
+    "std::bad_alloc",
+    "ONNX",
+    "Traceback",
+    "Error",
+    "FAILED",
+    "DEAD",
+    "dead-letter",
+)
 
 
 def _now() -> str:
@@ -107,14 +115,18 @@ class ProcessTreeMemorySampler:
                     max_worker = max(rss_list)
                     total_tree = sum(rss_list)
                     with self.lock:
-                        if max_worker > self.peak_worker_rss_mb:
-                            self.peak_worker_rss_mb = max_worker
-                        if total_tree > self.peak_total_tree_rss_mb:
-                            self.peak_total_tree_rss_mb = total_tree
-                        if max_worker > self.current_window_max_worker_mb:
-                            self.current_window_max_worker_mb = max_worker
-                        if total_tree > self.current_window_max_total_mb:
-                            self.current_window_max_total_mb = total_tree
+                        self.peak_worker_rss_mb = max(
+                            self.peak_worker_rss_mb, max_worker
+                        )
+                        self.peak_total_tree_rss_mb = max(
+                            self.peak_total_tree_rss_mb, total_tree
+                        )
+                        self.current_window_max_worker_mb = max(
+                            self.current_window_max_worker_mb, max_worker
+                        )
+                        self.current_window_max_total_mb = max(
+                            self.current_window_max_total_mb, total_tree
+                        )
             except Exception:
                 pass
             time.sleep(self.interval)
@@ -166,16 +178,33 @@ def main() -> int:
     ap.add_argument("--in", dest="sources", required=True, help="dir of source PDFs")
     ap.add_argument("--out", dest="parsed", required=True, help="parsed store root")
     ap.add_argument("--batch", required=True, help="batch id, e.g. b01")
-    ap.add_argument("--reports", required=True, help="reports dir (writes benchmark-<batch>.md)")
-    ap.add_argument("--limit", type=int, default=0, help="max files parsed this batch (0=all)")
-    ap.add_argument("--offset", type=int, default=0, help="starting file index (0=first)")
+    ap.add_argument(
+        "--reports", required=True, help="reports dir (writes benchmark-<batch>.md)"
+    )
+    ap.add_argument(
+        "--limit", type=int, default=0, help="max files parsed this batch (0=all)"
+    )
+    ap.add_argument(
+        "--offset", type=int, default=0, help="starting file index (0=first)"
+    )
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
-    ap.add_argument("--heavy-concurrency", type=int, default=None,
-                    help="bound the Docling heavy pool (default: RAM-derived).")
-    ap.add_argument("--shards", type=int, default=1,
-                    help="number of concurrent parser shard processes (Architecture B).")
-    ap.add_argument("--analyze-only", action="store_true",
-                    help="skip parser child; just join + report the current store")
+    ap.add_argument(
+        "--heavy-concurrency",
+        type=int,
+        default=None,
+        help="bound the Docling heavy pool (default: RAM-derived).",
+    )
+    ap.add_argument(
+        "--shards",
+        type=int,
+        default=1,
+        help="number of concurrent parser shard processes (Architecture B).",
+    )
+    ap.add_argument(
+        "--analyze-only",
+        action="store_true",
+        help="skip parser child; just join + report the current store",
+    )
     args = ap.parse_args()
 
     src = Path(args.sources)
@@ -189,9 +218,9 @@ def main() -> int:
 
     pdfs = sorted(src.glob("*.pdf"))
     if args.offset:
-        pdfs = pdfs[args.offset:]
+        pdfs = pdfs[args.offset :]
     if args.limit:
-        pdfs = pdfs[:args.limit]
+        pdfs = pdfs[: args.limit]
     if not pdfs:
         print(f"ERROR: no PDFs under {src}", file=sys.stderr)
         return 2
@@ -205,7 +234,9 @@ def main() -> int:
     log_lines: list[str] = []
     wall_s = 0.0
     rc = None
-    doc_telemetry: dict[str, dict] = {}  # filename -> {time_ms, pages, peak_worker_mb, peak_tree_mb}
+    doc_telemetry: dict[
+        str, dict
+    ] = {}  # filename -> {time_ms, pages, peak_worker_mb, peak_tree_mb}
     peak_worker_mb = 0.0
     peak_corpus_tree_mb = 0.0
 
@@ -263,7 +294,10 @@ def main() -> int:
                 log_lines.append(raw_line)
 
                 if any(sig in raw_line for sig in ERROR_SIGNALS):
-                    _append(reports / "errors.md", f"[{_now()}] [{args.batch}] {raw_line.strip()}")
+                    _append(
+                        reports / "errors.md",
+                        f"[{_now()}] [{args.batch}] {raw_line.strip()}",
+                    )
 
                 # Telemetry parsing:
                 # Matches "OK   PMC12345.pdf  pdf  pages=12  ..."
@@ -306,8 +340,16 @@ def main() -> int:
                         doc_telemetry[current_doc_name] = {
                             "pages": current_doc_pages,
                             "time_ms": t_ms,
-                            "peak_worker_mb": max(w_peak, existing.get("peak_worker_mb", 0.0) if existing else 0.0),
-                            "peak_tree_mb": max(t_peak, existing.get("peak_tree_mb", 0.0) if existing else 0.0),
+                            "peak_worker_mb": max(
+                                w_peak,
+                                existing.get("peak_worker_mb", 0.0)
+                                if existing
+                                else 0.0,
+                            ),
+                            "peak_tree_mb": max(
+                                t_peak,
+                                existing.get("peak_tree_mb", 0.0) if existing else 0.0,
+                            ),
                         }
                     current_doc_name = None
 
@@ -315,7 +357,9 @@ def main() -> int:
             sampler.stop()
 
             peak_worker_mb = max(peak_worker_mb, sampler.peak_worker_rss_mb)
-            peak_corpus_tree_mb = max(peak_corpus_tree_mb, sampler.peak_total_tree_rss_mb)
+            peak_corpus_tree_mb = max(
+                peak_corpus_tree_mb, sampler.peak_total_tree_rss_mb
+            )
 
             # Check progress made in this pass
             new_ok_cnt = 0
@@ -330,7 +374,10 @@ def main() -> int:
             if new_ok_cnt == ok_cnt:
                 consecutive_stalls += 1
                 if consecutive_stalls >= 3:
-                    print(f"[{_now()}] [{args.batch}] Stopping after 3 consecutive passes with 0 progress", flush=True)
+                    print(
+                        f"[{_now()}] [{args.batch}] Stopping after 3 consecutive passes with 0 progress",
+                        flush=True,
+                    )
                     break
             else:
                 consecutive_stalls = 0
@@ -388,12 +435,12 @@ def main() -> int:
     ntables = sum(r.get("tables", 0) for r in doc_results)
     nrefs = sum(r.get("refs", 0) for r in doc_results)
 
-    total_pages_done = sum(
-        sum(r.get("page_status", {}).values()) for r in doc_results
-    )
+    total_pages_done = sum(sum(r.get("page_status", {}).values()) for r in doc_results)
     ok_times = [r["time_ms"] for r in doc_results if r.get("time_ms", 0) > 0]
     avg_ms_per_doc = (sum(ok_times) / len(ok_times)) if ok_times else 0.0
-    avg_ms_per_page = (sum(ok_times) / total_pages_done) if total_pages_done > 0 and ok_times else 0.0
+    avg_ms_per_page = (
+        (sum(ok_times) / total_pages_done) if total_pages_done > 0 and ok_times else 0.0
+    )
 
     # System memory reporting
     mem_avail_start_gb = (sys_mem_start.available / (1024**3)) if sys_mem_start else 0.0
@@ -407,19 +454,22 @@ def main() -> int:
         "",
         "## Summary",
         f"- **Documents**: {len(pdfs)} issued · `{ok}` OK · `{failed}` failed · `{dead}` dead · `{unparsed}` unparsed",
-        f"- **Throughput & Timing**:",
-        f"  - Total wall time: `{wall_s:.1f}s` ({wall_s/60:.2f} mins)",
+        "- **Throughput & Timing**:",
+        f"  - Total wall time: `{wall_s:.1f}s` ({wall_s / 60:.2f} mins)",
         f"  - Total pages parsed: `{total_pages_done}`",
-        f"  - Mean time per doc: `{avg_ms_per_doc:.1f} ms` ({avg_ms_per_doc/1000:.2f}s)",
-        f"  - Mean time per page: `{avg_ms_per_page:.1f} ms` ({avg_ms_per_page/1000:.2f}s)",
-        f"- **Memory Telemetry**:",
+        f"  - Mean time per doc: `{avg_ms_per_doc:.1f} ms` ({avg_ms_per_doc / 1000:.2f}s)",
+        f"  - Mean time per page: `{avg_ms_per_page:.1f} ms` ({avg_ms_per_page / 1000:.2f}s)",
+        "- **Memory Telemetry**:",
         f"  - Peak memory per corpus (Total tree RSS): `{peak_corpus_tree_mb:.0f} MB`",
         f"  - Peak worker memory (Max single-process RSS): `{peak_worker_mb:.0f} MB`",
         f"  - Host RAM available: `{mem_avail_start_gb:.2f} GB` start -> `{mem_avail_end_gb:.2f} GB` end",
         f"  - Pagefile/Swap committed: `{swap_used_start_gb:.2f} GB` start -> `{swap_used_end_gb:.2f} GB` end",
         f"- **Extraction Yield**: `{nblocks}` blocks · `{ntables}` tables · `{nrefs}` references",
-        (f"- **Command**: `{' '.join(cmd)}`" if not args.analyze_only else
-         "- **Mode**: analyze-only (no parse; existing store)"),
+        (
+            f"- **Command**: `{' '.join(cmd)}`"
+            if not args.analyze_only
+            else "- **Mode**: analyze-only (no parse; existing store)"
+        ),
         "",
         "## Document Metrics",
         "| file | assembly | pages(done/exp) | time(s) | ms/page | peak_worker(MB) | peak_tree(MB) | blocks | tables | refs | ro_full |",
@@ -429,17 +479,21 @@ def main() -> int:
     for r in sorted(doc_results, key=lambda x: x.get("source_file", "")):
         pst = r.get("page_status", {})
         done = sum(pst.values())
-        t_s = f"{r.get('time_ms', 0) / 1000:.2f}" if r.get('time_ms', 0) > 0 else "-"
-        ms_p = f"{r.get('ms_per_page', 0):.0f}" if r.get('ms_per_page', 0) > 0 else "-"
-        p_w = f"{r.get('peak_worker_mb', 0):.0f}" if r.get('peak_worker_mb', 0) > 0 else "-"
-        p_t = f"{r.get('peak_tree_mb', 0):.0f}" if r.get('peak_tree_mb', 0) > 0 else "-"
+        t_s = f"{r.get('time_ms', 0) / 1000:.2f}" if r.get("time_ms", 0) > 0 else "-"
+        ms_p = f"{r.get('ms_per_page', 0):.0f}" if r.get("ms_per_page", 0) > 0 else "-"
+        p_w = (
+            f"{r.get('peak_worker_mb', 0):.0f}"
+            if r.get("peak_worker_mb", 0) > 0
+            else "-"
+        )
+        p_t = f"{r.get('peak_tree_mb', 0):.0f}" if r.get("peak_tree_mb", 0) > 0 else "-"
 
         report.append(
-            f"| {r.get('source_file','?')} | {r.get('assembly_status','?')} "
-            f"| {done}/{r.get('expected_pages','?')} "
+            f"| {r.get('source_file', '?')} | {r.get('assembly_status', '?')} "
+            f"| {done}/{r.get('expected_pages', '?')} "
             f"| {t_s} | {ms_p} | {p_w} | {p_t} "
-            f"| {r.get('blocks','-')} | {r.get('tables','-')} "
-            f"| {r.get('refs','-')} | {r.get('ro_full','-')} |"
+            f"| {r.get('blocks', '-')} | {r.get('tables', '-')} "
+            f"| {r.get('refs', '-')} | {r.get('ro_full', '-')} |"
         )
 
     report.append("")
@@ -453,14 +507,16 @@ def main() -> int:
     _append(
         reports / "benchmark.md",
         f"- **{args.batch}** ({_now()}): files={len(pdfs)} ok={ok} failed={failed} "
-        f"dead={dead} unparsed={unparsed} wall={wall_s:.1f}s avg_doc={avg_ms_per_doc/1000:.2f}s "
+        f"dead={dead} unparsed={unparsed} wall={wall_s:.1f}s avg_doc={avg_ms_per_doc / 1000:.2f}s "
         f"avg_page={avg_ms_per_page:.0f}ms peak_tree={peak_corpus_tree_mb:.0f}MB "
         f"peak_worker={peak_worker_mb:.0f}MB blocks={nblocks} tables={ntables}",
     )
 
-    print(f"\n[bench] {args.batch} complete: ok={ok} failed={failed} dead={dead} "
-          f"unparsed={unparsed} wall={wall_s:.1f}s avg_doc={avg_ms_per_doc/1000:.2f}s "
-          f"peak_tree={peak_corpus_tree_mb:.0f}MB peak_worker={peak_worker_mb:.0f}MB")
+    print(
+        f"\n[bench] {args.batch} complete: ok={ok} failed={failed} dead={dead} "
+        f"unparsed={unparsed} wall={wall_s:.1f}s avg_doc={avg_ms_per_doc / 1000:.2f}s "
+        f"peak_tree={peak_corpus_tree_mb:.0f}MB peak_worker={peak_worker_mb:.0f}MB"
+    )
     print(f"[bench] full report written to: {path}")
     return 0
 

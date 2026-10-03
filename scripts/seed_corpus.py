@@ -12,6 +12,7 @@ Usage:
 Writes manifest entries: {id, url, stratum, source, title, status:new}
 Fully deterministic given API responses; safe to re-run (dedups by id).
 Dependencies: requests (installed)."""
+
 from __future__ import annotations
 
 import argparse
@@ -27,19 +28,46 @@ import requests
 # the scan/forms/mixed strata (S4/S5). All public, non-PHI, .gov/.int.
 CURATED_SEED: list[dict] = [
     # CMS-1500 claim form (blank + sample) — S4 scans/forms
-    {"id": "cms-1500-blank", "url": "https://www.cms.gov/Medicare/CMS-Forms/CMS-Forms/Downloads/CMS1500.pdf",
-     "stratum": "S4", "source": "curated", "title": "CMS-1500 Health Insurance Claim Form (blank)", "status": "new"},
-    {"id": "hcfa-1500-sample", "url": "https://www.cms.gov/Medicare/CMS-Forms/CMS-Forms/Downloads/CMS-1500-2014.pdf",
-     "stratum": "S4", "source": "curated", "title": "CMS-1500 02/12 sample form", "status": "new"},
+    {
+        "id": "cms-1500-blank",
+        "url": "https://www.cms.gov/Medicare/CMS-Forms/CMS-Forms/Downloads/CMS1500.pdf",
+        "stratum": "S4",
+        "source": "curated",
+        "title": "CMS-1500 Health Insurance Claim Form (blank)",
+        "status": "new",
+    },
+    {
+        "id": "hcfa-1500-sample",
+        "url": "https://www.cms.gov/Medicare/CMS-Forms/CMS-Forms/Downloads/CMS-1500-2014.pdf",
+        "stratum": "S4",
+        "source": "curated",
+        "title": "CMS-1500 02/12 sample form",
+        "status": "new",
+    },
     # CDC MMWR (surveillance tables) — S2 table-dense
-    {"id": "mmwr-weekly-morbidity-table", "url": "https://www.cdc.gov/mmwr/PDF/wk/mm7407.pdf",
-     "stratum": "S2", "source": "curated", "title": "MMWR Surveillance Tables (sample week)", "status": "new"},
+    {
+        "id": "mmwr-weekly-morbidity-table",
+        "url": "https://www.cdc.gov/mmwr/PDF/wk/mm7407.pdf",
+        "stratum": "S2",
+        "source": "curated",
+        "title": "MMWR Surveillance Tables (sample week)",
+        "status": "new",
+    },
     # WHO guideline PDF (public) — S3
-    {"id": "who-hiv-guideline", "url": "https://iris.who.int/bitstream/handle/10665/208825/9789241549709-eng.pdf",
-     "stratum": "S3", "source": "curated", "title": "WHO Consolidated HIV Guidelines (public)", "status": "new"},
+    {
+        "id": "who-hiv-guideline",
+        "url": "https://iris.who.int/bitstream/handle/10665/208825/9789241549709-eng.pdf",
+        "stratum": "S3",
+        "source": "curated",
+        "title": "WHO Consolidated HIV Guidelines (public)",
+        "status": "new",
+    },
 ]
 
-ARXIV_NS = {"a": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
+ARXIV_NS = {
+    "a": "http://www.w3.org/2005/Atom",
+    "arxiv": "http://arxiv.org/schemas/atom",
+}
 
 # Stratum -> Europe PMC query fragments (all OPEN_ACCESS + PDF-available)
 STRATA_QUERIES: dict[str, list[str]] = {
@@ -84,16 +112,21 @@ def _norm_key(rec: dict) -> str:
     return f"{rec.get('source')}:{rec.get('id')}"
 
 
-def search_europepmc(query: str, page_size: int = 100, retries: int = 3,
-                     backoff: float = 4.0) -> list[dict]:
+def search_europepmc(
+    query: str, page_size: int = 100, retries: int = 3, backoff: float = 4.0
+) -> list[dict]:
     """Query Europe PMC REST search; return result records (core)."""
     url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     for attempt in range(retries):
         try:
             r = requests.get(
                 url,
-                params={"query": query, "format": "json", "resultType": "core",
-                        "pageSize": page_size},
+                params={
+                    "query": query,
+                    "format": "json",
+                    "resultType": "core",
+                    "pageSize": page_size,
+                },
                 timeout=45,
             )
             r.raise_for_status()
@@ -115,22 +148,27 @@ def pmc_to_manifest(records: list[dict], stratum: str) -> list[dict]:
             continue
         pdf_url = None
         for u in rec.get("fullTextUrlList", {}).get("fullTextUrl", []):
-            if u.get("documentStyle") == "pdf" and u.get("availability") == "Open access":
+            if (
+                u.get("documentStyle") == "pdf"
+                and u.get("availability") == "Open access"
+            ):
                 pdf_url = u.get("url")
                 break
         if not pdf_url:  # fall back to the stable render endpoint
             pdf_url = f"https://europepmc.org/articles/{pmcid}?pdf=render"
-        out.append({
-            "id": pmcid,
-            "url": pdf_url,
-            "stratum": stratum,
-            "source": "europepmc",
-            "title": (rec.get("title") or "")[:200],
-            "pmid": rec.get("pmid"),
-            "doi": rec.get("doi"),
-            "pub_year": rec.get("pubYear"),
-            "status": "new",
-        })
+        out.append(
+            {
+                "id": pmcid,
+                "url": pdf_url,
+                "stratum": stratum,
+                "source": "europepmc",
+                "title": (rec.get("title") or "")[:200],
+                "pmid": rec.get("pmid"),
+                "doi": rec.get("doi"),
+                "pub_year": rec.get("pubYear"),
+                "status": "new",
+            }
+        )
     return out
 
 
@@ -142,7 +180,11 @@ def search_arxiv(max_results: int = 60) -> list[dict]:
     )
     url = "http://export.arxiv.org/api/query"
     try:
-        r = requests.get(url, params={"search_query": query, "start": 0, "max_results": max_results}, timeout=45)
+        r = requests.get(
+            url,
+            params={"search_query": query, "start": 0, "max_results": max_results},
+            timeout=45,
+        )
         r.raise_for_status()
         root = ET.fromstring(r.text)
     except Exception as exc:  # noqa: BLE001
@@ -151,28 +193,44 @@ def search_arxiv(max_results: int = 60) -> list[dict]:
     out: list[dict] = []
     for entry in root.findall("a:entry", ARXIV_NS):
         aid = entry.findtext("a:id", default="", namespaces=ARXIV_NS)
-        title = " ".join((entry.findtext("a:title", default="", namespaces=ARXIV_NS) or "").split())
+        title = " ".join(
+            (entry.findtext("a:title", default="", namespaces=ARXIV_NS) or "").split()
+        )
         if "/abs/" in aid:
             arxid = aid.rsplit("/abs/", 1)[1]
-            out.append({
-                "id": f"arxiv-{arxid}",
-                "url": f"https://arxiv.org/pdf/{arxid}",
-                "stratum": "S5",
-                "source": "arxiv",
-                "title": title[:200],
-                "arxiv_id": arxid,
-                "status": "new",
-            })
+            out.append(
+                {
+                    "id": f"arxiv-{arxid}",
+                    "url": f"https://arxiv.org/pdf/{arxid}",
+                    "stratum": "S5",
+                    "source": "arxiv",
+                    "title": title[:200],
+                    "arxiv_id": arxid,
+                    "status": "new",
+                }
+            )
     return out
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", required=True, help="path to corpus manifest.json (append-only)")
-    ap.add_argument("--limit", type=int, default=800, help="max new entries added this run")
-    ap.add_argument("--strata", default="S1,S2,S3,S4,S5", help="comma-separated strata subset to seed")
+    ap.add_argument(
+        "--out", required=True, help="path to corpus manifest.json (append-only)"
+    )
+    ap.add_argument(
+        "--limit", type=int, default=800, help="max new entries added this run"
+    )
+    ap.add_argument(
+        "--strata",
+        default="S1,S2,S3,S4,S5",
+        help="comma-separated strata subset to seed",
+    )
     ap.add_argument("--no-arxiv", action="store_true", help="skip the arXiv query (S5)")
-    ap.add_argument("--dry-run", action="store_true", help="print candidates without touching manifest")
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print candidates without touching manifest",
+    )
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -198,11 +256,17 @@ def main() -> int:
         if stratum not in STRATA_QUERIES:
             continue
         for q in STRATA_QUERIES[stratum]:
-            if strata_added.get(stratum, 0) >= per_stratum_cap or len(added) >= args.limit:
+            if (
+                strata_added.get(stratum, 0) >= per_stratum_cap
+                or len(added) >= args.limit
+            ):
                 break
             recs = search_europepmc(q, page_size=100)
             for rec in pmc_to_manifest(recs, stratum):
-                if strata_added.get(stratum, 0) >= per_stratum_cap or len(added) >= args.limit:
+                if (
+                    strata_added.get(stratum, 0) >= per_stratum_cap
+                    or len(added) >= args.limit
+                ):
                     break
                 if _norm_key(rec) not in existing:
                     added.append(rec)
@@ -227,8 +291,10 @@ def main() -> int:
     merged = list(existing.values()) + added
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"OK: manifest {out} now has {len(merged)} entries (+{len(added)} new, "
-          f"{sum(1 for r in merged if r.get('status') == 'ok')} already downloaded)")
+    print(
+        f"OK: manifest {out} now has {len(merged)} entries (+{len(added)} new, "
+        f"{sum(1 for r in merged if r.get('status') == 'ok')} already downloaded)"
+    )
     for rec in added:
         print(f"  +[{rec['stratum']}] {rec['id']:<18} {rec['url'][:70]}")
     return 0

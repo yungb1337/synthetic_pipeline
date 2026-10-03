@@ -1,4 +1,5 @@
 """Tests for scripts/preflight_check.py."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -77,14 +78,18 @@ def test_check_swap():
 
 
 def test_run_preflight_all_pass():
-    with patch("scripts.preflight_check.check_ram", return_value=(True, "RAM OK")), \
-         patch("scripts.preflight_check.check_disk", return_value=(True, "Disk OK")), \
-         patch("scripts.preflight_check.check_swap", return_value=(True, "Swap OK")):
+    with (
+        patch("scripts.preflight_check.check_ram", return_value=(True, "RAM OK")),
+        patch("scripts.preflight_check.check_disk", return_value=(True, "Disk OK")),
+        patch("scripts.preflight_check.check_swap", return_value=(True, "Swap OK")),
+    ):
         assert run_preflight() is True
 
 
 def test_run_preflight_fails_on_low_memory():
-    with patch("scripts.preflight_check.check_ram", return_value=(False, "RAM LOW")), \
-         patch("scripts.preflight_check.check_disk", return_value=(True, "Disk OK")), \
-         patch("scripts.preflight_check.check_swap", return_value=(True, "Swap OK")):
+    with (
+        patch("scripts.preflight_check.check_ram", return_value=(False, "RAM LOW")),
+        patch("scripts.preflight_check.check_disk", return_value=(True, "Disk OK")),
+        patch("scripts.preflight_check.check_swap", return_value=(True, "Swap OK")),
+    ):
         assert run_preflight() is False

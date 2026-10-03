@@ -1,25 +1,21 @@
-"""Unit and integration tests for experimental Unlimited-OCR module.
-"""
+"""Unit and integration tests for experimental Unlimited-OCR module."""
+
 from __future__ import annotations
 
-import json
-import tempfile
 from pathlib import Path
 
-import fitz
-import pytest
-
-from experimental.unlimited_ocr.adapter import DocumentRawOCR, PageRawOCR, UnlimitedOCRAdapter
+from experimental.unlimited_ocr.adapter import (
+    UnlimitedOCRAdapter,
+)
 from experimental.unlimited_ocr.artifacts import ArtifactManager
 from experimental.unlimited_ocr.config import UnlimitedOCRConfig
 from experimental.unlimited_ocr.converter import UnlimitedOCRConverter
 from experimental.unlimited_ocr.metrics import (
-    DocumentMetrics,
     calculate_repetition_score,
     compute_text_hash,
 )
 from experimental.unlimited_ocr.runner import UnlimitedOCREvaluationRunner
-from tests.routing_fixtures import image_only_pdf, text_pdf
+from tests.routing_fixtures import text_pdf
 
 
 def test_repetition_score_detection():
@@ -47,7 +43,9 @@ def test_unlimited_ocr_adapter_process(tmp_path: Path):
     pdf_file = tmp_path / "sample.pdf"
     pdf_file.write_bytes(pdf_bytes)
 
-    cfg = UnlimitedOCRConfig(artifacts_dir=tmp_path / "artifacts", evaluation_dir=tmp_path / "eval")
+    cfg = UnlimitedOCRConfig(
+        artifacts_dir=tmp_path / "artifacts", evaluation_dir=tmp_path / "eval"
+    )
     adapter = UnlimitedOCRAdapter(cfg)
 
     raw_doc = adapter.process_pdf(pdf_file, document_id="doc-test-01")
@@ -66,7 +64,9 @@ def test_unlimited_ocr_converter_to_dom(tmp_path: Path):
     pdf_file = tmp_path / "sample_conv.pdf"
     pdf_file.write_bytes(pdf_bytes)
 
-    cfg = UnlimitedOCRConfig(artifacts_dir=tmp_path / "artifacts", evaluation_dir=tmp_path / "eval")
+    cfg = UnlimitedOCRConfig(
+        artifacts_dir=tmp_path / "artifacts", evaluation_dir=tmp_path / "eval"
+    )
     adapter = UnlimitedOCRAdapter(cfg)
     raw_doc = adapter.process_pdf(pdf_file, document_id="doc-conv-01")
 
@@ -82,7 +82,9 @@ def test_unlimited_ocr_converter_to_dom(tmp_path: Path):
 
 
 def test_artifacts_manager_layout(tmp_path: Path):
-    cfg = UnlimitedOCRConfig(artifacts_dir=tmp_path / "artifacts", evaluation_dir=tmp_path / "eval")
+    cfg = UnlimitedOCRConfig(
+        artifacts_dir=tmp_path / "artifacts", evaluation_dir=tmp_path / "eval"
+    )
     mgr = ArtifactManager(cfg)
 
     doc_id = "test-doc-123"

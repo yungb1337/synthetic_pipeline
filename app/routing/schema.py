@@ -9,9 +9,10 @@ Semantics (spec §4, §11): a missing observation is `value=None` +
 `status="missing"` — NEVER coerced to a 0/False "negative"; a failure is
 `status="failed"` — also a missing placeholder, never a real evidence string.
 """
+
 from __future__ import annotations
 
-from typing import Literal, Optional, Union
+from typing import Literal, Union
 
 from pydantic import BaseModel, Field
 
@@ -27,9 +28,9 @@ class Signal(BaseModel):
     detector: str
     version: str
     name: str
-    value: Optional[SignalValue] = None
-    confidence: Optional[float] = None      # 0..1; None = not established
-    evidence: Optional[str] = None          # short human-readable reason (§8)
+    value: SignalValue | None = None
+    confidence: float | None = None  # 0..1; None = not established
+    evidence: str | None = None  # short human-readable reason (§8)
     status: SignalStatus = "ok"
 
     def is_evidence(self) -> bool:
@@ -38,7 +39,11 @@ class Signal(BaseModel):
 
     def is_strong(self, threshold: float = 0.5) -> bool:
         """A 'ok' signal whose magnitude actually leans toward complexity."""
-        return self.status == "ok" and isinstance(self.value, (int, float)) and float(self.value) >= threshold
+        return (
+            self.status == "ok"
+            and isinstance(self.value, (int, float))
+            and float(self.value) >= threshold
+        )
 
 
 class RoutingDecision(BaseModel):

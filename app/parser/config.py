@@ -4,10 +4,11 @@ Every tunable lives here as a versioned value so projections stay
 reproducible (a key principle: the parser must be deterministic given
 (bytes, config).)
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.routing.config import RoutingConfig
@@ -21,9 +22,9 @@ class ParserConfig:
     dom_schema_version: str = "dom-schema-v0.1.0"
 
     # OCR
-    ocr_enabled: bool = True            # scan/image path
+    ocr_enabled: bool = True  # scan/image path
     ocr_lang: str = "en"
-    ocr_min_confidence: float = 0.0     # keep everything by default; filter later
+    ocr_min_confidence: float = 0.0  # keep everything by default; filter later
 
     # PDF
     pdf_extract_tables: bool = True
@@ -80,21 +81,25 @@ class ParserConfig:
 
     # ADR-011: the routing config snapshot used when layout_backend == "auto".
     # None => factory defaults (RoutingConfig()). Also gates routing on/off.
-    routing: Optional["RoutingConfig"] = None
+    routing: RoutingConfig | None = None
 
     # Retry policy (ADR-013 T13): bounded page-level retries in the Assembler.
     # Threaded Extractor -> Assembler; the assembler no longer hardcodes a literal.
     page_retries: int = 2
 
     # Security / resource limits
-    max_file_bytes: int = 512 * 1024 * 1024   # 512 MiB; enforced in Extractor.extract
+    max_file_bytes: int = 512 * 1024 * 1024  # 512 MiB; enforced in Extractor.extract
 
     temp_dir: str = "work"
     event_sink: str = "console"
 
     def snapshot(self) -> dict:
         """A JSON-safe fingerprint of this config (for provenance)."""
-        out = {k: v for k, v in vars(self).items() if not k.startswith("_") and k != "event_sink"}
+        out = {
+            k: v
+            for k, v in vars(self).items()
+            if not k.startswith("_") and k != "event_sink"
+        }
         routing = out.get("routing")
         if routing is not None:
             out["routing"] = routing.snapshot()  # JSON-safe fingerprint

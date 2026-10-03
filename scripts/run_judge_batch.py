@@ -21,6 +21,7 @@ Writes:
   <out>                        aggregate summary (metric means, verdict counts, issue tally)
   <judgments>/skipped.json     append-only log of skipped/unresolved docs
 Dependencies: PyMuPDF + google.generativeai via scripts/llm_judge.py."""
+
 from __future__ import annotations
 
 import argparse
@@ -73,16 +74,32 @@ def _sha256(path: Path) -> str | None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--store", required=True, help="parsed store root (dom/ raw/)")
-    ap.add_argument("--pdf-dir", required=True, help="dir of source PDFs (source recovery)")
-    ap.add_argument("--judgments", required=True, help="dir to write <doc_id>.json verdicts")
+    ap.add_argument(
+        "--pdf-dir", required=True, help="dir of source PDFs (source recovery)"
+    )
+    ap.add_argument(
+        "--judgments", required=True, help="dir to write <doc_id>.json verdicts"
+    )
     ap.add_argument("--out", required=True, help="aggregate summary markdown path")
     ap.add_argument("--batch", default="b01", help="batch label for the summary")
-    ap.add_argument("--limit", type=int, default=0, help="max docs judged this run (0=all)")
-    ap.add_argument("--force", action="store_true", help="re-judge docs that already have verdicts")
-    ap.add_argument("--model", default="gemini-3.5-flash-lite", help="light Gemini model")
-    ap.add_argument("--max-chars", type=int, default=6000, help="source text char budget per doc")
-    ap.add_argument("--pacing", type=float, default=4.0,
-                    help="seconds to sleep between docs (free-tier quota guard)")
+    ap.add_argument(
+        "--limit", type=int, default=0, help="max docs judged this run (0=all)"
+    )
+    ap.add_argument(
+        "--force", action="store_true", help="re-judge docs that already have verdicts"
+    )
+    ap.add_argument(
+        "--model", default="gemini-3.5-flash-lite", help="light Gemini model"
+    )
+    ap.add_argument(
+        "--max-chars", type=int, default=6000, help="source text char budget per doc"
+    )
+    ap.add_argument(
+        "--pacing",
+        type=float,
+        default=4.0,
+        help="seconds to sleep between docs (free-tier quota guard)",
+    )
     args = ap.parse_args()
 
     store = Path(args.store)
@@ -140,19 +157,37 @@ def main() -> int:
         if pdf is None:
             skipped += 1
             unresolved += 1
-            skipped_log.append({"doc_id": doc_id, "reason": "no-source-pdf",
-                                "source_hash": sha})
+            skipped_log.append(
+                {"doc_id": doc_id, "reason": "no-source-pdf", "source_hash": sha}
+            )
             continue
 
         if args.pacing > 0:
             time.sleep(args.pacing)  # free-tier quota guard between API calls
 
-        cmd = [sys.executable, str(JUDGE), "--pdf", str(pdf), "--dom", str(dom_file),
-               "--out", str(out_path), "--model", args.model,
-               "--max-chars", str(args.max_chars)]
+        cmd = [
+            sys.executable,
+            str(JUDGE),
+            "--pdf",
+            str(pdf),
+            "--dom",
+            str(dom_file),
+            "--out",
+            str(out_path),
+            "--model",
+            args.model,
+            "--max-chars",
+            str(args.max_chars),
+        ]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=300)
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,
+            )
         except subprocess.TimeoutExpired:
             skipped += 1
             skipped_log.append({"doc_id": doc_id, "reason": "timeout"})
@@ -160,8 +195,11 @@ def main() -> int:
             continue
 
         if r.returncode == 3:  # key missing / auth fatal — stop, nothing verifiable
-            print(f"ERROR: judge exited 3 (API key/auth fatal) at {doc_id}; "
-                  f"set GEMINI_API_KEY or key.py. Aborting batch.", file=sys.stderr)
+            print(
+                f"ERROR: judge exited 3 (API key/auth fatal) at {doc_id}; "
+                f"set GEMINI_API_KEY or key.py. Aborting batch.",
+                file=sys.stderr,
+            )
             if r.stderr:
                 print(r.stderr.strip(), file=sys.stderr)
             _write_skipped(judgments, skipped_log)
@@ -169,15 +207,24 @@ def main() -> int:
         if r.returncode == 4:  # rate-limited after internal retries — skip, continue
             skipped += 1
             skipped_log.append({"doc_id": doc_id, "reason": "rate-limited"})
-            print(f"  SKIP {doc_id} rate-limited (retries exhausted) {(r.stderr or '')[-200:]}",
-                  file=sys.stderr)
+            print(
+                f"  SKIP {doc_id} rate-limited (retries exhausted) {(r.stderr or '')[-200:]}",
+                file=sys.stderr,
+            )
             continue
         if r.returncode != 0:
             skipped += 1
-            skipped_log.append({"doc_id": doc_id, "reason": f"judge-exit-{r.returncode}",
-                                "stderr": (r.stderr or r.stdout or "")[-300:]})
-            print(f"  SKIP {doc_id} exit={r.returncode} {(r.stderr or '')[-200:]}",
-                  file=sys.stderr)
+            skipped_log.append(
+                {
+                    "doc_id": doc_id,
+                    "reason": f"judge-exit-{r.returncode}",
+                    "stderr": (r.stderr or r.stdout or "")[-300:],
+                }
+            )
+            print(
+                f"  SKIP {doc_id} exit={r.returncode} {(r.stderr or '')[-200:]}",
+                file=sys.stderr,
+            )
             continue
 
         try:
@@ -189,8 +236,10 @@ def main() -> int:
         results.append(rec)
         done += 1
         v = rec.get("verdict", {})
-        print(f"  judged {doc_id} -> {v.get('verdict')} "
-              f"(fid={v.get('metrics', {}).get('fidelity')})")
+        print(
+            f"  judged {doc_id} -> {v.get('verdict')} "
+            f"(fid={v.get('metrics', {}).get('fidelity')})"
+        )
 
     _write_skipped(judgments, skipped_log)
 
@@ -198,24 +247,39 @@ def main() -> int:
     verdict_counts = Counter(r.get("verdict", {}).get("verdict", "?") for r in results)
     metric_tot: dict[str, list[float]] = {}
     for m in METRICS:
-        metric_tot[m] = [r["verdict"]["metrics"].get(m, -1)
-                         for r in results if isinstance(r.get("verdict", {}).get("metrics"), dict)
-                         and m in r["verdict"]["metrics"]]
-    severity = Counter(i.get("severity", "?")
-                       for r in results for i in r.get("verdict", {}).get("issues", []))
-    surfaces = Counter(i.get("surface", "?")
-                       for r in results for i in r.get("verdict", {}).get("issues", []))
+        metric_tot[m] = [
+            r["verdict"]["metrics"].get(m, -1)
+            for r in results
+            if isinstance(r.get("verdict", {}).get("metrics"), dict)
+            and m in r["verdict"]["metrics"]
+        ]
+    severity = Counter(
+        i.get("severity", "?")
+        for r in results
+        for i in r.get("verdict", {}).get("issues", [])
+    )
+    surfaces = Counter(
+        i.get("surface", "?")
+        for r in results
+        for i in r.get("verdict", {}).get("issues", [])
+    )
     examples = sorted(
-        [i for r in results if r.get("verdict", {}).get("verdict") == "FAIL"
-         for i in r.get("verdict", {}).get("issues", []) if i.get("severity") in ("critical", "major")],
-        key=lambda i: i.get("severity", ""))[:8]
+        [
+            i
+            for r in results
+            if r.get("verdict", {}).get("verdict") == "FAIL"
+            for i in r.get("verdict", {}).get("issues", [])
+            if i.get("severity") in ("critical", "major")
+        ],
+        key=lambda i: i.get("severity", ""),
+    )[:8]
 
     lines = [
         f"# Judge Summary — {args.batch} ({_now()})",
         "",
         f"- Docs judged: **{done}** · skipped: `{skipped}` · unresolved-source: `{unresolved}` "
         f"· model: `{args.model}`",
-        f"- Verdicts: " + ", ".join(f"{k}=`{v}`" for k, v in verdict_counts.items()),
+        "- Verdicts: " + ", ".join(f"{k}=`{v}`" for k, v in verdict_counts.items()),
         "",
         "## Metrics means (0..1, across judged docs)",
         "",
@@ -230,22 +294,28 @@ def main() -> int:
         "",
         "## Issue tally",
         "",
-        f"- By severity: " + ", ".join(f"{k}=`{v}`" for k, v in sorted(severity.items())),
-        f"- By surface:  " + ", ".join(f"{k}=`{v}`" for k, v in sorted(surfaces.items())),
+        "- By severity: "
+        + ", ".join(f"{k}=`{v}`" for k, v in sorted(severity.items())),
+        "- By surface:  "
+        + ", ".join(f"{k}=`{v}`" for k, v in sorted(surfaces.items())),
         "",
         "## Critical/Major examples (FAIL docs)",
         "",
     ]
     if examples:
         for i in examples:
-            lines.append(f"- **[{i.get('severity')} / {i.get('surface')}]** {i.get('detail', '')[:200]}")
+            lines.append(
+                f"- **[{i.get('severity')} / {i.get('surface')}]** {i.get('detail', '')[:200]}"
+            )
     else:
         lines.append("(none in this batch)")
 
     out = Path(args.out)
     out.write_text("\n".join(lines), encoding="utf-8")
-    print(f"[judge] batch {args.batch} done: judged={done} skipped={skipped} "
-          f"-> {verdict_counts}")
+    print(
+        f"[judge] batch {args.batch} done: judged={done} skipped={skipped} "
+        f"-> {verdict_counts}"
+    )
     print(f"[judge] summary: {out}")
     return 0
 

@@ -6,13 +6,14 @@ For each page: run the native extractor. If the page produced ZERO text blocks
 matching ADR-012's "exactly one Pixmap per empty page". OCR is gated by
 `config.ocr_enabled`.
 """
+
 from __future__ import annotations
 
 import time
 
 from .. import ocr
 from ..config import ParserConfig
-from ..page_result import PageResult, PageStatus
+from ..page_result import PageResult
 from ..parts import RecoveredBlock
 from .base import ENRICHMENT, PageWorkItem
 from .native_pdf import NativePdfEngine
@@ -46,9 +47,9 @@ class EnrichmentEngine:
         res = native.process(item)
         # Count text-bearing blocks only (a page with no text is a candidate for
         # OCR; tables/images alone do not count as "readable text").
-        has_text = any(b.source == "text" or b.kind != "heading" for b in res.blocks) and any(
-            b.text.strip() for b in res.blocks
-        )
+        has_text = any(
+            b.source == "text" or b.kind != "heading" for b in res.blocks
+        ) and any(b.text.strip() for b in res.blocks)
         if has_text or not self.config.ocr_enabled:
             return res
 
@@ -74,7 +75,13 @@ class EnrichmentEngine:
             finally:
                 doc.close()
         except Exception as e:
-            res.errors.append({"page_no": item.page_index + 1, "category": "ocr_render", "message": str(e)})
+            res.errors.append(
+                {
+                    "page_no": item.page_index + 1,
+                    "category": "ocr_render",
+                    "message": str(e),
+                }
+            )
             return res
 
         ocr_blocks: list[RecoveredBlock] = []
@@ -84,9 +91,14 @@ class EnrichmentEngine:
                 continue
             ocr_blocks.append(
                 RecoveredBlock(
-                    page=item.page_index, kind="paragraph", text=clean, bbox=bbox,
-                    seq=len(res.blocks) + i, confidence=conf if conf <= 1.0 else conf / 100.0,
-                    source="ocr", ocr_engine=engine_name,
+                    page=item.page_index,
+                    kind="paragraph",
+                    text=clean,
+                    bbox=bbox,
+                    seq=len(res.blocks) + i,
+                    confidence=conf if conf <= 1.0 else conf / 100.0,
+                    source="ocr",
+                    ocr_engine=engine_name,
                 )
             )
         res.blocks.extend(ocr_blocks)

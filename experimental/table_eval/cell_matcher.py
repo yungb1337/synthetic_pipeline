@@ -1,8 +1,7 @@
-"""Spatial cell text assignment and table block occlusion handling.
-"""
+"""Spatial cell text assignment and table block occlusion handling."""
+
 from __future__ import annotations
 
-from typing import Any, Optional
 import fitz
 
 from .adapters.base import BoundingBox, RawCell, RawTable
@@ -19,7 +18,7 @@ class CellMatcher:
         ocr_scores: list[float],
         scale_x: float = 1.0,
         scale_y: float = 1.0,
-        fitz_page: Optional[fitz.Page] = None,
+        fitz_page: fitz.Page | None = None,
     ) -> RawTable:
         """Assigns OCR text items or digital text to the best matching cells in the table."""
         if not raw_table.cells:
@@ -33,7 +32,9 @@ class CellMatcher:
         for r_idx in row_map:
             row_map[r_idx].sort(key=lambda cell: cell.bbox.x0 if cell.bbox else 0.0)
 
-        cell_text_buckets: dict[int, list[str]] = {i: [] for i in range(len(raw_table.cells))}
+        cell_text_buckets: dict[int, list[str]] = {
+            i: [] for i in range(len(raw_table.cells))
+        }
 
         # Strategy A: If fitz_page is available with native text, extract text per cell bbox
         used_digital = False
@@ -42,7 +43,9 @@ class CellMatcher:
                 for c_idx, cell in enumerate(raw_table.cells):
                     if not cell.bbox:
                         continue
-                    rect = fitz.Rect(cell.bbox.x0, cell.bbox.y0, cell.bbox.x1, cell.bbox.y1)
+                    rect = fitz.Rect(
+                        cell.bbox.x0, cell.bbox.y0, cell.bbox.x1, cell.bbox.y1
+                    )
                     cell_text = fitz_page.get_text("text", clip=rect).strip()
                     if cell_text:
                         cell_text_buckets[c_idx].append(cell_text)
@@ -62,7 +65,8 @@ class CellMatcher:
                 ocr_items.append((cbox, txt.strip(), score))
 
             table_ocr_items = [
-                (box, txt, s) for (box, txt, s) in ocr_items
+                (box, txt, s)
+                for (box, txt, s) in ocr_items
                 if raw_table.bbox.intersects(box)
             ]
 
@@ -104,7 +108,9 @@ class CellMatcher:
 
         if reconstructed_rows:
             raw_table.header = reconstructed_rows[0]
-            raw_table.rows = reconstructed_rows[1:] if len(reconstructed_rows) > 1 else []
+            raw_table.rows = (
+                reconstructed_rows[1:] if len(reconstructed_rows) > 1 else []
+            )
 
         return raw_table
 

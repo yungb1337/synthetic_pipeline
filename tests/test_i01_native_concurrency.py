@@ -10,14 +10,14 @@ Verifies the concurrency contract introduced by the I-01 fix:
    (no output regression from the locking change).
 4. close() clears the doc cache and the engine keeps working afterwards.
 """
+
 from __future__ import annotations
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
 import fitz
+import pytest
 
 from app.parser.config import ParserConfig
 from app.parser.engines.native_pdf import NativePdfEngine, _native_page_from_doc
@@ -46,9 +46,9 @@ class _CriticalSectionProbe:
         self.hold_s = hold_s
         self._count = 0
         self._guard = threading.Lock()
-        self.active: list[str] = []          # src_paths currently inside
+        self.active: list[str] = []  # src_paths currently inside
         self.max_concurrent = 0
-        self.same_path_overlap = 0           # violations: same doc twice at once
+        self.same_path_overlap = 0  # violations: same doc twice at once
 
     def wrap(self, src_path, page_index, config, body_med=None):
         with self._guard:
@@ -62,7 +62,9 @@ class _CriticalSectionProbe:
             import time
 
             time.sleep(self.hold_s)
-            return _native_page_from_doc(src_path, page_index, config, body_med=body_med)
+            return _native_page_from_doc(
+                src_path, page_index, config, body_med=body_med
+            )
         finally:
             with self._guard:
                 self.active.remove(src_path)
@@ -72,9 +74,7 @@ class _CriticalSectionProbe:
 @pytest.fixture()
 def probe(monkeypatch):
     p = _CriticalSectionProbe()
-    monkeypatch.setattr(
-        "app.parser.engines.native_pdf._native_page_from_doc", p.wrap
-    )
+    monkeypatch.setattr("app.parser.engines.native_pdf._native_page_from_doc", p.wrap)
     return p
 
 

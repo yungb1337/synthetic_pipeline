@@ -7,25 +7,35 @@ scheduler restored prior OK pages via another full read. These tests pin:
 2. The B1 decision is unchanged (failed never clobbers a durable OK page).
 3. The scheduler's restore path probes first, reads only when needed.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from app.parser.page_result import PageResult, PageStatus
 from app.parser.storage_pages import PageStore
 
 
 def _ok(idx=0) -> PageResult:
-    return PageResult(doc_id="d-p", page_index=idx, route="native",
-                      status=PageStatus.OK,
-                      blocks=[__import__("app.parser.parts", fromlist=["RecoveredBlock"]).RecoveredBlock(
-                          page=idx, text="content", source="text")])
+    return PageResult(
+        doc_id="d-p",
+        page_index=idx,
+        route="native",
+        status=PageStatus.OK,
+        blocks=[
+            __import__("app.parser.parts", fromlist=["RecoveredBlock"]).RecoveredBlock(
+                page=idx, text="content", source="text"
+            )
+        ],
+    )
 
 
 def _failed(idx=0) -> PageResult:
-    return PageResult(doc_id="d-p", page_index=idx, route="native",
-                      status=PageStatus.FAILED,
-                      errors=[{"page_no": idx + 1, "category": "x", "message": "boom"}])
+    return PageResult(
+        doc_id="d-p",
+        page_index=idx,
+        route="native",
+        status=PageStatus.FAILED,
+        errors=[{"page_no": idx + 1, "category": "x", "message": "boom"}],
+    )
 
 
 def test_i07_probe_reads_status_without_building_pageresult(monkeypatch, tmp_path):
@@ -77,17 +87,20 @@ def test_i07_corrupt_prior_file_probes_none_and_overwrites(tmp_path):
 
 def test_i07_restore_path_probes_before_full_read(monkeypatch, tmp_path):
     """Scheduler restore: probe first; full read ONLY when a prior OK exists."""
-    from app.parser.scheduler import Scheduler
-    from app.parser.engines.base import PageWorkItem
     from app.parser.config import ParserConfig
+    from app.parser.engines.base import PageWorkItem
+    from app.parser.scheduler import Scheduler
 
     sched = Scheduler(ParserConfig())
     ps = PageStore(str(tmp_path / "store"))
     sched.page_store = ps
     from app.parser.storage_pages import Ledger
+
     sched.ledger = Ledger(str(tmp_path / "store"))
 
-    item = PageWorkItem(doc_id="d-r", source_hash="sha", src_path="/tmp/x.pdf", page_index=0)
+    item = PageWorkItem(
+        doc_id="d-r", source_hash="sha", src_path="/tmp/x.pdf", page_index=0
+    )
 
     class BrokenFuture:
         def result(self, timeout=None):
@@ -113,5 +126,7 @@ def test_i07_restore_path_probes_before_full_read(monkeypatch, tmp_path):
     ps.put_page("d-r", 0, _ok())
     res2 = sched._collect(item, BrokenFuture())
     assert res2.status == PageStatus.OK, "prior OK page must be restored over failure"
-    assert built["n"] == 1, f"expected exactly 1 full read for restore, got {built['n']}"
+    assert built["n"] == 1, (
+        f"expected exactly 1 full read for restore, got {built['n']}"
+    )
     sched.close()

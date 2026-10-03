@@ -4,6 +4,7 @@ Separates Corpus B (1,000 docs) and Corpus 945 (945 docs) into:
 - Curated Easy: sample of clean, text-based documents without tables
 Preserves source corpus provenance in distinct subdirectories.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,8 +43,22 @@ def curate_corpora(
     if output_base is None:
         output_base = ROOT_DIR / "artifacts"
 
-    corpus_b_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf"
-    corpus_945_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "sources" / "pdf"
+    corpus_b_dir = (
+        ROOT_DIR
+        / "checkpoints"
+        / "run"
+        / "run-2026-09-14-eval-1000"
+        / "sources"
+        / "pdf"
+    )
+    corpus_945_dir = (
+        ROOT_DIR
+        / "checkpoints"
+        / "run"
+        / "run-2026-09-04-parser-reliability"
+        / "sources"
+        / "pdf"
+    )
 
     hard_b_dir = output_base / "curated_hard" / "corpus_b"
     hard_945_dir = output_base / "curated_hard" / "corpus_945"
@@ -90,7 +105,11 @@ def curate_corpora(
                 pg_count = int(getattr(proc_res, "page_count", 1) or 1)
                 conf = float(getattr(proc_res, "confidence", 1.0))
 
-                is_hard = len(tbl_pages) > 0 or len(ocr_pages) > 0 or (len(col_pages) > 0 and conf < 0.80)
+                is_hard = (
+                    len(tbl_pages) > 0
+                    or len(ocr_pages) > 0
+                    or (len(col_pages) > 0 and conf < 0.80)
+                )
 
                 doc_entry = {
                     "doc_id": doc_id,
@@ -115,7 +134,9 @@ def curate_corpora(
                     easy_candidates.append(doc_entry)
 
                 if idx % 200 == 0 or idx == len(pdf_files):
-                    print(f"[{idx:4d}/{len(pdf_files):4d}] Hard so far: {stats[corpus_name]['hard']} | Easy candidates: {len(easy_candidates)}")
+                    print(
+                        f"[{idx:4d}/{len(pdf_files):4d}] Hard so far: {stats[corpus_name]['hard']} | Easy candidates: {len(easy_candidates)}"
+                    )
 
             except Exception as exc:
                 print(f"[ERROR] {doc_id}: {exc}")
@@ -130,19 +151,31 @@ def curate_corpora(
             manifest.append(e_entry)
             stats[corpus_name]["easy"] += 1
 
-        print(f"-> {corpus_name}: Curated {stats[corpus_name]['hard']} HARD docs and {stats[corpus_name]['easy']} EASY docs.")
+        print(
+            f"-> {corpus_name}: Curated {stats[corpus_name]['hard']} HARD docs and {stats[corpus_name]['easy']} EASY docs."
+        )
 
-    stats["curated_hard_total"] = stats["corpus_b"]["hard"] + stats["corpus_945"]["hard"]
-    stats["curated_easy_total"] = stats["corpus_b"]["easy"] + stats["corpus_945"]["easy"]
+    stats["curated_hard_total"] = (
+        stats["corpus_b"]["hard"] + stats["corpus_945"]["hard"]
+    )
+    stats["curated_easy_total"] = (
+        stats["corpus_b"]["easy"] + stats["corpus_945"]["easy"]
+    )
     stats["elapsed_seconds"] = round(time.perf_counter() - t0, 2)
 
     manifest_path = output_base / "curated_manifest.json"
-    manifest_path.write_text(json.dumps({"stats": stats, "manifest": manifest}, indent=2), encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps({"stats": stats, "manifest": manifest}, indent=2), encoding="utf-8"
+    )
 
     print("\n" + "=" * 70)
     print("CURATION SUMMARY")
-    print(f"Curated Hard Total: {stats['curated_hard_total']} documents (Corpus B: {stats['corpus_b']['hard']}, Corpus 945: {stats['corpus_945']['hard']})")
-    print(f"Curated Easy Total: {stats['curated_easy_total']} documents (Corpus B: {stats['corpus_b']['easy']}, Corpus 945: {stats['corpus_945']['easy']})")
+    print(
+        f"Curated Hard Total: {stats['curated_hard_total']} documents (Corpus B: {stats['corpus_b']['hard']}, Corpus 945: {stats['corpus_945']['hard']})"
+    )
+    print(
+        f"Curated Easy Total: {stats['curated_easy_total']} documents (Corpus B: {stats['corpus_b']['easy']}, Corpus 945: {stats['corpus_945']['easy']})"
+    )
     print(f"Total Manifest Entries: {len(manifest)}")
     print(f"Manifest written to: {manifest_path}")
     print("=" * 70)
@@ -152,7 +185,12 @@ def curate_corpora(
 
 def main():
     parser = argparse.ArgumentParser(description="Curate Hard and Easy PDF Corpora")
-    parser.add_argument("--easy-sample", type=int, default=50, help="Number of easy PDFs to sample per corpus")
+    parser.add_argument(
+        "--easy-sample",
+        type=int,
+        default=50,
+        help="Number of easy PDFs to sample per corpus",
+    )
     args = parser.parse_args()
     curate_corpora(easy_sample_per_corpus=args.easy_sample)
 

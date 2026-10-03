@@ -4,15 +4,14 @@ The old `EnrichmentEngine.process` built a fresh `NativePdfEngine` per page,
 so every page paid a full document re-open + document-wide median re-scan.
 This pins the new contract: one inner engine, reused across pages.
 """
+
 from __future__ import annotations
 
-import pytest
-
 import fitz
+import pytest
 
 from app.parser.config import ParserConfig
 from app.parser.engines.base import PageWorkItem
-from app.parser.engines import enrichment as enrichment_mod
 from app.parser.engines.enrichment import EnrichmentEngine
 from app.parser.engines.native_pdf import NativePdfEngine
 
@@ -28,8 +27,14 @@ def _make_pdf(path, pages: int = 4) -> str:
 
 
 def _item(src: str, idx: int) -> PageWorkItem:
-    return PageWorkItem(doc_id="d-e", source_hash="sha", src_path=src,
-                        page_index=idx, route="enrichment", ocr_enabled=False)
+    return PageWorkItem(
+        doc_id="d-e",
+        source_hash="sha",
+        src_path=src,
+        page_index=idx,
+        route="enrichment",
+        ocr_enabled=False,
+    )
 
 
 def test_i04_inner_engine_is_created_once_and_reused():

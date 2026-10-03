@@ -1,8 +1,9 @@
-"""pdfplumber table extraction adapter supporting line-based and text-based heuristics.
-"""
+"""pdfplumber table extraction adapter supporting line-based and text-based heuristics."""
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
+
 import pdfplumber
 
 from .base import BaseTableExtractor, BoundingBox, RawCell, RawTable
@@ -25,9 +26,9 @@ class PDFPlumberTableExtractor(BaseTableExtractor):
         self,
         fitz_page: Any,
         page_index: int,
-        page_image: Optional[Any] = None,
-        layout_regions: Optional[list[Any]] = None,
-        pdf_path: Optional[str] = None,
+        page_image: Any | None = None,
+        layout_regions: list[Any] | None = None,
+        pdf_path: str | None = None,
     ) -> list[RawTable]:
         tables: list[RawTable] = []
         if not pdf_path:
@@ -40,8 +41,12 @@ class PDFPlumberTableExtractor(BaseTableExtractor):
                 page = pdf.pages[page_index]
 
                 table_settings = {
-                    "vertical_strategy": "lines" if self.strategy == "lines" else "text",
-                    "horizontal_strategy": "lines" if self.strategy == "lines" else "text",
+                    "vertical_strategy": "lines"
+                    if self.strategy == "lines"
+                    else "text",
+                    "horizontal_strategy": "lines"
+                    if self.strategy == "lines"
+                    else "text",
                     "snap_tolerance": self.snap_tolerance,
                     "join_tolerance": self.join_tolerance,
                 }
@@ -54,7 +59,9 @@ class PDFPlumberTableExtractor(BaseTableExtractor):
                         continue
 
                     # Filter out ghost / empty tables
-                    has_content = any(any(str(c or "").strip() for c in r) for r in extracted)
+                    has_content = any(
+                        any(str(c or "").strip() for c in r) for r in extracted
+                    )
                     if not has_content:
                         continue
 

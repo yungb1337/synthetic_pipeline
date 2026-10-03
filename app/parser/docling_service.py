@@ -6,22 +6,21 @@ requests and processes them out-of-process from the parser orchestrator.
 Usage:
     python -m app.parser.docling_service --port 8001 --host 0.0.0.0
 """
+
 from __future__ import annotations
 
 import argparse
 import base64
 import json
 import os
-import sys
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Optional
 
 from .config import ParserConfig, default_config
 from .engines.base import PageWorkItem
 from .engines.heavy_docling import HeavyDoclingEngine
 from .loaders import docling_loader
-from .page_result import PageResult, PageStatus
+from .page_result import PageResult
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -29,7 +28,7 @@ logger = get_logger(__name__)
 
 class DoclingRequestHandler(BaseHTTPRequestHandler):
     config: ParserConfig = default_config()
-    _engine: Optional[HeavyDoclingEngine] = None
+    _engine: HeavyDoclingEngine | None = None
 
     @classmethod
     def get_engine(cls) -> HeavyDoclingEngine:
@@ -86,12 +85,16 @@ class DoclingRequestHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_response(400)
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": f"invalid json: {e}"}).encode("utf-8"))
+                self.wfile.write(
+                    json.dumps({"error": f"invalid json: {e}"}).encode("utf-8")
+                )
                 return
 
             temp_file = None
             src_path = req_data.get("src_path", "")
-            if req_data.get("data_b64") and (not src_path or not os.path.exists(src_path)):
+            if req_data.get("data_b64") and (
+                not src_path or not os.path.exists(src_path)
+            ):
                 # Materialize uploaded bytes to temp file
                 try:
                     raw_bytes = base64.b64decode(req_data["data_b64"])
@@ -104,7 +107,11 @@ class DoclingRequestHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     self.send_response(500)
                     self.end_headers()
-                    self.wfile.write(json.dumps({"error": f"failed to decode data_b64: {e}"}).encode("utf-8"))
+                    self.wfile.write(
+                        json.dumps({"error": f"failed to decode data_b64: {e}"}).encode(
+                            "utf-8"
+                        )
+                    )
                     return
 
             try:
@@ -150,8 +157,9 @@ class DoclingRequestHandler(BaseHTTPRequestHandler):
         pass
 
 
-def create_server(host: str = "127.0.0.1", port: int = 8001,
-                  config: ParserConfig | None = None) -> ThreadingHTTPServer:
+def create_server(
+    host: str = "127.0.0.1", port: int = 8001, config: ParserConfig | None = None
+) -> ThreadingHTTPServer:
     handler = DoclingRequestHandler
     if config is not None:
         handler.config = config
@@ -159,7 +167,9 @@ def create_server(host: str = "127.0.0.1", port: int = 8001,
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Docling Microservice Server (Architecture E / B2)")
+    ap = argparse.ArgumentParser(
+        description="Docling Microservice Server (Architecture E / B2)"
+    )
     ap.add_argument("--host", default="0.0.0.0", help="bind host (default 0.0.0.0)")
     ap.add_argument("--port", type=int, default=8001, help="bind port (default 8001)")
     args = ap.parse_args(argv)

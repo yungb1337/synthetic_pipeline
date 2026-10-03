@@ -4,6 +4,7 @@ Reuses the shared `_image_bytes` helper so behaviour matches `Loaders._image`
 exactly. OCR is gated by `config.ocr_enabled`; with it off the page is OK with
 zero blocks (never a crash).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -25,16 +26,18 @@ class ImageEngine:
         self.config = config
 
     def process(self, item: PageWorkItem) -> PageResult:
-        from ..parts import RecoveredDocument
-        from ..detection import Detected
         from ..mime import MIME as _MIME
+        from ..parts import RecoveredDocument
 
         rec = RecoveredDocument(detected_type="image", mime=_MIME["png"])
         try:
             data = open(item.src_path, "rb").read()
         except Exception as e:
             return PageResult(
-                doc_id=item.doc_id, page_index=0, route=IMAGE, status=PageStatus.FAILED,
+                doc_id=item.doc_id,
+                page_index=0,
+                route=IMAGE,
+                status=PageStatus.FAILED,
                 errors=[{"page_no": 1, "category": "image_read", "message": str(e)}],
                 source_hash=item.source_hash,
             )
@@ -54,7 +57,12 @@ class ImageEngine:
             )
         ]
         return PageResult(
-            doc_id=item.doc_id, page_index=0, route=IMAGE, status=PageStatus.OK,
-            blocks=rec.blocks, images=images, timings=rec.timings,
+            doc_id=item.doc_id,
+            page_index=0,
+            route=IMAGE,
+            status=PageStatus.OK,
+            blocks=rec.blocks,
+            images=images,
+            timings=rec.timings,
             source_hash=item.source_hash,
         )

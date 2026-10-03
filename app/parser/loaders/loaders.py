@@ -9,21 +9,19 @@ Design notes:
   * OCR (scanned + images) is a loader backend, invoked only for image/scanned.
   * tables and images are first-class parts; never flattened to prose.
 """
+
 from __future__ import annotations
 
 import csv as _csv
-import hashlib
 import html.parser
 import io
 import json
 from xml.etree import ElementTree as ET
 
 from ..config import ParserConfig
-from ..mime import MIME as _MIME
 from ..parts import (
     RecoveredBlock,
     RecoveredDocument,
-    RecoveredImage,
     RecoveredTable,
 )
 
@@ -67,7 +65,11 @@ class _TextExtractor(html.parser.HTMLParser):
         text = "".join(self._cur["text"]).strip()
         if text:
             tag = self._cur["tag"] or "p"
-            kind = "heading" if tag[0] == "h" else ("list_item" if tag == "li" else "paragraph")
+            kind = (
+                "heading"
+                if tag[0] == "h"
+                else ("list_item" if tag == "li" else "paragraph")
+            )
             self.blocks.append((kind, text))
         self._cur = {"tag": None, "text": []}
 
@@ -76,7 +78,9 @@ class Loaders:
     def __init__(self, config: ParserConfig):
         self.config = config
 
-    def load(self, detected, data: bytes, *, route: str | None = None) -> RecoveredDocument:
+    def load(
+        self, detected, data: bytes, *, route: str | None = None
+    ) -> RecoveredDocument:
         slug = detected.slug
         # ADR-007 + ADR-011 (route-aware dispatch). When a `route` is supplied
         # (from the Extractor after detection) we honor it; when it's None we
@@ -92,7 +96,9 @@ class Loaders:
             from . import docling_loader
 
             if docling_loader.engine_available():
-                rec = docling_loader.parse(data, f"doc.{slug}", self.config.docling_models_dir)
+                rec = docling_loader.parse(
+                    data, f"doc.{slug}", self.config.docling_models_dir
+                )
                 if rec is not None:
                     rec.detected_type = slug
                     rec.mime = detected.mime
@@ -201,7 +207,12 @@ class Loaders:
         rec.page_count = 1
         header = [c.strip() for c in rows[0]]
         rec.tables.append(
-            RecoveredTable(page=0, header=header, rows=[[c.strip() for c in r] for r in rows[1:]], source="native")
+            RecoveredTable(
+                page=0,
+                header=header,
+                rows=[[c.strip() for c in r] for r in rows[1:]],
+                source="native",
+            )
         )
         return rec
 
@@ -212,7 +223,15 @@ class Loaders:
         rec.page_count = 1
         for i, line in enumerate(text.split("\n")):
             if line.strip():
-                rec.blocks.append(RecoveredBlock(page=0, seq=i, text=line.strip(), kind="paragraph", source="text"))
+                rec.blocks.append(
+                    RecoveredBlock(
+                        page=0,
+                        seq=i,
+                        text=line.strip(),
+                        kind="paragraph",
+                        source="text",
+                    )
+                )
         return rec
 
     def _json(self, data, detected):
@@ -223,7 +242,13 @@ class Loaders:
         except Exception:
             obj = None
         rec.blocks.append(
-            RecoveredBlock(page=0, seq=0, text=json.dumps(obj, ensure_ascii=False) if obj is not None else "", kind="code", source="json")
+            RecoveredBlock(
+                page=0,
+                seq=0,
+                text=json.dumps(obj, ensure_ascii=False) if obj is not None else "",
+                kind="code",
+                source="json",
+            )
         )
         return rec
 
@@ -234,8 +259,14 @@ class Loaders:
             root = ET.fromstring(data)
         except Exception:
             root = None
-        text = ET.tostring(root, encoding="unicode") if root is not None else data.decode("utf-8", errors="ignore")
-        rec.blocks.append(RecoveredBlock(page=0, seq=0, text=text, kind="code", source="xml"))
+        text = (
+            ET.tostring(root, encoding="unicode")
+            if root is not None
+            else data.decode("utf-8", errors="ignore")
+        )
+        rec.blocks.append(
+            RecoveredBlock(page=0, seq=0, text=text, kind="code", source="xml")
+        )
         return rec
 
     def _html(self, data, detected):
@@ -248,7 +279,9 @@ class Loaders:
             pass
         p.close()
         for i, (kind, text) in enumerate(p.blocks):
-            rec.blocks.append(RecoveredBlock(page=0, seq=i, kind=kind, text=text, source="markup"))
+            rec.blocks.append(
+                RecoveredBlock(page=0, seq=i, kind=kind, text=text, source="markup")
+            )
         return rec
 
     def _markdown(self, data, detected):
@@ -261,12 +294,26 @@ class Loaders:
             line = raw.rstrip()
             if not line.strip():
                 if para:
-                    rec.blocks.append(RecoveredBlock(page=0, seq=len(rec.blocks), text=" ".join(para).strip(), source="markdown"))
+                    rec.blocks.append(
+                        RecoveredBlock(
+                            page=0,
+                            seq=len(rec.blocks),
+                            text=" ".join(para).strip(),
+                            source="markdown",
+                        )
+                    )
                     para = []
                 continue
             if line.lstrip().startswith(("#", "```", "-", "*")):
                 if para:
-                    rec.blocks.append(RecoveredBlock(page=0, seq=len(rec.blocks), text=" ".join(para).strip(), source="markdown"))
+                    rec.blocks.append(
+                        RecoveredBlock(
+                            page=0,
+                            seq=len(rec.blocks),
+                            text=" ".join(para).strip(),
+                            source="markdown",
+                        )
+                    )
                     para = []
                 if line.lstrip().startswith("#"):
                     kind = "heading"
@@ -276,16 +323,32 @@ class Loaders:
                     continue
                 else:
                     kind = "list_item"
-                rec.blocks.append(RecoveredBlock(page=0, seq=len(rec.blocks), text=line.strip(), kind=kind, source="markdown"))
+                rec.blocks.append(
+                    RecoveredBlock(
+                        page=0,
+                        seq=len(rec.blocks),
+                        text=line.strip(),
+                        kind=kind,
+                        source="markdown",
+                    )
+                )
             else:
                 para.append(line)
         if para:
-            rec.blocks.append(RecoveredBlock(page=0, seq=len(rec.blocks), text=" ".join(para).strip(), source="markdown"))
+            rec.blocks.append(
+                RecoveredBlock(
+                    page=0,
+                    seq=len(rec.blocks),
+                    text=" ".join(para).strip(),
+                    source="markdown",
+                )
+            )
         return rec
 
     # --- DOCX ---------------------------------------------------------------
     def _docx(self, data, detected):
         import zipfile
+
         rec = self._base(detected, RecoveredDocument)
         ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
         try:
@@ -299,24 +362,41 @@ class Loaders:
         seq = 0
         if body is not None:
             for child in body:
-                if child.tag == "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p":
+                if (
+                    child.tag
+                    == "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+                ):
                     text = "".join(t.text or "" for t in child.iter(_NSW("t")))
                     if text.strip():
-                        rec.blocks.append(RecoveredBlock(page=0, seq=seq, text=text.strip(), source="markup"))
+                        rec.blocks.append(
+                            RecoveredBlock(
+                                page=0, seq=seq, text=text.strip(), source="markup"
+                            )
+                        )
                         seq += 1
                 elif child.tag == _NSW("tbl"):
                     rows = []
                     for tr in child.findall(_NSW("tr")):
                         row = []
                         for tc in tr.findall(_NSW("tc")):
-                            row.append("".join(t.text or "" for t in tc.iter(_NSW("t"))).strip())
+                            row.append(
+                                "".join(
+                                    t.text or "" for t in tc.iter(_NSW("t"))
+                                ).strip()
+                            )
                         if any(r for r in row):
                             rows.append(row)
                     if rows:
-                        rec.tables.append(RecoveredTable(page=0, header=rows[0], rows=rows[1:], source="native"))
+                        rec.tables.append(
+                            RecoveredTable(
+                                page=0, header=rows[0], rows=rows[1:], source="native"
+                            )
+                        )
         # core props
         if core:
-            cns = {"cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"}
+            cns = {
+                "cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+            }
             try:
                 croot = ET.fromstring(core)
                 rec.title = (croot.findtext(".//cp:title", None, cns) or "").strip()
@@ -328,6 +408,7 @@ class Loaders:
     # --- XLSX ---------------------------------------------------------------
     def _xlsx(self, data, detected):
         from openpyxl import load_workbook
+
         rec = self._base(detected, RecoveredDocument)
         wb = load_workbook(io.BytesIO(data), data_only=True, read_only=True)
         rec.page_count = len(wb.sheetnames)
@@ -339,8 +420,12 @@ class Loaders:
             if not rows:
                 continue
             rec.tables.append(
-                RecoveredTable(page=sid, header=[c.strip() for c in rows[0]],
-                               rows=[[c.strip() for c in r] for r in rows[1:]], source="native")
+                RecoveredTable(
+                    page=sid,
+                    header=[c.strip() for c in rows[0]],
+                    rows=[[c.strip() for c in r] for r in rows[1:]],
+                    source="native",
+                )
             )
             rec.page_sizes[sid] = (ws.max_column or 0, ws.max_row or 0)
         return rec
@@ -367,6 +452,7 @@ def _image_bytes(rec: RecoveredDocument, data: bytes, config: ParserConfig) -> N
     if not config.ocr_enabled:
         return
     import time as _time
+
     from .. import ocr
 
     t_ocr = _time.time()
@@ -381,7 +467,13 @@ def _image_bytes(rec: RecoveredDocument, data: bytes, config: ParserConfig) -> N
     rec.timings["ocr_pages"] = 1
     for i, (text, bbox, conf) in enumerate(lines):
         rec.blocks.append(
-            RecoveredBlock(page=0, seq=i, text=text, bbox=bbox,
-                           confidence=conf if conf <= 1.0 else conf / 100.0,
-                           source="ocr", ocr_engine=ocr.engine_name())
+            RecoveredBlock(
+                page=0,
+                seq=i,
+                text=text,
+                bbox=bbox,
+                confidence=conf if conf <= 1.0 else conf / 100.0,
+                source="ocr",
+                ocr_engine=ocr.engine_name(),
+            )
         )

@@ -1,5 +1,5 @@
-"""Adapter wrapping all firecrawl/pdf-inspector APIs for experimentation.
-"""
+"""Adapter wrapping all firecrawl/pdf-inspector APIs for experimentation."""
+
 from __future__ import annotations
 
 import time
@@ -47,7 +47,9 @@ class PDFInspectorAdapter:
     def __init__(self, extract_positions: bool = True):
         self.extract_positions = extract_positions
 
-    def inspect_and_extract(self, pdf_path: str | Path, doc_id: str = "") -> InspectorExtractionResult:
+    def inspect_and_extract(
+        self, pdf_path: str | Path, doc_id: str = ""
+    ) -> InspectorExtractionResult:
         p_path = str(Path(pdf_path).resolve())
         t0 = time.perf_counter()
 
@@ -67,11 +69,13 @@ class PDFInspectorAdapter:
                         pno = getattr(item, "page", 1)
                         if pno not in positions_by_page:
                             positions_by_page[pno] = []
-                        positions_by_page[pno].append({
-                            "text": getattr(item, "text", ""),
-                            "x": getattr(item, "x", 0.0),
-                            "y": getattr(item, "y", 0.0),
-                        })
+                        positions_by_page[pno].append(
+                            {
+                                "text": getattr(item, "text", ""),
+                                "x": getattr(item, "x", 0.0),
+                                "y": getattr(item, "y", 0.0),
+                            }
+                        )
                 except Exception:
                     pass
 
@@ -90,10 +94,15 @@ class PDFInspectorAdapter:
             for p_obj in getattr(pages_res, "pages", []):
                 p_num = getattr(p_obj, "page", 1)
                 md = getattr(p_obj, "markdown", "") or ""
-                needs_ocr = getattr(p_obj, "needs_ocr", False) or (p_num in ocr_set) or has_encoding or (pdf_type in ("scanned", "image_based"))
+                needs_ocr = (
+                    getattr(p_obj, "needs_ocr", False)
+                    or (p_num in ocr_set)
+                    or has_encoding
+                    or (pdf_type in ("scanned", "image_based"))
+                )
                 ocr_reason = getattr(p_obj, "ocr_reason", "") or ""
-                has_tables = (p_num in tables_set)
-                has_columns = (p_num in cols_set)
+                has_tables = p_num in tables_set
+                has_columns = p_num in cols_set
 
                 if needs_ocr:
                     p_route = "cuda_ocr"
@@ -104,16 +113,18 @@ class PDFInspectorAdapter:
 
                 route_counts[p_route] += 1
 
-                pages.append(PageData(
-                    page_num=p_num,
-                    markdown=md,
-                    route=p_route,
-                    needs_ocr=needs_ocr,
-                    ocr_reason=ocr_reason,
-                    has_tables=has_tables,
-                    has_columns=has_columns,
-                    positioned_items=positions_by_page.get(p_num, []),
-                ))
+                pages.append(
+                    PageData(
+                        page_num=p_num,
+                        markdown=md,
+                        route=p_route,
+                        needs_ocr=needs_ocr,
+                        ocr_reason=ocr_reason,
+                        has_tables=has_tables,
+                        has_columns=has_columns,
+                        positioned_items=positions_by_page.get(p_num, []),
+                    )
+                )
 
             wall_ms = (time.perf_counter() - t0) * 1000.0
 
@@ -126,9 +137,15 @@ class PDFInspectorAdapter:
                 has_encoding_issues=has_encoding,
                 is_complex_layout=is_complex,
                 processing_time_ms=wall_ms,
-                pages_needing_ocr=list(getattr(proc_res, "pages_needing_ocr", []) or []),
-                pages_with_columns=list(getattr(proc_res, "pages_with_columns", []) or []),
-                pages_with_tables=list(getattr(proc_res, "pages_with_tables", []) or []),
+                pages_needing_ocr=list(
+                    getattr(proc_res, "pages_needing_ocr", []) or []
+                ),
+                pages_with_columns=list(
+                    getattr(proc_res, "pages_with_columns", []) or []
+                ),
+                pages_with_tables=list(
+                    getattr(proc_res, "pages_with_tables", []) or []
+                ),
                 full_markdown=getattr(proc_res, "markdown", "") or "",
                 pages=pages,
                 route_breakdown=route_counts,

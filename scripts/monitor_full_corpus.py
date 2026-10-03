@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 """Monitor progress of full corpus run."""
-import glob
+
 import json
-import time
 from pathlib import Path
+
 try:
     import psutil
 except ImportError:
     psutil = None
+
 
 def report(parsed_dir="checkpoints/run/run-2026-09-14-full-corpus/parsed"):
     root = Path(parsed_dir)
@@ -38,7 +39,11 @@ def report(parsed_dir="checkpoints/run/run-2026-09-14-full-corpus/parsed"):
                     total_tables += sum(len(pg.get("tables", [])) for pg in dom_pages)
                     total_images += sum(len(pg.get("images", [])) for pg in dom_pages)
                     total_refs += len(dom_data.get("references", []))
-                    r = dom_data.get("provenance", {}).get("routing", {}).get("route", "unknown")
+                    r = (
+                        dom_data.get("provenance", {})
+                        .get("routing", {})
+                        .get("route", "unknown")
+                    )
                     routes[r] = routes.get(r, 0) + 1
         except Exception:
             pass
@@ -46,11 +51,14 @@ def report(parsed_dir="checkpoints/run/run-2026-09-14-full-corpus/parsed"):
     mem_str = ""
     if psutil:
         vm = psutil.virtual_memory()
-        mem_str = f" | RAM: {vm.percent}% ({vm.used/(1024**3):.2f}/{vm.total/(1024**3):.2f} GB)"
+        mem_str = f" | RAM: {vm.percent}% ({vm.used / (1024**3):.2f}/{vm.total / (1024**3):.2f} GB)"
 
     pct = (ok / 945.0) * 100
-    print(f"[{ok}/945 ({pct:.1f}%)] Pages: {total_pages} | Blocks: {total_blocks} | Tables: {total_tables} | Images: {total_images} | Refs: {total_refs}{mem_str}")
+    print(
+        f"[{ok}/945 ({pct:.1f}%)] Pages: {total_pages} | Blocks: {total_blocks} | Tables: {total_tables} | Images: {total_images} | Refs: {total_refs}{mem_str}"
+    )
     print(f"Routes: {routes}")
+
 
 if __name__ == "__main__":
     report()

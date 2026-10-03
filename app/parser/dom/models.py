@@ -4,9 +4,8 @@ This model is the single source of truth downstream modules (normalization,
 chunking, KG) consume. It must be parser-independent, so keep it lean and
 faithful: unknown values become `None`, never fabricated text.
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +18,7 @@ from app.routing.schema import RoutingDecision
 
 class BBox(BaseModel):
     """Coordinates in source space (PDF points by default). Nullable per node."""
+
     x0: float
     y0: float
     x1: float
@@ -27,36 +27,37 @@ class BBox(BaseModel):
 
 class Block(BaseModel):
     """A text-bearing region (spatial or logical) of the document."""
+
     id: str
     kind: str = "paragraph"
     text: str = ""
-    bbox: Optional[BBox] = None
+    bbox: BBox | None = None
     page: int = 0
     confidence: float = 1.0
-    font_size: Optional[float] = None
-    bold: Optional[bool] = None
+    font_size: float | None = None
+    bold: bool | None = None
     # provenance of this block
-    source: str = "text"           # "text" | "ocr" | "markup" | "spreadsheet" | ...
-    ocr_engine: Optional[str] = None
+    source: str = "text"  # "text" | "ocr" | "markup" | "spreadsheet" | ...
+    ocr_engine: str | None = None
 
 
 class Cell(BaseModel):
     text: str = ""
-    bbox: Optional[BBox] = None
+    bbox: BBox | None = None
 
 
 class Row(BaseModel):
     cells: list[Cell] = Field(default_factory=list)
-    bbox: Optional[BBox] = None   # row-level geometry, when available (D5)
+    bbox: BBox | None = None  # row-level geometry, when available (D5)
 
 
 class Table(BaseModel):
     id: str = ""
     page: int = 0
-    bbox: Optional[BBox] = None
+    bbox: BBox | None = None
     header: list[str] = Field(default_factory=list)
     rows: list[Row] = Field(default_factory=list)
-    source: str = "native"   # "native" | "ocr" | "heuristic"
+    source: str = "native"  # "native" | "ocr" | "heuristic"
     confidence: float = 1.0
     # Caption/title text associated with the table (from source structure, e.g.
     # Docling caption refs or a full-width title row). Kept separate from the
@@ -68,23 +69,23 @@ class Table(BaseModel):
 class ImageObject(BaseModel):
     id: str = ""
     page: int = 0
-    bbox: Optional[BBox] = None
-    storage_ref: str = ""       # path/key into the Store
+    bbox: BBox | None = None
+    storage_ref: str = ""  # path/key into the Store
     mime: str = ""
     checksum: str = ""
     caption: str = ""
 
 
 class Annotation(BaseModel):
-    kind: str = ""   # "note" | "highlight" | "stamp" | "link" | ...
+    kind: str = ""  # "note" | "highlight" | "stamp" | "link" | ...
     text: str = ""
     page: int = 0
 
 
 class Page(BaseModel):
     index: int
-    width: Optional[float] = None
-    height: Optional[float] = None
+    width: float | None = None
+    height: float | None = None
     blocks: list[Block] = Field(default_factory=list)
     tables: list[Table] = Field(default_factory=list)
     images: list[ImageObject] = Field(default_factory=list)
@@ -93,7 +94,8 @@ class Page(BaseModel):
 
 class Reference(BaseModel):
     """A reference/link or citation target captured from source."""
-    kind: str = "link"          # "link" | "citation" | "ident"
+
+    kind: str = "link"  # "link" | "citation" | "ident"
     target: str = ""
     # Additive structured fields (extraction-quality run): a reference has a
     # stable id, a human label (e.g. "[33]"), and full text. Empty by default so
@@ -111,15 +113,16 @@ class ReadingOrderEntry(BaseModel):
     sequence — blocks, tables, and images in canonical order — so every content
     unit is represented exactly once (investigation D4). Reuses existing ids.
     """
-    type: str = "block"         # "block" | "table" | "image"
+
+    type: str = "block"  # "block" | "table" | "image"
     id: str = ""
 
 
 class Metadata(BaseModel):
     mime: str = ""
-    detected_type: str = ""        # our canonical type slug, e.g. "pdf", "csv"
-    declared_extension: str = ""   # the misleading/derived extension
-    probe: str = ""                # which detect signal won ("magic","container",...)
+    detected_type: str = ""  # our canonical type slug, e.g. "pdf", "csv"
+    declared_extension: str = ""  # the misleading/derived extension
+    probe: str = ""  # which detect signal won ("magic","container",...)
     title: str = ""
     author: str = ""
     creator: str = ""
@@ -134,18 +137,18 @@ class Metadata(BaseModel):
 class Provenance(BaseModel):
     parser_version: str
     dom_schema_version: str
-    ocr_engine: Optional[str] = None
+    ocr_engine: str | None = None
     oct_level: bool = False
     # ADR-007: Docling backend identity (present only when the Docling path ran).
-    docling_version: Optional[str] = None
-    layout_model: Optional[str] = None
+    docling_version: str | None = None
+    layout_model: str | None = None
     config: dict = Field(default_factory=dict)
     # ADR-011: the intelligent router's decision (present only when the auto
     # route ran); None for manual-native/docling and pre-router DOMs (additive).
-    routing: Optional[RoutingDecision] = None
+    routing: RoutingDecision | None = None
     # --- normalization stage (Module #2) ---
-    normalizer_version: Optional[str] = None
-    normalization_report: Optional[dict] = None
+    normalizer_version: str | None = None
+    normalization_report: dict | None = None
 
 
 class Region(BaseModel):
@@ -154,20 +157,22 @@ class Region(BaseModel):
     Additive field — absent in older DOMs, consumers that don't need
     regions ignore this field entirely.
     """
+
     id: str = ""
     page: int = 0
-    bbox: Optional[BBox] = None
+    bbox: BBox | None = None
     kind: str = "column"  # "column" | "sidebar" | "footnote" | "header"
     block_ids: list[str] = Field(default_factory=list)
 
 
 class Document(BaseModel):
     """The canonical output of the Parser module."""
+
     version: str
     document_id: str
     source_hash: str
     metadata: Metadata = Field(default_factory=Metadata)
-    provenance: Optional[Provenance] = None
+    provenance: Provenance | None = None
     reading_order: list[str] = Field(default_factory=list)  # chain of block ids
     # Complete typed reading sequence (blocks + tables + images); additive for
     # D4. Every semantic content unit appears exactly once. The chunker still
@@ -180,7 +185,7 @@ class Document(BaseModel):
     # Region partition per page (column / sidebar / footnote / header).
     # Additive — absent in older DOMs, consumers that don't need regions
     # ignore this field.
-    regions: list["Region"] = Field(default_factory=list)
+    regions: list[Region] = Field(default_factory=list)
 
     # aggregate counts for monitoring/validate
     def num_blocks(self) -> int:

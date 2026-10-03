@@ -1,9 +1,10 @@
-"""SLANet / PP-Structure table structure recognition adapter.
-"""
+"""SLANet / PP-Structure table structure recognition adapter."""
+
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
+
 import numpy as np
 from PIL import Image
 
@@ -19,6 +20,7 @@ class SLANetTableExtractor(BaseTableExtractor):
     def _ensure_loaded(self) -> None:
         if self._engine is None:
             from rapid_table import RapidTable
+
             self._engine = RapidTable()
 
     def _parse_html_table(self, html_str: str) -> tuple[list[str], list[list[str]]]:
@@ -30,7 +32,9 @@ class SLANetTableExtractor(BaseTableExtractor):
 
         table_data = []
         for r_str in rows_match:
-            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", r_str, re.DOTALL | re.IGNORECASE)
+            cells = re.findall(
+                r"<t[dh][^>]*>(.*?)</t[dh]>", r_str, re.DOTALL | re.IGNORECASE
+            )
             # Clean cell text
             cleaned_cells = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
             table_data.append(cleaned_cells)
@@ -46,9 +50,9 @@ class SLANetTableExtractor(BaseTableExtractor):
         self,
         fitz_page: Any,
         page_index: int,
-        page_image: Optional[Image.Image] = None,
-        layout_regions: Optional[list[Any]] = None,
-        candidate_bboxes: Optional[list[BoundingBox]] = None,
+        page_image: Image.Image | None = None,
+        layout_regions: list[Any] | None = None,
+        candidate_bboxes: list[BoundingBox] | None = None,
     ) -> list[RawTable]:
         if page_image is None:
             return []
@@ -86,7 +90,11 @@ class SLANetTableExtractor(BaseTableExtractor):
 
             try:
                 res = self._engine(crop_np)
-                pred_html = res.pred_htmls[0] if (res.pred_htmls and len(res.pred_htmls) > 0) else ""
+                pred_html = (
+                    res.pred_htmls[0]
+                    if (res.pred_htmls and len(res.pred_htmls) > 0)
+                    else ""
+                )
                 header, rows = self._parse_html_table(pred_html)
 
                 # Extract cell bboxes
@@ -108,7 +116,9 @@ class SLANetTableExtractor(BaseTableExtractor):
                             RawCell(
                                 row_idx=0,
                                 col_idx=0,
-                                bbox=BoundingBox(page_cx0, page_cy0, page_cx1, page_cy1),
+                                bbox=BoundingBox(
+                                    page_cx0, page_cy0, page_cx1, page_cy1
+                                ),
                             )
                         )
 

@@ -261,7 +261,9 @@ def _control_class() -> str:
     out.extend(chr(c) for c in single)
     return "".join(out)
 
+
 _CONTROL_RE = re.compile("[" + _control_class() + "]")
+
 
 def strip_controls(text: str) -> tuple[str, bool]:
     new = _CONTROL_RE.sub("", text)
@@ -293,6 +295,7 @@ def nfkc(text: str) -> tuple[str, bool]:
 ```python
 _HYPHEN_JOIN_RE = re.compile(r"(\b[a-záéíóúüñ]+)-\s*\n\s*([a-záéíóúüñ]+\b)")
 
+
 def dehyphenate(text: str) -> tuple[str, bool]:
     new = _HYPHEN_JOIN_RE.sub(r"\1\2", text)
     return new, new != text
@@ -309,6 +312,7 @@ def dehyphenate(text: str) -> tuple[str, bool]:
 #### Rule 4: `collapse_whitespace(text: str)` (Lines 56–60)
 ```python
 _WS_RE = re.compile(r"(?:[ \t]*\n)+[ \t]*|[ \t]{2,}")
+
 
 def collapse_whitespace(text: str) -> tuple[str, bool]:
     new = _WS_RE.sub(" ", text).strip()
@@ -329,10 +333,10 @@ _TYPOG = {
     "’": "'",
     "“": '"',
     "”": '"',
-    "–": "-",   # en dash
-    "—": "-",   # em dash
+    "–": "-",  # en dash
+    "—": "-",  # em dash
     " ": " ",
-    "­": "",    # soft hyphen (­)
+    "­": "",  # soft hyphen (­)
 }
 ```
 - **Line 71 Defect (High):** Replacing unspaced em-dashes (`—`) with hyphens (`-`) turns parenthetical clauses into false compound words (`"hypertension—dyspnea"` $\rightarrow$ `"hypertension-dyspnea"`).

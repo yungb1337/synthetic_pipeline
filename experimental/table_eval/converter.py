@@ -1,5 +1,5 @@
-"""Converts extracted tables and OCR blocks into canonical Document DOM and runs Normalization.
-"""
+"""Converts extracted tables and OCR blocks into canonical Document DOM and runs Normalization."""
+
 from __future__ import annotations
 
 import re
@@ -30,7 +30,9 @@ class TableBenchmarkDOMConverter:
     def __init__(self, normalizer: Normalizer | None = None):
         self.normalizer = normalizer or Normalizer()
 
-    def _quad_to_bbox(self, quad: list[list[float]], scale_x: float = 1.0, scale_y: float = 1.0) -> BBox | None:
+    def _quad_to_bbox(
+        self, quad: list[list[float]], scale_x: float = 1.0, scale_y: float = 1.0
+    ) -> BBox | None:
         if not quad or len(quad) < 4:
             return None
         xs = [pt[0] / scale_x for pt in quad]
@@ -41,7 +43,11 @@ class TableBenchmarkDOMConverter:
         t = text.strip()
         if not t:
             return "paragraph"
-        if re.match(r"^(?:[0-9]+(?:\.[0-9]+)*\s+[A-Z]|Abstract\b|Introduction\b|Methods\b|Results\b|Discussion\b|Conclusion\b|References\b)", t, re.IGNORECASE):
+        if re.match(
+            r"^(?:[0-9]+(?:\.[0-9]+)*\s+[A-Z]|Abstract\b|Introduction\b|Methods\b|Results\b|Discussion\b|Conclusion\b|References\b)",
+            t,
+            re.IGNORECASE,
+        ):
             return "heading"
         if len(t) < 60 and (t.isupper() or t.istitle()) and not t.endswith("."):
             return "heading"
@@ -85,12 +91,16 @@ class TableBenchmarkDOMConverter:
                     cells = [Cell(text=str(c)) for c in r]
                     dom_rows.append(Row(cells=cells))
 
-                t_bbox = BBox(
-                    x0=raw_tbl.bbox.x0,
-                    y0=raw_tbl.bbox.y0,
-                    x1=raw_tbl.bbox.x1,
-                    y1=raw_tbl.bbox.y1,
-                ) if raw_tbl.bbox else None
+                t_bbox = (
+                    BBox(
+                        x0=raw_tbl.bbox.x0,
+                        y0=raw_tbl.bbox.y0,
+                        x1=raw_tbl.bbox.x1,
+                        y1=raw_tbl.bbox.y1,
+                    )
+                    if raw_tbl.bbox
+                    else None
+                )
 
                 t_id = f"t-p{p_idx}-{t_idx:02d}"
                 dom_table = Table(
@@ -111,7 +121,9 @@ class TableBenchmarkDOMConverter:
             ocr_scores = p_data.get("ocr_scores", [])
 
             indexed_lines = []
-            for i, (txt, score, box) in enumerate(zip(ocr_texts, ocr_scores, ocr_boxes)):
+            for i, (txt, score, box) in enumerate(
+                zip(ocr_texts, ocr_scores, ocr_boxes)
+            ):
                 bbox = self._quad_to_bbox(box, scale_x, scale_y)
                 indexed_lines.append((i, txt, score, box, bbox))
 

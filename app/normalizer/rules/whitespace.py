@@ -5,10 +5,10 @@ Respects document structure by inspecting block semantics:
   * Formulas (kind="formula"): Preserves notation and internal spacing.
   * Paragraphs / Headings: Collapses single line breaks into spaces (soft OCR wraps) while preserving '\\n\\n' paragraph breaks (when enabled).
 """
+
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from .base import RuleContext
 
@@ -23,7 +23,9 @@ _HORIZ_WS_RE = re.compile(r"[ \t]{2,}")
 _ALL_WS_RE = re.compile(r"(?:[ \t]*\n)+[ \t]*|[ \t]{2,}")
 
 
-def collapse_whitespace(text: str, context: Optional[RuleContext] = None) -> tuple[str, bool]:
+def collapse_whitespace(
+    text: str, context: RuleContext | None = None
+) -> tuple[str, bool]:
     """Collapse whitespace according to structural semantics and configuration."""
     if not text:
         return text, False

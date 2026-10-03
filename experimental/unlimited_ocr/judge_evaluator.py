@@ -1,20 +1,19 @@
-"""Reuses the exact repository LLM Judge methodology to evaluate Unlimited-OCR DOMs vs Source PDFs.
-"""
+"""Reuses the exact repository LLM Judge methodology to evaluate Unlimited-OCR DOMs vs Source PDFs."""
+
 from __future__ import annotations
 
 import json
 import re
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from scripts.llm_judge import (
+    _MAX_ATTEMPTS,
     DEFAULT_MODEL,
     FALLBACK_MODELS,
     PROMPT_TEMPLATE,
-    _MAX_ATTEMPTS,
     _rate_limited,
     _retry_delay,
     extract_source_text,
@@ -43,7 +42,9 @@ class JudgeEvaluator:
     def is_available(self) -> bool:
         return bool(self.api_key)
 
-    def judge_dom(self, pdf_path: str | Path, dom_dict: dict[str, Any]) -> dict[str, Any]:
+    def judge_dom(
+        self, pdf_path: str | Path, dom_dict: dict[str, Any]
+    ) -> dict[str, Any]:
         if not self.api_key:
             return {
                 "error": "No Gemini API key available (judge skipped)",

@@ -12,16 +12,17 @@ the assembled page set EXACTLY equals the `expected_page_set` from the source
 scan. Any missing page => the document is NOT reported as parsed; exhausted pages
 are dead-lettered with an explicit actual-vs-expected record.
 """
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
 
 from .config import ParserConfig
-from .parts import RecoveredDocument
 from .dom import DocumentBuilder
 from .loaders import docling_loader
 from .page_result import PageResult, PageStatus
+from .parts import RecoveredDocument
 from .planner import ExecutionPlan
 from .storage import Store
 from .storage_pages import Ledger
@@ -30,7 +31,7 @@ from .storage_pages import Ledger
 @dataclass
 class AssemblyReport:
     doc_id: str
-    status: str                       # "ok" | "partial" | "failed" | "dead"
+    status: str  # "ok" | "partial" | "failed" | "dead"
     expected_pages: int = 0
     actual_pages: int = 0
     missing_pages: list[int] = field(default_factory=list)
@@ -38,7 +39,7 @@ class AssemblyReport:
     dead_pages: list[int] = field(default_factory=list)
     dom_key: str | None = None
     raw_key: str | None = None
-    document: "object | None" = None
+    document: object | None = None
     errors: list[dict] = field(default_factory=list)
 
 
@@ -51,12 +52,21 @@ class DocumentValidator:
         # (1) status=OK/PARTIAL AND has content, OR
         # (2) status=OK AND processed without error (even if blank)
         # This ensures blank pages don't destroy the document (F-01 fix).
-        ok_with_content = {r.page_index for r in results
-                           if r.status == PageStatus.OK and r.content_present}
-        partial_with_content = {r.page_index for r in results
-                                if r.status == PageStatus.PARTIAL and r.content_present}
-        ok_blank = {r.page_index for r in results
-                    if r.status == PageStatus.OK and not r.content_present and not r.errors}
+        ok_with_content = {
+            r.page_index
+            for r in results
+            if r.status == PageStatus.OK and r.content_present
+        }
+        partial_with_content = {
+            r.page_index
+            for r in results
+            if r.status == PageStatus.PARTIAL and r.content_present
+        }
+        ok_blank = {
+            r.page_index
+            for r in results
+            if r.status == PageStatus.OK and not r.content_present and not r.errors
+        }
         return ok_with_content | partial_with_content | ok_blank
 
     @staticmethod
@@ -69,12 +79,21 @@ class DocumentValidator:
     def classify(results: list[PageResult], plan: ExecutionPlan) -> AssemblyReport:
         expected = set(plan.expected_page_set)
         # Use the same logic as assembled_page_set (includes valid blanks)
-        ok_with_content = {r.page_index for r in results
-                           if r.status == PageStatus.OK and r.content_present}
-        partial_with_content = {r.page_index for r in results
-                                if r.status == PageStatus.PARTIAL and r.content_present}
-        ok_blank = {r.page_index for r in results
-                    if r.status == PageStatus.OK and not r.content_present and not r.errors}
+        ok_with_content = {
+            r.page_index
+            for r in results
+            if r.status == PageStatus.OK and r.content_present
+        }
+        partial_with_content = {
+            r.page_index
+            for r in results
+            if r.status == PageStatus.PARTIAL and r.content_present
+        }
+        ok_blank = {
+            r.page_index
+            for r in results
+            if r.status == PageStatus.OK and not r.content_present and not r.errors
+        }
         failed = {r.page_index for r in results if r.status == PageStatus.FAILED}
         dead = {r.page_index for r in results if r.status == PageStatus.DEAD}
         actual = ok_with_content | partial_with_content | ok_blank
@@ -86,9 +105,12 @@ class DocumentValidator:
             else:
                 status = "failed"
         return AssemblyReport(
-            doc_id=plan.doc_id, status=status,
-            expected_pages=len(expected), actual_pages=len(actual),
-            missing_pages=missing, failed_pages=sorted(failed),
+            doc_id=plan.doc_id,
+            status=status,
+            expected_pages=len(expected),
+            actual_pages=len(actual),
+            missing_pages=missing,
+            failed_pages=sorted(failed),
             dead_pages=sorted(dead),
         )
 
@@ -124,8 +146,16 @@ def _fold_results(results: list[PageResult], plan: ExecutionPlan) -> RecoveredDo
             rec.page_sizes.setdefault(int(k), tuple(v))
     # Carry the source PDF info dict (title/author/subject/...) into the DOM so
     # the page-centric path preserves the legacy native loader's provenance.
-    for k in ("title", "author", "creator", "producer", "subject",
-              "created", "modified", "language"):
+    for k in (
+        "title",
+        "author",
+        "creator",
+        "producer",
+        "subject",
+        "created",
+        "modified",
+        "language",
+    ):
         if plan.metadata.get(k):
             setattr(rec, k, plan.metadata[k])
     # Carry the docling/layout version through from the page results so the DOM
@@ -134,14 +164,21 @@ def _fold_results(results: list[PageResult], plan: ExecutionPlan) -> RecoveredDo
     for r in results:
         if getattr(r, "docling_version", None):
             rec.docling_version = r.docling_version
-        if getattr(r, "route", None) == "docling" and getattr(r, "engine_version", None):
+        if getattr(r, "route", None) == "docling" and getattr(
+            r, "engine_version", None
+        ):
             rec.docling_version = rec.docling_version or r.engine_version
     return rec
 
 
 class Assembler:
-    def __init__(self, config: ParserConfig, store: Store, ledger: Ledger | None = None,
-                 scheduler=None):
+    def __init__(
+        self,
+        config: ParserConfig,
+        store: Store,
+        ledger: Ledger | None = None,
+        scheduler=None,
+    ):
         """`scheduler` (I-03): the pipeline's shared `Scheduler`. When supplied,
         page retries are executed THROUGH its pools (docling retries go to the
         heavy pool — never run in-process). Optional for backward compatibility;
@@ -158,9 +195,14 @@ class Assembler:
         self.page_store = None
         self.builder = DocumentBuilder(config)
 
-    def assemble(self, plan: ExecutionPlan, results: list[PageResult],
-                 src_path: str, sha256: str,
-                 max_retries: int = 2) -> AssemblyReport:
+    def assemble(
+        self,
+        plan: ExecutionPlan,
+        results: list[PageResult],
+        src_path: str,
+        sha256: str,
+        max_retries: int = 2,
+    ) -> AssemblyReport:
         """Fold pages -> DocumentBuilder.build -> Store -> emit.
 
         Retries FAILED/PARTIAL pages a bounded number of times with backoff; when
@@ -203,7 +245,11 @@ class Assembler:
                 img.storage_ref = self.store.put_image(plan.doc_id, img)
             except Exception:
                 pass
-        is_success = not report.missing_pages and not report.failed_pages and not report.dead_pages
+        is_success = (
+            not report.missing_pages
+            and not report.failed_pages
+            and not report.dead_pages
+        )
         if is_success:
             # Source bytes are read once; needed by the table-reconstruction
             # evidence-graph recovery (D2) and the geometric bibliography label
@@ -229,8 +275,9 @@ class Assembler:
                 report.status = "failed"
                 report.dom_key = None
             try:
-                report.raw_key = self.store.put_raw(plan.doc_id, sha256,
-                                                    _read_src(src_path), plan.declared_extension)
+                report.raw_key = self.store.put_raw(
+                    plan.doc_id, sha256, _read_src(src_path), plan.declared_extension
+                )
             except Exception as e:
                 report.errors.append({"category": "store_raw", "message": str(e)})
                 report.status = "failed"
@@ -249,21 +296,25 @@ class Assembler:
                 assembled = sorted(DocumentValidator.assembled_page_set(results))
                 self.ledger.update_assembly(
                     plan.doc_id,
-                    PageStatus(report.status) if report.status in ("ok", "partial", "failed", "dead")
+                    PageStatus(report.status)
+                    if report.status in ("ok", "partial", "failed", "dead")
                     else PageStatus.PARTIAL,
                     assembled,
-                    {"expected_pages": report.expected_pages,
-                     "actual_pages": report.actual_pages,
-                     "missing_pages": report.missing_pages,
-                     "failed_pages": report.failed_pages,
-                     "dead_pages": report.dead_pages},
+                    {
+                        "expected_pages": report.expected_pages,
+                        "actual_pages": report.actual_pages,
+                        "missing_pages": report.missing_pages,
+                        "failed_pages": report.failed_pages,
+                        "dead_pages": report.dead_pages,
+                    },
                 )
             except Exception:
                 pass
         return report
 
-    def _reload_page_blobs(self, plan: ExecutionPlan,
-                           results: list[PageResult]) -> list[PageResult]:
+    def _reload_page_blobs(
+        self, plan: ExecutionPlan, results: list[PageResult]
+    ) -> list[PageResult]:
         """I-09: restore image blob bytes from the durable page store.
 
         Returns the original list untouched when every image-bearing page
@@ -288,8 +339,9 @@ class Assembler:
             replaced = True
         return out if replaced else results
 
-    def _retry_pages(self, plan: ExecutionPlan, results: list[PageResult],
-                     report: AssemblyReport) -> list[PageResult]:
+    def _retry_pages(
+        self, plan: ExecutionPlan, results: list[PageResult], report: AssemblyReport
+    ) -> list[PageResult]:
         from .engines.enrichment import EnrichmentEngine
         from .engines.image import ImageEngine
         from .engines.native_pdf import NativePdfEngine
@@ -302,10 +354,15 @@ class Assembler:
         # whose failure was `engine_unavailable` — the engine is cached-unavailable
         # in this process, so a retry is guaranteed to hit the same wall.
         retry_pages = {
-            p for p in retry_pages
-            if not (by_page.get(p) is not None and any(
-                (e.get("category") or "") == "engine_unavailable"
-                for e in (by_page[p].errors or [])))
+            p
+            for p in retry_pages
+            if not (
+                by_page.get(p) is not None
+                and any(
+                    (e.get("category") or "") == "engine_unavailable"
+                    for e in (by_page[p].errors or [])
+                )
+            )
         }
 
         # I-03: when a scheduler is wired, execute retries THROUGH its pools so
@@ -336,8 +393,9 @@ class Assembler:
             # later clean run retries them via the normal scheduler path.
             existing = by_page.get(p)
             if existing is not None and any(
-                    (e.get("category") or "") == "engine_unavailable"
-                    for e in (existing.errors or [])):
+                (e.get("category") or "") == "engine_unavailable"
+                for e in (existing.errors or [])
+            ):
                 continue
             item = None
             for wi in plan.work_items:
@@ -360,29 +418,47 @@ class Assembler:
                     # and re-enters the Docling layout path (with the same
                     # silent-loss guard via docling_guard_status).
                     from .engines.heavy_docling import HeavyDoclingEngine
+
                     r = HeavyDoclingEngine(self.config).process(item)
                 else:
                     r = NativePdfEngine(self.config).process(item)
             except Exception as e:
                 r = PageResult(
-                    doc_id=item.doc_id, page_index=p, route=band,
+                    doc_id=item.doc_id,
+                    page_index=p,
+                    route=band,
                     status=PageStatus.FAILED,
-                    errors=[{"page_no": p + 1, "category": "assemble_retry", "message": str(e)}],
+                    errors=[
+                        {
+                            "page_no": p + 1,
+                            "category": "assemble_retry",
+                            "message": str(e),
+                        }
+                    ],
                     source_hash=item.source_hash,
                 )
             by_page[p] = r
         return list(by_page.values())
 
-    def _mark_dead(self, results: list[PageResult], page_index: int,
-                   plan: ExecutionPlan) -> list[PageResult]:
+    def _mark_dead(
+        self, results: list[PageResult], page_index: int, plan: ExecutionPlan
+    ) -> list[PageResult]:
         by_page = {r.page_index: r for r in results}
         prev = by_page.get(page_index)
         errs = prev.errors if prev is not None else []
-        errs = list(errs) + [{"page_no": page_index + 1, "category": "dead_letter",
-                              "message": "page exhausted after retries; dead-lettered"}]
+        errs = list(errs) + [
+            {
+                "page_no": page_index + 1,
+                "category": "dead_letter",
+                "message": "page exhausted after retries; dead-lettered",
+            }
+        ]
         by_page[page_index] = PageResult(
-            doc_id=plan.doc_id, page_index=page_index, route="",
-            status=PageStatus.DEAD, errors=errs,
+            doc_id=plan.doc_id,
+            page_index=page_index,
+            route="",
+            status=PageStatus.DEAD,
+            errors=errs,
             source_hash=plan.source_hash,
         )
         return list(by_page.values())

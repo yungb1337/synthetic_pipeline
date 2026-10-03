@@ -1,4 +1,5 @@
 """Hermetic tests for ChunkEmbedPipeline (DummyEmbedder only)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,18 +17,31 @@ def _block(seq: int, text: str, kind: str = "paragraph") -> Block:
     return Block(id=f"{DID}/b{seq:03d}", text=text, kind=kind, page=0)
 
 
-def _write_norm_dom(root: str, doc_id: str, blocks, version: str = "norm-v0.1.0",
-                    normalizer_version: str = "normalizer-v0.1.0") -> Document:
+def _write_norm_dom(
+    root: str,
+    doc_id: str,
+    blocks,
+    version: str = "norm-v0.1.0",
+    normalizer_version: str = "normalizer-v0.1.0",
+) -> Document:
     doc = Document(
-        version="dom-schema-v0.1.0", document_id=doc_id, source_hash="00", metadata=Metadata(),
-        provenance=Provenance(parser_version="p", dom_schema_version="dom-schema-v0.1.0",
-                              normalizer_version=normalizer_version),
+        version="dom-schema-v0.1.0",
+        document_id=doc_id,
+        source_hash="00",
+        metadata=Metadata(),
+        provenance=Provenance(
+            parser_version="p",
+            dom_schema_version="dom-schema-v0.1.0",
+            normalizer_version=normalizer_version,
+        ),
         reading_order=[b.id for b in blocks],
         pages=[Page(index=0, blocks=blocks)],
     )
     d = Path(root) / "dom" / doc_id
     d.mkdir(parents=True, exist_ok=True)
-    (d / f"{version}.docJSON").write_text(doc.model_dump_json(indent=2), encoding="utf-8")
+    (d / f"{version}.docJSON").write_text(
+        doc.model_dump_json(indent=2), encoding="utf-8"
+    )
     return doc
 
 
@@ -36,7 +50,9 @@ def _store(tmp_path) -> str:
 
 
 def _pipe(tmp_path, embedder=None, **kw):
-    return ChunkEmbedPipeline(store_root=_store(tmp_path), embedder=embedder or DummyEmbedder(), **kw)
+    return ChunkEmbedPipeline(
+        store_root=_store(tmp_path), embedder=embedder or DummyEmbedder(), **kw
+    )
 
 
 # --------------------------------------------------------------- run behavior
@@ -59,12 +75,14 @@ def test_never_embeds_twice(tmp_path):
     _write_norm_dom(_store(tmp_path), DID, blocks)
     p = _pipe(tmp_path)
     first = p.run(DID)
-    sidecar = tmp_path / "store" / "embeddings" / DID / "emb-v0.1.0-dummy-feature-hash.json"
+    sidecar = (
+        tmp_path / "store" / "embeddings" / DID / "emb-v0.1.0-dummy-feature-hash.json"
+    )
     before = sidecar.read_bytes()
     second = p.run(DID)
     assert first.embedded == 2 and first.skipped == 0
     assert second.embedded == 0 and second.skipped == 2
-    assert sidecar.read_bytes() == before   # no write happened -> identical bytes
+    assert sidecar.read_bytes() == before  # no write happened -> identical bytes
 
 
 def test_new_chunk_only_embedded(tmp_path):
@@ -92,7 +110,7 @@ def test_artifact_shapes(tmp_path):
     assert got is not None
     got_ids, matrix, _ = got
     assert got_ids == chunk_ids
-    assert matrix.shape == (2, 64)                     # DummyEmbedder dim=64
+    assert matrix.shape == (2, 64)  # DummyEmbedder dim=64
     assert matrix.dtype == np.float32
     for i, cid in enumerate(chunk_ids):
         row = store.get_embedding(DID, cid, "chunker-v0.1.0", "dummy-feature-hash")
@@ -120,7 +138,17 @@ def test_event_emitted(tmp_path):
     names = [n for n, _ in events]
     assert "chunk_embedded.v1" in names
     payload = dict(events)["chunk_embedded.v1"]
-    for key in ("doc_id", "chunker_version", "embedder_id", "chunks", "embedded", "skipped", "dim", "dtype", "ms"):
+    for key in (
+        "doc_id",
+        "chunker_version",
+        "embedder_id",
+        "chunks",
+        "embedded",
+        "skipped",
+        "dim",
+        "dtype",
+        "ms",
+    ):
         assert key in payload
     assert payload["doc_id"] == DID
     assert payload["embedded"] == 1
@@ -142,7 +170,13 @@ def test_validation_stamp_in_sidecar(tmp_path):
 def test_latest_norm_dom_resolved(tmp_path):
     blocks = [_block(0, "x" * 2000)]
     _write_norm_dom(_store(tmp_path), DID, blocks, version="norm-v0.1.0")
-    _write_norm_dom(_store(tmp_path), DID, blocks, version="norm-v0.2.0", normalizer_version="normalizer-v0.2.0")
+    _write_norm_dom(
+        _store(tmp_path),
+        DID,
+        blocks,
+        version="norm-v0.2.0",
+        normalizer_version="normalizer-v0.2.0",
+    )
     p = _pipe(tmp_path)
     r = p.run(DID)
     assert r.status == "ok"
@@ -177,6 +211,7 @@ def test_cli_chunk_only(tmp_path, monkeypatch):
     blocks = [_block(0, "x" * 2000), _block(1, "x" * 2000)]
     _write_norm_dom(_store(tmp_path), DID, blocks)
     from app.chunking import cli
+
     rc = cli.main(["--doc", DID, "--store", _store(tmp_path)])
     assert rc == 0
     assert (tmp_path / "store" / "chunks" / DID / "chunks-v0.1.0.json").exists()
@@ -188,7 +223,9 @@ def test_chunk_only_never_touches_embedder(tmp_path, monkeypatch):
     _write_norm_dom(_store(tmp_path), DID, blocks)
 
     def _boom(*a, **k):
-        raise AssertionError("default_embedder must not be constructed for chunk-only runs")
+        raise AssertionError(
+            "default_embedder must not be constructed for chunk-only runs"
+        )
 
     monkeypatch.setattr("app.chunking.pipeline.default_embedder", _boom)
     p = ChunkEmbedPipeline(store_root=_store(tmp_path))
@@ -204,23 +241,31 @@ def test_cli_with_embed(tmp_path, monkeypatch):
     blocks = [_block(0, "x" * 2000), _block(1, "x" * 2000)]
     _write_norm_dom(_store(tmp_path), DID, blocks)
     from app.chunking import cli
+
     rc = cli.main(["--doc", DID, "--store", _store(tmp_path), "--embed"])
     assert rc == 0
     assert (tmp_path / "store" / "chunks" / DID / "chunks-v0.1.0.json").exists()
-    assert (tmp_path / "store" / "embeddings" / DID / "emb-v0.1.0-dummy-feature-hash.json").exists()
-    assert (tmp_path / "store" / "embeddings" / DID / "emb-v0.1.0-dummy-feature-hash.npy").exists()
+    assert (
+        tmp_path / "store" / "embeddings" / DID / "emb-v0.1.0-dummy-feature-hash.json"
+    ).exists()
+    assert (
+        tmp_path / "store" / "embeddings" / DID / "emb-v0.1.0-dummy-feature-hash.npy"
+    ).exists()
 
 
 def test_cli_missing_dom_exits_1(tmp_path, monkeypatch):
     _force_dummy(monkeypatch)
     from app.chunking import cli
+
     rc = cli.main(["--doc", "nope", "--store", _store(tmp_path)])
     assert rc == 1
 
 
 def _force_dummy(monkeypatch):
     """Default embedder would load real BGE-M3 on this box; keep CLI tests hermetic."""
-    monkeypatch.setattr("app.chunking.pipeline.default_embedder", lambda *a, **k: DummyEmbedder())
+    monkeypatch.setattr(
+        "app.chunking.pipeline.default_embedder", lambda *a, **k: DummyEmbedder()
+    )
 
 
 class _CapturingPublisher:

@@ -1,14 +1,11 @@
 """Comprehensive test suite for Module #2 — Text Normalization (deterministic, production-grade)."""
+
 from __future__ import annotations
 
-import unicodedata
-import pytest
-
-from app.normalizer import apply, is_idempotent, rules, Normalizer, NormalizerConfig
-from app.normalizer.rules.base import RuleContext, RuleResult
+from app.normalizer import Normalizer, NormalizerConfig, apply, is_idempotent, rules
+from app.normalizer.rules.base import RuleContext
 from app.parser.dom import (
     Annotation,
-    BBox,
     Block,
     Cell,
     Document,
@@ -48,7 +45,9 @@ def _doc(
         document_id="d-test",
         source_hash="00",
         metadata=metadata,
-        provenance=Provenance(parser_version="p", dom_schema_version="dom-schema-v0.1.0"),
+        provenance=Provenance(
+            parser_version="p", dom_schema_version="dom-schema-v0.1.0"
+        ),
         reading_order=[b.id for b in blocks],
         pages=[
             Page(
@@ -66,6 +65,7 @@ def _doc(
 # =========================================================================
 # 1. Hygiene & Control Character Tests (Issue 1 & 6)
 # =========================================================================
+
 
 def test_hygiene_crlf_and_cr_normalized_to_lf():
     """CRLF and CR line endings must be standardized to LF."""
@@ -95,7 +95,7 @@ def test_hygiene_tab_in_code_block_expands_to_4_spaces():
 
 def test_hygiene_strips_c0_c1_controls_and_bom():
     """C0 controls (except tab/lf), DEL, and BOM must be removed."""
-    raw = "\x00\x01\x08Header\x0B\x0C\x1F\x7F ﻿Text"
+    raw = "\x00\x01\x08Header\x0b\x0c\x1f\x7f ﻿Text"
     out, changed = rules.strip_controls(raw)
     assert out == "Header Text"
     assert changed is True
@@ -103,7 +103,7 @@ def test_hygiene_strips_c0_c1_controls_and_bom():
 
 def test_hygiene_strips_zero_width_space():
     """Zero-width space (U+200B) and Word Joiner (U+2060) must be stripped."""
-    raw = "Zero​Width⁠Space"
+    raw = "Zero\u200bWidth⁠Space"
     out, changed = rules.strip_controls(raw)
     assert out == "ZeroWidthSpace"
     assert changed is True
@@ -128,6 +128,7 @@ def test_hygiene_preserves_multilingual_zwnj_and_zwj():
 # =========================================================================
 # 2. Unicode Canonicalization & Ligature Tests (Issue 2)
 # =========================================================================
+
 
 def test_unicode_nfc_preserves_superscripts_and_exponents():
     """Audit Fix: NFC baseline preserves exponents and superscripts (preventing 100x dosage error)."""
@@ -162,7 +163,9 @@ def test_unicode_nfc_composes_combining_diacritics():
 
 def test_unicode_targeted_ligatures_expanded():
     """Audit Fix: Typographic ligatures expand cleanly without NFKC side effects."""
-    raw = "The patient suffered from severe ﬁbrosis and pulmonary inﬂammation (ﬀ, ﬃ, ﬄ)."
+    raw = (
+        "The patient suffered from severe ﬁbrosis and pulmonary inﬂammation (ﬀ, ﬃ, ﬄ)."
+    )
     out, changed = rules.expand_ligatures(raw)
     assert "fibrosis" in out
     assert "inflammation" in out
@@ -182,6 +185,7 @@ def test_unicode_ligature_expansion_preserves_math():
 # =========================================================================
 # 3. Context-Aware Dehyphenation Tests (Issue 4)
 # =========================================================================
+
 
 def test_dehyphenate_lowercase_word_break():
     """Standard lowercase word broken across line break."""
@@ -251,6 +255,7 @@ def test_dehyphenate_preserves_inline_real_hyphens():
 # 4. Structure-Aware Whitespace Tests (Issue 3)
 # =========================================================================
 
+
 def test_whitespace_collapses_horizontal_space():
     """Multiple spaces and tabs collapse to single space."""
     out, changed = rules.collapse_whitespace("  BP   :120/80  mmHg  ")
@@ -309,11 +314,12 @@ def test_whitespace_idempotent_multiple_runs():
 # 5. Typography & Punctuation Tests (Issue 5)
 # =========================================================================
 
+
 def test_typography_smart_quotes_to_straight():
     """Smart single and double quotes convert to ASCII straight quotes."""
     raw = "‘Patient’s’ chart: “Normal sinus rhythm” and „quoted‟"
     out, changed = rules.typography(raw)
-    assert out == "'Patient's' chart: \"Normal sinus rhythm\" and \"quoted\""
+    assert out == '\'Patient\'s\' chart: "Normal sinus rhythm" and "quoted"'
     assert changed is True
 
 
@@ -348,6 +354,7 @@ def test_typography_non_breaking_spaces_to_regular_space():
 # 6. Pipeline & Idempotency Tests
 # =========================================================================
 
+
 def test_pipeline_composition_order():
     """Full pipeline executes in canonical order and tracks per-rule changes."""
     raw = "  Patient:	John\r\n‘Severe’ ﬁbrosis—10² mg  \n\nCardio-\nvascular  "
@@ -379,9 +386,14 @@ def test_pipeline_idempotency_guarantee():
 # 7. Full DOM Traversal & Coverage Tests (Issue 7)
 # =========================================================================
 
+
 def test_normalizer_covers_blocks_with_structure_awareness():
     """Normalizer normalizes blocks and respects block kind."""
-    para_block = _b(0, "The patient has  stable diabetes.\r\n\r\nFollow–up in 2 weeks.", kind="paragraph")
+    para_block = _b(
+        0,
+        "The patient has  stable diabetes.\r\n\r\nFollow–up in 2 weeks.",
+        kind="paragraph",
+    )
     code_block = _b(1, "def check_dose():\n\treturn 10²", kind="code")
     doc = _doc(blocks=[para_block, code_block])
 
@@ -489,6 +501,7 @@ def test_normalizer_covers_metadata_fields():
 # 8. Provenance, Extensibility & Architecture Tests
 # =========================================================================
 
+
 def test_provenance_and_version_attached():
     """Provenance carries normalizer version and comprehensive statistics."""
     doc = _doc(blocks=[_b(0, "  spaced	text  ")])
@@ -506,7 +519,10 @@ def test_provenance_and_version_attached():
 
 def test_runtime_custom_rule_registration():
     """Audit Fix: Extensible architecture allows adding custom rules at runtime."""
-    def custom_redact_rule(text: str, context: RuleContext | None = None) -> tuple[str, bool]:
+
+    def custom_redact_rule(
+        text: str, context: RuleContext | None = None
+    ) -> tuple[str, bool]:
         new = text.replace("SECRET", "[REDACTED]")
         return new, new != text
 
@@ -553,6 +569,7 @@ def test_normalizer_non_destructive_deep_copy():
 # =========================================================================
 # 9. Extended Edge Cases, Multilingual & Clinical Notation Tests
 # =========================================================================
+
 
 def test_empty_and_whitespace_only_inputs():
     """All rules must gracefully handle empty and whitespace-only strings."""
@@ -662,7 +679,9 @@ def test_config_disabled_rules():
     doc = _doc(blocks=[_b(0, "  Unmodified	Text–ﬁbrosis  \n\npara-\ngraph")])
     out = Normalizer(cfg).normalize(doc)
     # When all rules disabled, block text is untouched
-    assert out.pages[0].blocks[0].text == "  Unmodified	Text–ﬁbrosis  \n\npara-\ngraph"
+    assert (
+        out.pages[0].blocks[0].text == "  Unmodified	Text–ﬁbrosis  \n\npara-\ngraph"
+    )
 
 
 def test_custom_unicode_form_nfkc():
@@ -699,7 +718,11 @@ def test_full_idempotency_f_f_x_equals_f_x_property():
     doc = _doc(
         blocks=[
             _b(0, "Header	1: Patient	Status", kind="heading"),
-            _b(1, "The pa-\ntient has severe asthma—especially at night.\r\n\r\nDose: 10² mg.", kind="paragraph"),
+            _b(
+                1,
+                "The pa-\ntient has severe asthma—especially at night.\r\n\r\nDose: 10² mg.",
+                kind="paragraph",
+            ),
             _b(2, "SELECT	*	FROM	vitals;", kind="code"),
         ],
         tables=[
@@ -731,4 +754,3 @@ def test_full_idempotency_f_f_x_equals_f_x_property():
     # Metadata matches
     assert pass1.metadata.title == pass2.metadata.title
     assert pass1.metadata.author == pass2.metadata.author
-

@@ -5,6 +5,7 @@ any image handed to RapidOCR so its C++ preprocess tensor (proportional to pixel
 AREA) cannot blow past process memory -> `std::bad_alloc`. These tests verify the
 downscaling behaviour WITHOUT needing the heavy OCR engine loaded.
 """
+
 from __future__ import annotations
 
 import io

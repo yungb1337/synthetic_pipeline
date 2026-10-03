@@ -5,6 +5,7 @@ Docling is an optional dependency, so tests that exercise the real backend skip
 when it is not installed (matching the OCR lazy-engine pattern); the
 degradation-to-native test runs on every environment.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -32,7 +33,9 @@ def _pdf_bytes():
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     page.insert_text((72, 100), "Clinical Report", fontsize=20)
-    page.insert_text((72, 130), "The patient has stable diabetes on metformin.", fontsize=11)
+    page.insert_text(
+        (72, 130), "The patient has stable diabetes on metformin.", fontsize=11
+    )
     # a tiny bordered table so table-structure has something to find (API-version
     # dependent; skip if the installed PyMuPDF has no table-insertion support)
     try:
@@ -80,8 +83,12 @@ def test_docling_mapping_logic(tmp_path):
             self.text = text
 
     class FakeTable:
-        table_cells = [FakeCell(0, 0, "h1"), FakeCell(0, 1, "h2"),
-                       FakeCell(1, 0, "a"), FakeCell(1, 1, "b")]
+        table_cells = [
+            FakeCell(0, 0, "h1"),
+            FakeCell(0, 1, "h2"),
+            FakeCell(1, 0, "a"),
+            FakeCell(1, 1, "b"),
+        ]
 
     class FakeTableItem:
         label = FakeLabel("table")
@@ -97,12 +104,14 @@ def test_docling_mapping_logic(tmp_path):
         image = Image.new("RGB", (4, 4))
 
     rec = RecoveredDocument()
-    for item in [FakeItem("section_header", "Intro", 0, (0, 0, 100, 20)),
-                 FakeItem("text", "Body text here", 0, (0, 30, 200, 50)),
-                 FakeItem("list_item", "- item", 0, (0, 60, 50, 80)),
-                 FakeItem("code", "x=1", 0, (0, 90, 50, 100)),
-                 FakeTableItem(),
-                 FakePictureItem()]:
+    for item in [
+        FakeItem("section_header", "Intro", 0, (0, 0, 100, 20)),
+        FakeItem("text", "Body text here", 0, (0, 30, 200, 50)),
+        FakeItem("list_item", "- item", 0, (0, 60, 50, 80)),
+        FakeItem("code", "x=1", 0, (0, 90, 50, 100)),
+        FakeTableItem(),
+        FakePictureItem(),
+    ]:
         docling_loader._map_item(item, rec)
 
     kinds = [b.kind for b in rec.blocks]
@@ -122,18 +131,31 @@ def test_table_structural_confidence_detects_row_collapse():
     from app.parser.loaders import docling_loader as dl
 
     # well-segmented: header + >=2 body rows -> trustworthy
-    assert dl._table_structural_confidence(["A", "B"], [["a1", "b1"], ["a2", "b2"]]) == 1.0
+    assert (
+        dl._table_structural_confidence(["A", "B"], [["a1", "b1"], ["a2", "b2"]]) == 1.0
+    )
     # legitimate single-data-row table (short cells) -> trustworthy
-    assert dl._table_structural_confidence(["Dataset", "Ref"], [["WANLI", "[36]"]]) == 1.0
+    assert (
+        dl._table_structural_confidence(["Dataset", "Ref"], [["WANLI", "[36]"]]) == 1.0
+    )
     # collapsed: single body row whose cell is a long concatenation
     collapsed = dl._table_structural_confidence(
         ["Dataset", "Reference"],
-        [["WANLI GPT3Mix Unnatural Instructions Self-Instruct AugGPT Code Alpaca WizardCoder AlphaCode",
-          "[36] [58] [23] [53] [9] [4]"]],
+        [
+            [
+                "WANLI GPT3Mix Unnatural Instructions Self-Instruct AugGPT Code Alpaca WizardCoder AlphaCode",
+                "[36] [58] [23] [53] [9] [4]",
+            ]
+        ],
     )
     assert collapsed < 1.0
     # single-column tables have no column structure to collapse -> not flagged
-    assert dl._table_structural_confidence(["Notes"], [["a b c d e f g h i j k l m n o p"]]) == 1.0
+    assert (
+        dl._table_structural_confidence(
+            ["Notes"], [["a b c d e f g h i j k l m n o p"]]
+        )
+        == 1.0
+    )
 
 
 def test_map_table_preserves_segmented_rows(tmp_path):
@@ -162,14 +184,16 @@ def test_map_table_preserves_segmented_rows(tmp_path):
         table = object()  # non-None so _map_table's guard passes (df path)
 
         def export_to_dataframe(self):
-            return pd.DataFrame({"Dataset": ["WANLI", "GPT3Mix"], "Domain": ["Text", "Text"]})
+            return pd.DataFrame(
+                {"Dataset": ["WANLI", "GPT3Mix"], "Domain": ["Text", "Text"]}
+            )
 
     rec = RecoveredDocument()
     dl._map_table(FakeTableItem(), rec, 0, (0, 0, 10, 10))
     t = rec.tables[0]
     assert t.header == ["Dataset", "Domain"]
-    assert len(t.rows) == 2                 # both logical rows preserved
-    assert t.rows[0] == ["WANLI", "Text"]   # row-1 cell mapping
+    assert len(t.rows) == 2  # both logical rows preserved
+    assert t.rows[0] == ["WANLI", "Text"]  # row-1 cell mapping
     assert t.rows[1] == ["GPT3Mix", "Text"]
     assert t.confidence == 1.0
 
@@ -200,16 +224,20 @@ def test_map_table_flags_collapsed_rows_without_fabrication(tmp_path):
         table = object()  # non-None so _map_table's guard passes (df path)
 
         def export_to_dataframe(self):
-            return pd.DataFrame({
-                "Dataset": ["WANLI GPT3Mix Unnatural Instructions AugGPT Code Alpaca"],
-                "Reference": ["[36] [58] [23] [9] [4]"],
-            })
+            return pd.DataFrame(
+                {
+                    "Dataset": [
+                        "WANLI GPT3Mix Unnatural Instructions AugGPT Code Alpaca"
+                    ],
+                    "Reference": ["[36] [58] [23] [9] [4]"],
+                }
+            )
 
     rec = RecoveredDocument()
     dl._map_table(FakeTableItem(), rec, 0, (0, 0, 10, 10))
     t = rec.tables[0]
-    assert t.confidence < 1.0                         # structure flagged uncertain
-    assert len(t.rows) == 1                           # nothing fabricated
+    assert t.confidence < 1.0  # structure flagged uncertain
+    assert len(t.rows) == 1  # nothing fabricated
     assert "WANLI" in t.rows[0][0] and "Code Alpaca" in t.rows[0][0]  # text preserved
 
 
@@ -220,12 +248,21 @@ def test_normalize_merges_marker_prefixed_continuation():
     from app.parser.loaders import docling_loader as dl
     from app.parser.parts import RecoveredTable
 
-    parent = RecoveredTable(page=7, header=["Approach / Study", "Key Idea"],
-                            rows=[["A", "B"]], source="docling")
-    frag = RecoveredTable(page=8,
-                          header=["Continuation of Table 3.Approach / Study",
-                                  "Continuation of Table 3.Key Idea"],
-                          rows=[["C", "D"], ["E", "F"]], source="docling")
+    parent = RecoveredTable(
+        page=7,
+        header=["Approach / Study", "Key Idea"],
+        rows=[["A", "B"]],
+        source="docling",
+    )
+    frag = RecoveredTable(
+        page=8,
+        header=[
+            "Continuation of Table 3.Approach / Study",
+            "Continuation of Table 3.Key Idea",
+        ],
+        rows=[["C", "D"], ["E", "F"]],
+        source="docling",
+    )
     out = dl.normalize_tables([parent, frag])
     assert len(out) == 1
     assert out[0].header == ["Approach / Study", "Key Idea"]
@@ -240,17 +277,29 @@ def test_normalize_merges_degenerate_marker_continuation_and_drops_markers():
     from app.parser.loaders import docling_loader as dl
     from app.parser.parts import RecoveredTable
 
-    parent = RecoveredTable(page=11, header=["Approach / System", "Code Task", "Key Idea"],
-                            rows=[["CodeRL [31]", "gen", "uses RL"]], source="docling")
-    frag = RecoveredTable(page=12, header=["Continuation of Table 4"] * 3,
-                          rows=[["Approach / System", "Code Task", "Key Idea"],  # repeated header
-                                ["WizardCoder [40]", "complex", "builds on"],
-                                ["End of Table", "End of Table", "End of Table"]], source="docling")
+    parent = RecoveredTable(
+        page=11,
+        header=["Approach / System", "Code Task", "Key Idea"],
+        rows=[["CodeRL [31]", "gen", "uses RL"]],
+        source="docling",
+    )
+    frag = RecoveredTable(
+        page=12,
+        header=["Continuation of Table 4"] * 3,
+        rows=[
+            ["Approach / System", "Code Task", "Key Idea"],  # repeated header
+            ["WizardCoder [40]", "complex", "builds on"],
+            ["End of Table", "End of Table", "End of Table"],
+        ],
+        source="docling",
+    )
     out = dl.normalize_tables([parent, frag])
     assert len(out) == 1
     assert out[0].header == ["Approach / System", "Code Task", "Key Idea"]
-    assert out[0].rows == [["CodeRL [31]", "gen", "uses RL"],
-                           ["WizardCoder [40]", "complex", "builds on"]]  # header-repeat + marker dropped
+    assert out[0].rows == [
+        ["CodeRL [31]", "gen", "uses RL"],
+        ["WizardCoder [40]", "complex", "builds on"],
+    ]  # header-repeat + marker dropped
 
 
 def test_normalize_does_not_merge_unrelated_tables():
@@ -259,7 +308,9 @@ def test_normalize_does_not_merge_unrelated_tables():
     from app.parser.parts import RecoveredTable
 
     a = RecoveredTable(page=3, header=["X", "Y"], rows=[["1", "2"]], source="docling")
-    b = RecoveredTable(page=3, header=["A", "B", "C"], rows=[["3", "4", "5"]], source="docling")
+    b = RecoveredTable(
+        page=3, header=["A", "B", "C"], rows=[["3", "4", "5"]], source="docling"
+    )
     c = RecoveredTable(page=6, header=["P", "Q"], rows=[["6", "7"]], source="docling")
     out = dl.normalize_tables([a, b, c])
     assert len(out) == 3
@@ -270,11 +321,21 @@ def test_normalize_chain_of_three_fragments():
     from app.parser.loaders import docling_loader as dl
     from app.parser.parts import RecoveredTable
 
-    f1 = RecoveredTable(page=5, header=["H1", "H2"], rows=[["a", "b"]], source="docling")
-    f2 = RecoveredTable(page=6, header=["Continuation of Table 9.H1", "Continuation of Table 9.H2"],
-                        rows=[["c", "d"]], source="docling")
-    f3 = RecoveredTable(page=7, header=["Continuation of Table 9.H1", "Continuation of Table 9.H2"],
-                        rows=[["e", "f"]], source="docling")
+    f1 = RecoveredTable(
+        page=5, header=["H1", "H2"], rows=[["a", "b"]], source="docling"
+    )
+    f2 = RecoveredTable(
+        page=6,
+        header=["Continuation of Table 9.H1", "Continuation of Table 9.H2"],
+        rows=[["c", "d"]],
+        source="docling",
+    )
+    f3 = RecoveredTable(
+        page=7,
+        header=["Continuation of Table 9.H1", "Continuation of Table 9.H2"],
+        rows=[["e", "f"]],
+        source="docling",
+    )
     out = dl.normalize_tables([f1, f2, f3])
     assert len(out) == 1
     assert out[0].rows == [["a", "b"], ["c", "d"], ["e", "f"]]
@@ -301,12 +362,16 @@ def test_evidence_reconstruct_recovers_collapsed_rows(tmp_path):
         page.insert_text((col1, y), b, fontsize=11)
     pdf_bytes = doc.tobytes()
 
-    t = RecoveredTable(page=1, header=["Col A", "Col B"],
-                       rows=[["one two three", "alpha beta gamma"]],  # collapsed body
-                       source="docling", confidence=0.3,
-                       column_starts=[72.0, 300.0])
+    t = RecoveredTable(
+        page=1,
+        header=["Col A", "Col B"],
+        rows=[["one two three", "alpha beta gamma"]],  # collapsed body
+        source="docling",
+        confidence=0.3,
+        column_starts=[72.0, 300.0],
+    )
     dl._evidence_reconstruct(pdf_bytes, t)
-    assert len(t.rows) == 3                       # header line dropped, 3 data rows
+    assert len(t.rows) == 3  # header line dropped, 3 data rows
     assert t.rows[0] == ["one", "alpha"]
     assert t.rows[2] == ["three", "gamma"]
     assert t.confidence == 0.9
@@ -329,10 +394,16 @@ def test_evidence_reconstruct_insufficient_evidence_keeps_collapsed():
     page.insert_text((72, 122), "solo", fontsize=11)
     pdf_bytes = doc.tobytes()
 
-    t = RecoveredTable(page=1, header=["H1", "H2"], rows=[["solo", ""]],
-                       source="docling", confidence=0.3, column_starts=[72.0, 300.0])
+    t = RecoveredTable(
+        page=1,
+        header=["H1", "H2"],
+        rows=[["solo", ""]],
+        source="docling",
+        confidence=0.3,
+        column_starts=[72.0, 300.0],
+    )
     dl._evidence_reconstruct(pdf_bytes, t)
-    assert t.rows == [["solo", ""]]               # unchanged
+    assert t.rows == [["solo", ""]]  # unchanged
     assert t.confidence == 0.3
 
 
@@ -367,15 +438,24 @@ def test_evidence_reconstruct_does_not_split_wrapped_single_row():
     page.insert_text((c2, 146), "thirteen fourteen fifteen sixteen", fontsize=8)
     pdf_bytes = doc.tobytes()
 
-    t = RecoveredTable(page=1, header=["Approach", "Task", "Idea"],
-                       rows=[["Alpha Beta Gamma", "Task A Task B more Task C",
-                              "one two three four five six seven eight nine ten "
-                              "eleven twelve thirteen fourteen fifteen sixteen"]],
-                       source="docling", confidence=0.3,
-                       column_starts=[float(c0), float(c1), float(c2)])
+    t = RecoveredTable(
+        page=1,
+        header=["Approach", "Task", "Idea"],
+        rows=[
+            [
+                "Alpha Beta Gamma",
+                "Task A Task B more Task C",
+                "one two three four five six seven eight nine ten "
+                "eleven twelve thirteen fourteen fifteen sixteen",
+            ]
+        ],
+        source="docling",
+        confidence=0.3,
+        column_starts=[float(c0), float(c1), float(c2)],
+    )
     dl._evidence_reconstruct(pdf_bytes, t)
-    assert len(t.rows) == 1               # not over-segmented into 3 rows
-    assert t.confidence == 0.3            # evidence did not establish >1 row
+    assert len(t.rows) == 1  # not over-segmented into 3 rows
+    assert t.confidence == 0.3  # evidence did not establish >1 row
     assert t.rows[0][0] == "Alpha Beta Gamma"  # text preserved intact
 
 
@@ -404,15 +484,26 @@ def test_evidence_reconstruct_folds_sibling_line_before_anchor():
     page.insert_text((c4, 133.0), "[40]", fontsize=9)
     pdf_bytes = doc.tobytes()
 
-    t = RecoveredTable(page=1, header=["Dataset", "Domain", "Type", "Metrics", "Ref"],
-                       rows=[["WANLI WizardCoder", "Text Code", "Natural Complex",
-                              "AccF1 PassK", "[36] [40]"]],
-                       source="docling", confidence=0.3,
-                       column_starts=[float(v) for v in (c0, c1, c2, c3, c4)])
+    t = RecoveredTable(
+        page=1,
+        header=["Dataset", "Domain", "Type", "Metrics", "Ref"],
+        rows=[
+            [
+                "WANLI WizardCoder",
+                "Text Code",
+                "Natural Complex",
+                "AccF1 PassK",
+                "[36] [40]",
+            ]
+        ],
+        source="docling",
+        confidence=0.3,
+        column_starts=[float(v) for v in (c0, c1, c2, c3, c4)],
+    )
     dl._evidence_reconstruct(pdf_bytes, t)
     assert len(t.rows) == 2
     row2 = t.rows[1]
-    assert row2[0] == "WizardCoder"       # first cell populated, not empty
+    assert row2[0] == "WizardCoder"  # first cell populated, not empty
     assert row2[1] == "Code"
     assert row2[4] == "[40]"
 
@@ -424,9 +515,12 @@ def test_normalize_strips_fused_trailing_marker():
     from app.parser.loaders import docling_loader as dl
     from app.parser.parts import RecoveredTable
 
-    t = RecoveredTable(page=1, header=["A", "B", "C"],
-                       rows=[["CoT [13]", "Task", "Improves model performance. End of Table"]],
-                       source="docling")
+    t = RecoveredTable(
+        page=1,
+        header=["A", "B", "C"],
+        rows=[["CoT [13]", "Task", "Improves model performance. End of Table"]],
+        source="docling",
+    )
     out = dl.normalize_tables([t])
     assert out[0].rows[-1][-1] == "Improves model performance"
 
@@ -436,16 +530,26 @@ def test_strip_trailing_marker_preserves_real_trailing_text():
     boundary is a marker. A genuine final sentence keeps its period and stays."""
     from app.parser.loaders import docling_loader as dl
 
-    assert dl._strip_trailing_marker_cell("X improves model performance. End of Table") == \
-        "X improves model performance"
+    assert (
+        dl._strip_trailing_marker_cell("X improves model performance. End of Table")
+        == "X improves model performance"
+    )
     # genuine trailing sentence ends with '.', so it is NOT stripped
-    assert dl._strip_trailing_marker_cell("Found strong gains. This is a real trailing sentence.") == \
-        "Found strong gains. This is a real trailing sentence."
+    assert (
+        dl._strip_trailing_marker_cell(
+            "Found strong gains. This is a real trailing sentence."
+        )
+        == "Found strong gains. This is a real trailing sentence."
+    )
     # no sentence boundary -> untouched
     assert dl._strip_trailing_marker_cell("Short cell value") == "Short cell value"
     # long fragment after the boundary is real text, not a marker
-    assert dl._strip_trailing_marker_cell("Result A. Something much longer than a marker here.") == \
-        "Result A. Something much longer than a marker here."
+    assert (
+        dl._strip_trailing_marker_cell(
+            "Result A. Something much longer than a marker here."
+        )
+        == "Result A. Something much longer than a marker here."
+    )
 
 
 def test_map_table_strips_full_width_title_row_into_caption():
@@ -468,15 +572,22 @@ def test_map_table_strips_full_width_title_row_into_caption():
         bbox = FakeBBox()
 
     class Cell:
-        def __init__(self, text, column_header=False, col_span=1, row_span=1, bbox=None):
+        def __init__(
+            self, text, column_header=False, col_span=1, row_span=1, bbox=None
+        ):
             self.text = text
             self.column_header = column_header
             self.col_span = col_span
             self.row_span = row_span
             self.bbox = bbox or FakeBBox()
 
-    title_row = [Cell("Adult Census Data (10K records)", column_header=True, col_span=2)]
-    header_row = [Cell("SD Metrics", column_header=True), Cell("Labels", column_header=True)]
+    title_row = [
+        Cell("Adult Census Data (10K records)", column_header=True, col_span=2)
+    ]
+    header_row = [
+        Cell("SD Metrics", column_header=True),
+        Cell("Labels", column_header=True),
+    ]
     body1 = [Cell("0.92"), Cell("0.87")]
     body2 = [Cell("0.88"), Cell("0.83")]
 
@@ -494,9 +605,9 @@ def test_map_table_strips_full_width_title_row_into_caption():
     rec = RecoveredDocument()
     dl._map_table(FakeTableItem(), rec)
     t = rec.tables[0]
-    assert t.caption == "Adult Census Data (10K records)"   # title -> caption
-    assert t.header == ["SD Metrics", "Labels"]             # clean header
-    assert t.rows == [["0.92", "0.87"], ["0.88", "0.83"]]   # body intact
+    assert t.caption == "Adult Census Data (10K records)"  # title -> caption
+    assert t.header == ["SD Metrics", "Labels"]  # clean header
+    assert t.rows == [["0.92", "0.87"], ["0.88", "0.83"]]  # body intact
     assert t.column_starts  # geometry from the real header row, not the title
 
 
@@ -526,9 +637,11 @@ def test_map_table_keeps_real_caption_over_title_row():
             self.bbox = FakeBBox()
 
     class FakeTable:
-        grid = [[Cell("Title Row", column_header=True, col_span=2)],
-                [Cell("H1", column_header=True), Cell("H2", column_header=True)],
-                [Cell("a"), Cell("b")]]
+        grid = [
+            [Cell("Title Row", column_header=True, col_span=2)],
+            [Cell("H1", column_header=True), Cell("H2", column_header=True)],
+            [Cell("a"), Cell("b")],
+        ]
 
     class FakeTableItem:
         label = FakeLabel()
@@ -590,7 +703,9 @@ def test_map_image_never_drops_and_extracts_ref_bytes():
     ref, none = rec.images
     assert ref.mime == "image/png" and ref.blob and ref.checksum
     assert ref.caption == "Figure 1: Pipeline architecture"
-    assert none.mime == "" and none.blob == b"" and none.checksum == ""  # preserved, not dropped
+    assert (
+        none.mime == "" and none.blob == b"" and none.checksum == ""
+    )  # preserved, not dropped
     assert none.caption == ""
 
 
@@ -639,8 +754,11 @@ def test_recover_formula_text_from_page_layer():
     pdf_bytes = doc.tobytes()
 
     rec = RecoveredDocument()
-    rec.blocks.append(RecoveredBlock(page=1, kind="formula", text="",
-                                     bbox=(72, 290, 400, 312), source="docling"))
+    rec.blocks.append(
+        RecoveredBlock(
+            page=1, kind="formula", text="", bbox=(72, 290, 400, 312), source="docling"
+        )
+    )
     dl._recover_formula_text(pdf_bytes, rec)
     assert "diff" in rec.blocks[0].text
     assert "df_synth.corr" in rec.blocks[0].text
@@ -673,6 +791,7 @@ def test_bbox_normalizes_bottomleft_to_topleft():
     # and a box near the BOTTOM (t=142, b=122) mirrors to y=700..720
     bl2 = Prov(BBox(50, 142, 120, 122, Origin()))
     assert dl._bbox(bl2, page_h=842.0) == (50.0, 700.0, 120.0, 720.0)
+
     # top-left origin (or absent origin) -> unchanged
     class NoOrigin:
         def __init__(self, l, t, r, b):
@@ -691,15 +810,17 @@ def test_fitz_metadata_maps_pdf_info_dict():
     from app.parser.loaders._pdfmeta import fitz_metadata
 
     doc = fitz.open()
-    doc.set_metadata({
-        "title": "A Clinical Study",
-        "author": "Dr. Ada",
-        "subject": "Retrospective",
-        "creator": "LaTeX",
-        "producer": "pdflatex",
-        "creationDate": "D:20230814153012",
-        "modDate": "D:20230814",
-    })
+    doc.set_metadata(
+        {
+            "title": "A Clinical Study",
+            "author": "Dr. Ada",
+            "subject": "Retrospective",
+            "creator": "LaTeX",
+            "producer": "pdflatex",
+            "creationDate": "D:20230814153012",
+            "modDate": "D:20230814",
+        }
+    )
     m = fitz_metadata(doc)
     assert m["title"] == "A Clinical Study"
     assert m["author"] == "Dr. Ada"
@@ -719,13 +840,19 @@ def test_native_pdf_loader_carries_metadata(tmp_path):
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     page.insert_text((72, 100), "Report body", fontsize=11)
-    doc.set_metadata({"title": "Native Meta Doc", "author": "Claude", "subject": "Test"})
+    doc.set_metadata(
+        {"title": "Native Meta Doc", "author": "Claude", "subject": "Test"}
+    )
     pdf_bytes = doc.tobytes()
 
     from app.parser.config import ParserConfig
 
     store = FilesystemStore(str(tmp_path / "store"))
-    ex = Extractor(ParserConfig(layout_backend="native"), store, events=EventPublisher(sink=lambda n, p: None))
+    ex = Extractor(
+        ParserConfig(layout_backend="native"),
+        store,
+        events=EventPublisher(sink=lambda n, p: None),
+    )
     out = ex.extract(pdf_bytes, "meta.pdf")
     assert out.ok
     assert out.document.metadata.title == "Native Meta Doc"

@@ -6,16 +6,16 @@ tagged with the document's route band. It writes the ledger (`plan.json`) and
 supports RESUME: pages already `OK` in the ledger AND present in the page store
 are excluded from `work_items` (idempotent — never reparse done pages).
 """
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING
 
 from .config import ParserConfig
-from .loaders import docling_loader
 from .engines.base import PageWorkItem
-from .page_result import PageStatus
-from .source import SourceManifest, _IMAGE_SLUGS
+from .loaders import docling_loader
+from .source import _IMAGE_SLUGS, SourceManifest
 from .storage_pages import Ledger, PageStore
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ class ExecutionPlan:
     source_hash: str
     sha: str
     route: str
-    decision: "RoutingDecision | None"
+    decision: RoutingDecision | None
     detected_type: str
     mime: str
     declared_extension: str
@@ -40,14 +40,21 @@ class ExecutionPlan:
     config_snapshot: dict
     work_items: list[PageWorkItem] = field(default_factory=list)
 
-    def to_ledger(self, prior_pages: dict | None = None, prior_assembly: dict | None = None) -> dict:
+    def to_ledger(
+        self, prior_pages: dict | None = None, prior_assembly: dict | None = None
+    ) -> dict:
         pages = {}
         for p in self.expected_page_set:
             if prior_pages and str(p) in prior_pages:
                 pages[str(p)] = prior_pages[str(p)]
             else:
-                pages[str(p)] = {"status": "pending", "checksum": "", "engine": None,
-                                 "attempts": 0, "errors": []}
+                pages[str(p)] = {
+                    "status": "pending",
+                    "checksum": "",
+                    "engine": None,
+                    "attempts": 0,
+                    "errors": [],
+                }
         return {
             "doc_id": self.doc_id,
             "source_hash": self.source_hash,
@@ -57,7 +64,8 @@ class ExecutionPlan:
             "created_at": "",
             "config_snapshot": self.config_snapshot,
             "pages": pages,
-            "assembly": prior_assembly or {"status": "pending", "assembled_page_set": [], "report": None},
+            "assembly": prior_assembly
+            or {"status": "pending", "assembled_page_set": [], "report": None},
         }
 
     def to_dict(self) -> dict:
@@ -69,8 +77,13 @@ class Planner:
         self.page_store = page_store
         self.ledger = ledger
 
-    def _band(self, manifest: SourceManifest, route: str | None,
-              decision: "RoutingDecision | None", config: ParserConfig) -> str:
+    def _band(
+        self,
+        manifest: SourceManifest,
+        route: str | None,
+        decision: RoutingDecision | None,
+        config: ParserConfig,
+    ) -> str:
         # Band resolution: explicit layout_backend or route overrides;
         # a present decision carries its own route (native/enrichment/docling); else auto.
         if config.layout_backend == "docling" and manifest.slug == "pdf":
@@ -88,11 +101,17 @@ class Planner:
             band = "enrichment" if config.ocr_enabled else "native"
         return band
 
-    def _page_band(self, manifest: SourceManifest, base_band: str,
-                   decision: "RoutingDecision | None", config: ParserConfig,
-                   page_idx: int, table_pages: set[int] | None = None,
-                   ocr_pages: set[int] | None = None,
-                   simple_table_pages: set[int] | None = None) -> str:
+    def _page_band(
+        self,
+        manifest: SourceManifest,
+        base_band: str,
+        decision: RoutingDecision | None,
+        config: ParserConfig,
+        page_idx: int,
+        table_pages: set[int] | None = None,
+        ocr_pages: set[int] | None = None,
+        simple_table_pages: set[int] | None = None,
+    ) -> str:
         """Determines the per-page execution band.
 
         Two-Tier Table Routing (P2):
@@ -106,7 +125,11 @@ class Planner:
 
         # If user explicitly configured layout_backend="docling", execute docling
         if config.layout_backend == "docling":
-            return "docling" if docling_loader.engine_available() else ("enrichment" if config.ocr_enabled else "native")
+            return (
+                "docling"
+                if docling_loader.engine_available()
+                else ("enrichment" if config.ocr_enabled else "native")
+            )
 
         # If route was explicitly forced (no routing decision), respect base_band
         if decision is None:
@@ -131,9 +154,14 @@ class Planner:
         # Priority 3: Clean non-table digital pages stay on native fast path
         return "native"
 
-    def plan(self, manifest: SourceManifest, route: str | None,
-             decision: "RoutingDecision | None", config: ParserConfig,
-             resume: bool = False) -> ExecutionPlan:
+    def plan(
+        self,
+        manifest: SourceManifest,
+        route: str | None,
+        decision: RoutingDecision | None,
+        config: ParserConfig,
+        resume: bool = False,
+    ) -> ExecutionPlan:
         band = self._band(manifest, route, decision, config)
 
         table_pages = None
@@ -142,6 +170,7 @@ class Planner:
         if manifest.slug == "pdf" and manifest.src_path:
             try:
                 import pdf_inspector
+
                 res = pdf_inspector.process_pdf(manifest.src_path)
                 p_tables = getattr(res, "pages_with_tables", None)
                 if p_tables:
@@ -161,6 +190,7 @@ class Planner:
             if table_pages:
                 try:
                     import fitz
+
                     with fitz.open(manifest.src_path) as doc:
                         for p_num in table_pages:
                             p_idx = p_num - 1
@@ -172,7 +202,11 @@ class Planner:
                                     for t in finder.tables:
                                         try:
                                             rows = t.extract()
-                                            if not rows or len(rows) < 2 or len(rows[0]) < 2:
+                                            if (
+                                                not rows
+                                                or len(rows) < 2
+                                                or len(rows[0]) < 2
+                                            ):
                                                 all_simple = False
                                                 break
                                             ncols = len(rows[0])
@@ -239,23 +273,44 @@ class Planner:
         for p in manifest.expected_page_set:
             if p in done:
                 continue
-            p_band = self._page_band(manifest, band, decision, config, p, table_pages, ocr_pages, simple_table_pages=simple_table_pages)
-            base.work_items.append(PageWorkItem(
-                doc_id=manifest.doc_id,
-                source_hash=manifest.source_hash,
-                src_path=manifest.src_path,
-                page_index=p,
-                route=p_band,
-                decision=decision,
-                models_dir=config.docling_models_dir,
-                ocr_enabled=config.ocr_enabled,
-                attempt=(prior_attempt.get(p, 0) + (1 if resume and p in prior_attempt else 0)),
-                docling_table_mode=config.docling_table_mode,
-                docling_ocr=config.docling_ocr,
-            ))
+            p_band = self._page_band(
+                manifest,
+                band,
+                decision,
+                config,
+                p,
+                table_pages,
+                ocr_pages,
+                simple_table_pages=simple_table_pages,
+            )
+            base.work_items.append(
+                PageWorkItem(
+                    doc_id=manifest.doc_id,
+                    source_hash=manifest.source_hash,
+                    src_path=manifest.src_path,
+                    page_index=p,
+                    route=p_band,
+                    decision=decision,
+                    models_dir=config.docling_models_dir,
+                    ocr_enabled=config.ocr_enabled,
+                    attempt=(
+                        prior_attempt.get(p, 0)
+                        + (1 if resume and p in prior_attempt else 0)
+                    ),
+                    docling_table_mode=config.docling_table_mode,
+                    docling_ocr=config.docling_ocr,
+                )
+            )
 
-        self.ledger.write_plan(manifest.doc_id, base.to_ledger(
-            prior_pages=ledger_plan.get("pages") if resume and ledger_plan else None,
-            prior_assembly=ledger_plan.get("assembly") if resume and ledger_plan else None,
-        ))
+        self.ledger.write_plan(
+            manifest.doc_id,
+            base.to_ledger(
+                prior_pages=ledger_plan.get("pages")
+                if resume and ledger_plan
+                else None,
+                prior_assembly=ledger_plan.get("assembly")
+                if resume and ledger_plan
+                else None,
+            ),
+        )
         return base

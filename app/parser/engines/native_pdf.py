@@ -6,6 +6,7 @@ from the former `Loaders._pdf` and reduced to a single page via
 `_native_page_from_doc` (the reusable core). The legacy `Loaders._pdf` now calls
 that same core so there is no behaviour regression and no duplicated logic.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -17,14 +18,14 @@ import unicodedata
 from ..config import ParserConfig
 from ..mime import MIME as _MIME
 from ..page_result import PageResult, PageStatus
-from ..parts import RecoveredBlock, RecoveredTable, RecoveredImage
+from ..parts import RecoveredBlock, RecoveredImage, RecoveredTable
 from .base import NATIVE, PageWorkItem
 
 _TABLE_CAPTION_RE = re.compile(r"\b(table|tab\.)\s+[0-9a-zivx]+", re.IGNORECASE)
 _REPEATING_GLYPH_RE = re.compile(
-    r"^(.)\1{3,}$|"                     # any single repeating char 4+ times (aaaa, 1111)
-    r"^[a-z]?1{4,}[a-z]?$|"            # a1111111111, 111111111a, a1111
-    r"^(a1|1a|01|10){3,}$",            # alternating vector patterns
+    r"^(.)\1{3,}$|"  # any single repeating char 4+ times (aaaa, 1111)
+    r"^[a-z]?1{4,}[a-z]?$|"  # a1111111111, 111111111a, a1111
+    r"^(a1|1a|01|10){3,}$",  # alternating vector patterns
     re.IGNORECASE,
 )
 _JOURNAL_MARGIN_BOILERPLATE_RE = re.compile(
@@ -35,7 +36,9 @@ _JOURNAL_MARGIN_BOILERPLATE_RE = re.compile(
 )
 
 
-def _is_probable_heading(b: RecoveredBlock, body_med: float, threshold_ratio: float) -> bool:
+def _is_probable_heading(
+    b: RecoveredBlock, body_med: float, threshold_ratio: float
+) -> bool:
     """Classify if a block is genuinely a section heading or body paragraph (P1)."""
     if not b.font_size or b.font_size <= body_med * threshold_ratio:
         return False
@@ -62,7 +65,7 @@ def _is_probable_heading(b: RecoveredBlock, body_med: float, threshold_ratio: fl
 
     # Filter 4: Sentence termination check
     last_char = raw[-1]
-    if last_char in ('.', '?', '!'):
+    if last_char in (".", "?", "!"):
         # Headings rarely end in full sentence terminators unless short section number
         if word_count > 6:
             return False
@@ -78,8 +81,10 @@ def _is_probable_heading(b: RecoveredBlock, body_med: float, threshold_ratio: fl
     return True
 
 
-def _bbox_overlap_ratio(b_bbox: tuple[float, float, float, float] | None,
-                        t_bbox: tuple[float, float, float, float] | None) -> float:
+def _bbox_overlap_ratio(
+    b_bbox: tuple[float, float, float, float] | None,
+    t_bbox: tuple[float, float, float, float] | None,
+) -> float:
     """Fraction of b_bbox area that falls inside t_bbox."""
     if not b_bbox or not t_bbox:
         return 0.0
@@ -120,8 +125,9 @@ def _image_mime(ext: str) -> str:
     }.get(ext, "image/" + ext)
 
 
-def _native_page_from_doc(page, page_index: int, config: ParserConfig,
-                          body_med: float | None = None) -> PageResult:
+def _native_page_from_doc(
+    page, page_index: int, config: ParserConfig, body_med: float | None = None
+) -> PageResult:
     """Extract ONE already-open fitz `page` into a `PageResult`.
 
     Pure per-page extraction. A genuinely blank page still returns `OK` with
@@ -160,8 +166,14 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
             continue
         all_blocks.append(
             RecoveredBlock(
-                page=page_index, kind="paragraph", text=text, bbox=tuple(bbox),
-                seq=len(all_blocks), font_size=size, bold=bold, source="text",
+                page=page_index,
+                kind="paragraph",
+                text=text,
+                bbox=tuple(bbox),
+                seq=len(all_blocks),
+                font_size=size,
+                bold=bold,
+                source="text",
             )
         )
 
@@ -176,14 +188,23 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
             # page carries table markers (e.g. "Table 1") and extract with horizontal
             # lines + whitespace columns.
             if not found_tables:
-                page_text = "\n".join(b.text for b in all_blocks if isinstance(b, RecoveredBlock))
+                page_text = "\n".join(
+                    b.text for b in all_blocks if isinstance(b, RecoveredBlock)
+                )
                 if _TABLE_CAPTION_RE.search(page_text):
-                    finder2 = page.find_tables(horizontal_strategy="lines", vertical_strategy="text")
+                    finder2 = page.find_tables(
+                        horizontal_strategy="lines", vertical_strategy="text"
+                    )
                     if finder2 is not None and finder2.tables:
                         for t in finder2.tables:
                             try:
                                 rows = t.extract()
-                                if rows and len(rows) >= 2 and len(rows[0]) >= 2 and not _is_oversplit_table(rows):
+                                if (
+                                    rows
+                                    and len(rows) >= 2
+                                    and len(rows[0]) >= 2
+                                    and not _is_oversplit_table(rows)
+                                ):
                                     found_tables.append(t)
                             except Exception:
                                 pass
@@ -210,8 +231,13 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
                 continue
             bbox = getattr(t, "bbox", None)
             valid_tables.append(
-                RecoveredTable(page=page_index, bbox=tuple(bbox) if bbox else None,
-                               header=header, rows=data, source="native")
+                RecoveredTable(
+                    page=page_index,
+                    bbox=tuple(bbox) if bbox else None,
+                    header=header,
+                    rows=data,
+                    source="native",
+                )
             )
 
     # Filter out paragraph blocks whose bounding box overlaps significantly (>60%)
@@ -235,8 +261,13 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
             mime = _image_mime(ext)
             blob = einfo["image"]
             images.append(
-                RecoveredImage(page=page_index, bbox=bbox, mime=mime,
-                               checksum=hashlib.sha256(blob).hexdigest(), blob=blob)
+                RecoveredImage(
+                    page=page_index,
+                    bbox=bbox,
+                    mime=mime,
+                    checksum=hashlib.sha256(blob).hexdigest(),
+                    blob=blob,
+                )
             )
     except Exception:
         pass
@@ -261,14 +292,18 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
             elif y_mid > page_h * 0.94:
                 b.kind = "footer"
                 continue
-            elif (y_mid < page_h * 0.10 or y_mid > page_h * 0.90) and _JOURNAL_MARGIN_BOILERPLATE_RE.search(b.text.strip()):
+            elif (
+                y_mid < page_h * 0.10 or y_mid > page_h * 0.90
+            ) and _JOURNAL_MARGIN_BOILERPLATE_RE.search(b.text.strip()):
                 b.kind = "header" if y_mid < page_h * 0.10 else "footer"
                 continue
 
         if _is_probable_heading(b, body_med, config.pdf_heading_threshold_ratio):
             # Hierarchy smoothing: if previous block was already heading with >= size,
             # and current block is long or ends in period, demote current to paragraph
-            if last_was_heading and (b.text.strip().endswith('.') or len(b.text.split()) > 8):
+            if last_was_heading and (
+                b.text.strip().endswith(".") or len(b.text.split()) > 8
+            ):
                 b.kind = "paragraph"
                 last_was_heading = False
             else:
@@ -289,7 +324,10 @@ def _native_page_from_doc(page, page_index: int, config: ParserConfig,
     page_sizes = {page_index: (pw, ph)} if pw is not None else {}
 
     return PageResult(
-        doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.OK,
+        doc_id="",
+        page_index=page_index,
+        route=NATIVE,
+        status=PageStatus.OK,
         blocks=extracted_blocks,
         tables=valid_tables,
         images=images,
@@ -313,6 +351,7 @@ class NativePdfEngine:
     native band, including every document's O(N)-page median scan, which froze
     all other documents whenever any document opened.)
     """
+
     route_band = NATIVE
 
     # I-01: cap on simultaneously cached document handles (FD/memory bound).
@@ -327,7 +366,9 @@ class NativePdfEngine:
         self._locks_guard = threading.Lock()
         self._doc_locks: dict[str, threading.RLock] = {}  # src_path -> lock
         # F-05/F-06 fix: cache document handle + median per source path
-        self._doc_cache: dict[str, tuple[object, float]] = {}  # path -> (fitz.Document, median)
+        self._doc_cache: dict[
+            str, tuple[object, float]
+        ] = {}  # path -> (fitz.Document, median)
 
     def _lock_for(self, src_path: str) -> threading.RLock:
         """Get-or-create the per-document lock (I-01)."""
@@ -417,32 +458,79 @@ class NativePdfEngine:
                     doc, body_med = self._open_and_compute_median(src_path)
                 except Exception as e:
                     return PageResult(
-                        doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                        errors=[{"page_no": page_index + 1, "category": "native_open", "message": str(e)}],
+                        doc_id="",
+                        page_index=page_index,
+                        route=NATIVE,
+                        status=PageStatus.FAILED,
+                        errors=[
+                            {
+                                "page_no": page_index + 1,
+                                "category": "native_open",
+                                "message": str(e),
+                            }
+                        ],
                     )
                 if doc is None:
                     return PageResult(
-                        doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                        errors=[{"page_no": page_index + 1, "category": "native_open",
-                                 "message": "failed to open document"}],
+                        doc_id="",
+                        page_index=page_index,
+                        route=NATIVE,
+                        status=PageStatus.FAILED,
+                        errors=[
+                            {
+                                "page_no": page_index + 1,
+                                "category": "native_open",
+                                "message": "failed to open document",
+                            }
+                        ],
                     )
                 try:
                     if page_index < 0 or page_index >= doc.page_count:
                         return PageResult(
-                            doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                            errors=[{"page_no": page_index + 1, "category": "native_range",
-                                     "message": f"page {page_index} out of range (doc has {doc.page_count})"}],
+                            doc_id="",
+                            page_index=page_index,
+                            route=NATIVE,
+                            status=PageStatus.FAILED,
+                            errors=[
+                                {
+                                    "page_no": page_index + 1,
+                                    "category": "native_range",
+                                    "message": f"page {page_index} out of range (doc has {doc.page_count})",
+                                }
+                            ],
                         )
-                    return _native_page_from_doc(doc[page_index], page_index, self.config, body_med=body_med)
+                    return _native_page_from_doc(
+                        doc[page_index], page_index, self.config, body_med=body_med
+                    )
                 except Exception as e:
                     return PageResult(
-                        doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                        errors=[{"page_no": page_index + 1, "category": "native_extract", "message": str(e)}],
+                        doc_id="",
+                        page_index=page_index,
+                        route=NATIVE,
+                        status=PageStatus.FAILED,
+                        errors=[
+                            {
+                                "page_no": page_index + 1,
+                                "category": "native_extract",
+                                "message": str(e),
+                            }
+                        ],
                     )
-        except Exception as e:  # defensive: lock/meta-lock failures never crash the pool
+        except (
+            Exception
+        ) as e:  # defensive: lock/meta-lock failures never crash the pool
             return PageResult(
-                doc_id="", page_index=page_index, route=NATIVE, status=PageStatus.FAILED,
-                errors=[{"page_no": page_index + 1, "category": "native_extract", "message": str(e)}],
+                doc_id="",
+                page_index=page_index,
+                route=NATIVE,
+                status=PageStatus.FAILED,
+                errors=[
+                    {
+                        "page_no": page_index + 1,
+                        "category": "native_extract",
+                        "message": str(e),
+                    }
+                ],
             )
 
     def process(self, item: PageWorkItem) -> PageResult:

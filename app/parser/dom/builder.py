@@ -12,13 +12,14 @@ Stage boundary (§1.3 fix #1):
   Stage 2 (logical/semantic): references, reading_order_full, entities, footnotes.
   Orchestrated via SemanticContext — no implicit global state.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..parts import RecoveredDocument
-from ..config import ParserConfig
 from .._pdfmeta import clean_meta_string
+from ..config import ParserConfig
+from ..parts import RecoveredDocument
 from . import reading_order
 from .models import (
     Annotation,
@@ -44,6 +45,7 @@ class SemanticContext:
     Immutable after construction — Stage 2 methods mutate this in place
     (populate Document fields) so the builder retains full control.
     """
+
     document_id: str = ""
     pages: dict[int, Page] = field(default_factory=dict)
     reading_order: list[str] = field(default_factory=list)
@@ -63,7 +65,9 @@ class DocumentBuilder:
     def __init__(self, config: ParserConfig) -> None:
         self.config = config
 
-    def build(self, recovered: RecoveredDocument, document_id: str, sha256: str) -> Document:
+    def build(
+        self, recovered: RecoveredDocument, document_id: str, sha256: str
+    ) -> Document:
         """Stage 1 + Stage 2 assembly.
 
         Stage 1 (physical/layout): objects, bboxes, reading order, cells, images.
@@ -102,8 +106,10 @@ class DocumentBuilder:
             p = pages.setdefault(t.page, Page(index=t.page, blocks=[]))
             _rows = [
                 Row(
-                    cells=[Cell(text=c) for c in (r.cells if hasattr(r, 'cells') else r)],
-                    bbox=_bbox(r.bbox) if hasattr(r, 'bbox') and r.bbox else None,
+                    cells=[
+                        Cell(text=c) for c in (r.cells if hasattr(r, "cells") else r)
+                    ],
+                    bbox=_bbox(r.bbox) if hasattr(r, "bbox") and r.bbox else None,
                 )
                 for r in t.rows
             ]
@@ -134,7 +140,9 @@ class DocumentBuilder:
             )
         for ann in recovered.annotations:
             p = pages.setdefault(ann.page, Page(index=ann.page, blocks=[]))
-            p.annotations.append(Annotation(kind=ann.kind, text=ann.text, page=ann.page))
+            p.annotations.append(
+                Annotation(kind=ann.kind, text=ann.text, page=ann.page)
+            )
 
         # D9: guarantee a Page object for EVERY page in the expected set, even
         # when the page carries no content in the folded RecoveredDocument. A
@@ -226,7 +234,9 @@ class DocumentBuilder:
             citation_index=semantic_ctx.citation_index,
         )
 
-    def _extract_references(self, ctx: SemanticContext, recovered: RecoveredDocument) -> None:
+    def _extract_references(
+        self, ctx: SemanticContext, recovered: RecoveredDocument
+    ) -> None:
         """Stage 2: D3 — extract references/bibliography from source.
 
         Delegates to the reference_extractor; results are stored on

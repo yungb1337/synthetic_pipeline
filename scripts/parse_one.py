@@ -14,6 +14,7 @@ Exit code is 0 on success (DOM written), 2 if the path is missing, and the
 parser's own status is reported on stdout. A "failed"/dead doc emits no DOM
 (page-centric zero-silent-loss).
 """
+
 from __future__ import annotations
 
 import os
@@ -36,16 +37,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.parser.config import default_config
-from app.parser.storage import FilesystemStore
 from app.parser.extraction import Extractor
+from app.parser.storage import FilesystemStore
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", dest="path", required=True, help="path to a single PDF")
-    ap.add_argument("--out", dest="outdir", required=True, help="output root (FilesystemStore)")
-    ap.add_argument("--cpu", action="store_true",
-                    help="force CPU (hide CUDA) — use when the GPU OOMs during Docling layout")
+    ap.add_argument(
+        "--out", dest="outdir", required=True, help="output root (FilesystemStore)"
+    )
+    ap.add_argument(
+        "--cpu",
+        action="store_true",
+        help="force CPU (hide CUDA) — use when the GPU OOMs during Docling layout",
+    )
     args = ap.parse_args()
 
     src = Path(args.path)
@@ -75,16 +81,22 @@ def main() -> int:
     images = doc.num_images() if doc else 0
     refs = len(doc.references) if doc and hasattr(doc, "references") else 0
     expect = out.report.get("expected_pages", 0) if out.report else 0
-    actual = out.report.get("pages", out.report.get("actual_pages", 0)) if out.report else 0
+    actual = (
+        out.report.get("pages", out.report.get("actual_pages", 0)) if out.report else 0
+    )
 
     if out.ok:
         dom_key = f"dom/{out.document_id}/dom-v0.1.0.docJSON"
-        print(f"OK   {src.name}: doc_id={out.document_id} pages={actual}/{expect} "
-              f"blocks={blocks} tables={tables} images={images} refs={refs} "
-              f"({elapsed}ms) -> {dom_key}")
+        print(
+            f"OK   {src.name}: doc_id={out.document_id} pages={actual}/{expect} "
+            f"blocks={blocks} tables={tables} images={images} refs={refs} "
+            f"({elapsed}ms) -> {dom_key}"
+        )
         return 0
-    print(f"FAIL {src.name}: status={out.status} pages={actual}/{expect} "
-          f"({elapsed}ms) {out.report.get('error','') if out.report else ''}")
+    print(
+        f"FAIL {src.name}: status={out.status} pages={actual}/{expect} "
+        f"({elapsed}ms) {out.report.get('error', '') if out.report else ''}"
+    )
     return 1
 
 

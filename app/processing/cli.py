@@ -8,6 +8,7 @@ The manifest makes each run idempotent/incremental: files whose sha256 is
 already in the manifest are skipped, so a 1M-document corpus resumes cheaply
 and re-runs pick up only new/changed files.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,19 +23,40 @@ from .executor import BatchWorker, ParseNormalizePipeline
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Synthetic Data Factory — batch processing (Parse+Normalize)")
+    ap = argparse.ArgumentParser(
+        description="Synthetic Data Factory — batch processing (Parse+Normalize)"
+    )
     ap.add_argument("--in", dest="input", required=True, help="corpus directory")
     ap.add_argument("--out", dest="out", default="parser_out", help="store root")
     ap.add_argument("--concurrency", type=int, default=None)
-    ap.add_argument("--native-concurrency", type=int, default=None,
-                    help="override native (ThreadPool) pool size")
-    ap.add_argument("--heavy-concurrency", type=int, default=None,
-                    help="override Docling (ProcessPool) pool size (auto by default)")
+    ap.add_argument(
+        "--native-concurrency",
+        type=int,
+        default=None,
+        help="override native (ThreadPool) pool size",
+    )
+    ap.add_argument(
+        "--heavy-concurrency",
+        type=int,
+        default=None,
+        help="override Docling (ProcessPool) pool size (auto by default)",
+    )
     ap.add_argument("--manifest", default="work/manifest.json")
-    ap.add_argument("--shard-index", type=int, default=0, help="B3: cluster worker shard index (0 <= index < total)")
-    ap.add_argument("--shard-total", type=int, default=1, help="B3: total cluster worker shards")
+    ap.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="B3: cluster worker shard index (0 <= index < total)",
+    )
+    ap.add_argument(
+        "--shard-total", type=int, default=1, help="B3: total cluster worker shards"
+    )
     ap.add_argument("--no-ocr", action="store_true")
-    ap.add_argument("--embed", action="store_true", help="also run batched (dummy) embeddings over normalized blocks")
+    ap.add_argument(
+        "--embed",
+        action="store_true",
+        help="also run batched (dummy) embeddings over normalized blocks",
+    )
     args = ap.parse_args(argv)
 
     cfg = ProcessingConfig()
@@ -46,8 +68,12 @@ def main(argv: list[str] | None = None) -> int:
         cfg = replace(cfg, heavy_concurrency=args.heavy_concurrency)
     if args.no_ocr:
         cfg = replace(cfg, ocr_warm=False)
-    cfg = replace(cfg, manifest_path=args.manifest,
-                  shard_index=args.shard_index, shard_total=args.shard_total)
+    cfg = replace(
+        cfg,
+        manifest_path=args.manifest,
+        shard_index=args.shard_index,
+        shard_total=args.shard_total,
+    )
 
     store = FilesystemStore(args.out)
     pipeline = ParseNormalizePipeline(store, config=cfg)
@@ -101,21 +127,33 @@ def _embed_pass(report, store, cfg) -> None:
         doc = Document.model_validate_json(blob.decode("utf-8"))
         blocks = [b for p in doc.pages for b in p.blocks]
         total_texts += len(blocks)
-        total_vecs += len(batch_embed(embed.embed, [b.text for b in blocks], cfg.embed_batch_size))
+        total_vecs += len(
+            batch_embed(embed.embed, [b.text for b in blocks], cfg.embed_batch_size)
+        )
     device = getattr(embed, "device", "n/a")
-    print(f"\n  batch-embedded: docs={len(report.ids)} blocks={total_texts} vecs={total_vecs} "
-          f"(embedder={embed.name} device={device} dim={getattr(embed, 'dim', 'n/a')})")
+    print(
+        f"\n  batch-embedded: docs={len(report.ids)} blocks={total_texts} vecs={total_vecs} "
+        f"(embedder={embed.name} device={device} dim={getattr(embed, 'dim', 'n/a')})"
+    )
 
 
 def _write_report(out: str, report) -> None:
     import os
+
     p = os.path.join(out, "batch_report.json")
     with open(p, "w", encoding="utf-8") as fh:
-        json.dump({
-            "total": report.total, "ok": report.ok, "skipped": report.skipped,
-            "failed": report.failed, "elapsed_ms": report.elapsed_ms,
-            "per_format": report.per_format,
-        }, fh, indent=2)
+        json.dump(
+            {
+                "total": report.total,
+                "ok": report.ok,
+                "skipped": report.skipped,
+                "failed": report.failed,
+                "elapsed_ms": report.elapsed_ms,
+                "per_format": report.per_format,
+            },
+            fh,
+            indent=2,
+        )
 
 
 if __name__ == "__main__":

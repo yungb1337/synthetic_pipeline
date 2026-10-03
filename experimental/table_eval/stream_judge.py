@@ -1,11 +1,11 @@
 """Concurrent stream judge for Corpus B evaluation.
 Runs LLM Judge concurrently on newly generated canonical DOMs.
 """
+
 from __future__ import annotations
 
 import concurrent.futures
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -17,11 +17,29 @@ if str(WORKSPACE_ROOT) not in sys.path:
 
 from experimental.table_eval.judge_evaluator import TableBenchmarkJudgeEvaluator
 
-DOM_DIR = WORKSPACE_ROOT / "artifacts" / "table_eval" / "corpus_b_p003" / "normalized_output"
+DOM_DIR = (
+    WORKSPACE_ROOT / "artifacts" / "table_eval" / "corpus_b_p003" / "normalized_output"
+)
 LOGS_DIR = WORKSPACE_ROOT / "artifacts" / "table_eval" / "corpus_b_p003" / "logs"
-SOURCES_DIR = WORKSPACE_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf"
-MANIFEST_PATH = WORKSPACE_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "manifest.json"
-JUDGMENTS_DIR = WORKSPACE_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "judgment"
+SOURCES_DIR = (
+    WORKSPACE_ROOT
+    / "checkpoints"
+    / "run"
+    / "run-2026-09-14-eval-1000"
+    / "sources"
+    / "pdf"
+)
+MANIFEST_PATH = (
+    WORKSPACE_ROOT
+    / "checkpoints"
+    / "run"
+    / "run-2026-09-14-eval-1000"
+    / "sources"
+    / "manifest.json"
+)
+JUDGMENTS_DIR = (
+    WORKSPACE_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "judgment"
+)
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -48,6 +66,7 @@ def load_doc_mapping() -> dict[str, Path]:
     if MANIFEST_PATH.exists():
         try:
             import hashlib
+
             manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
             for item in manifest:
                 item_id = item.get("id", "")
@@ -55,7 +74,9 @@ def load_doc_mapping() -> dict[str, Path]:
                 if not p.exists():
                     p = SOURCES_DIR / f"{item_id}.pdf"
                 if p.exists():
-                    doc_id_hash = f"d-{hashlib.sha256(item_id.encode()).hexdigest()[:16]}"
+                    doc_id_hash = (
+                        f"d-{hashlib.sha256(item_id.encode()).hexdigest()[:16]}"
+                    )
                     if doc_id_hash not in doc_map:
                         doc_map[doc_id_hash] = p
                     doc_map[item_id] = p
@@ -86,10 +107,14 @@ def _judge_task(task: dict[str, Any]) -> dict[str, Any]:
     return {"doc_id": doc_id, "data": res, "cached": False}
 
 
-def run_stream_judge(max_workers: int = 4, pacing: float = 1.0, model: str = "gemini-3.5-flash-lite"):
+def run_stream_judge(
+    max_workers: int = 4, pacing: float = 1.0, model: str = "gemini-3.5-flash-lite"
+):
     doc_map = load_doc_mapping()
     print(f"[STREAM JUDGE] Loaded {len(doc_map)} document mappings.")
-    print(f"[STREAM JUDGE] Concurrency: {max_workers} workers | Model: {model} | Pacing: {pacing}s")
+    print(
+        f"[STREAM JUDGE] Concurrency: {max_workers} workers | Model: {model} | Pacing: {pacing}s"
+    )
 
     total_judged = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -104,18 +129,24 @@ def run_stream_judge(max_workers: int = 4, pacing: float = 1.0, model: str = "ge
                 if not out_v.exists():
                     pdf_p = doc_map.get(doc_id)
                     if pdf_p and pdf_p.exists():
-                        pending_tasks.append({
-                            "doc_id": doc_id,
-                            "pdf_path": pdf_p,
-                            "dom_path": df,
-                            "out_verdict_path": out_v,
-                            "pacing": pacing,
-                            "model": model,
-                        })
+                        pending_tasks.append(
+                            {
+                                "doc_id": doc_id,
+                                "pdf_path": pdf_p,
+                                "dom_path": df,
+                                "out_verdict_path": out_v,
+                                "pacing": pacing,
+                                "model": model,
+                            }
+                        )
 
             if pending_tasks:
-                print(f"\n[STREAM JUDGE] Found {len(pending_tasks)} pending DOMs ready for judging...")
-                future_to_doc = {executor.submit(_judge_task, task): task for task in pending_tasks}
+                print(
+                    f"\n[STREAM JUDGE] Found {len(pending_tasks)} pending DOMs ready for judging..."
+                )
+                future_to_doc = {
+                    executor.submit(_judge_task, task): task for task in pending_tasks
+                }
                 for future in concurrent.futures.as_completed(future_to_doc):
                     task = future_to_doc[future]
                     total_judged += 1
@@ -123,20 +154,30 @@ def run_stream_judge(max_workers: int = 4, pacing: float = 1.0, model: str = "ge
                         res = future.result()
                         j_data = res.get("data", {})
                         v_status = j_data.get("verdict_status") or (
-                            j_data.get("verdict") if isinstance(j_data.get("verdict"), str) else "PASS"
+                            j_data.get("verdict")
+                            if isinstance(j_data.get("verdict"), str)
+                            else "PASS"
                         )
                         metrics = j_data.get("metrics", {})
                         t_score = metrics.get("tables", 0.0)
                         f_score = metrics.get("fidelity", 0.0)
                         cached = " (cached)" if res.get("cached") else ""
-                        print(f"[{total_judged:3d}] {task['doc_id']}{cached} -> {v_status} (Tables: {t_score:.2f}, Fidelity: {f_score:.2f})", flush=True)
+                        print(
+                            f"[{total_judged:3d}] {task['doc_id']}{cached} -> {v_status} (Tables: {t_score:.2f}, Fidelity: {f_score:.2f})",
+                            flush=True,
+                        )
                     except Exception as exc:
-                        print(f"[{total_judged:3d}] {task['doc_id']} -> ERROR: {exc}", flush=True)
+                        print(
+                            f"[{total_judged:3d}] {task['doc_id']} -> ERROR: {exc}",
+                            flush=True,
+                        )
 
             # Check if all 1,000 are judged or sleep
             existing_verdicts = list(LOGS_DIR.glob("*.verdict.json"))
             if len(existing_verdicts) >= 1000:
-                print(f"[STREAM JUDGE] All {len(existing_verdicts)} documents judged! Exiting.")
+                print(
+                    f"[STREAM JUDGE] All {len(existing_verdicts)} documents judged! Exiting."
+                )
                 break
 
             time.sleep(5)

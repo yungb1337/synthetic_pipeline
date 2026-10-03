@@ -1,12 +1,12 @@
 """Unified Live Streaming Evaluation & Auto-Escalation Pipeline for pdf-inspector.
 Runs concurrent hybrid parsing + live LLM Judge scoring + auto-retry on low scores.
 """
+
 from __future__ import annotations
 
 import argparse
 import glob
 import json
-import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,8 +18,9 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import psutil
-from experimental.pdf_inspector_eval.inspector_adapter import PDFInspectorAdapter
+
 from experimental.pdf_inspector_eval.dom_converter import PDFInspectorDOMConverter
+from experimental.pdf_inspector_eval.inspector_adapter import PDFInspectorAdapter
 from experimental.pdf_inspector_eval.smart_router import PDFInspectorSmartRouter
 from experimental.table_eval.judge_evaluator import TableBenchmarkJudgeEvaluator
 
@@ -47,9 +48,23 @@ class LiveStreamingPipeline:
         self.escalation_dir.mkdir(parents=True, exist_ok=True)
 
         if corpus_type == "corpus_b":
-            self.pdf_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf"
+            self.pdf_dir = (
+                ROOT_DIR
+                / "checkpoints"
+                / "run"
+                / "run-2026-09-14-eval-1000"
+                / "sources"
+                / "pdf"
+            )
         elif corpus_type == "corpus_945":
-            self.pdf_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "sources" / "pdf"
+            self.pdf_dir = (
+                ROOT_DIR
+                / "checkpoints"
+                / "run"
+                / "run-2026-09-04-parser-reliability"
+                / "sources"
+                / "pdf"
+            )
         elif corpus_type in ("curated_hard", "curated_easy"):
             self.pdf_dir = ROOT_DIR / "artifacts" / corpus_type
         else:
@@ -58,7 +73,9 @@ class LiveStreamingPipeline:
         self.router = PDFInspectorSmartRouter()
         self.adapter = PDFInspectorAdapter()
         self.converter = PDFInspectorDOMConverter()
-        self.judge_evaluator = TableBenchmarkJudgeEvaluator(model=judge_model, pacing_seconds=0.5)
+        self.judge_evaluator = TableBenchmarkJudgeEvaluator(
+            model=judge_model, pacing_seconds=0.5
+        )
         self.judge_workers = judge_workers
         self.judge_model = judge_model
         self.score_threshold = score_threshold
@@ -66,7 +83,10 @@ class LiveStreamingPipeline:
 
     def discover_targets(self, limit: int | None = None) -> list[dict[str, Any]]:
         all_pdfs = sorted(glob.glob(str(self.pdf_dir / "**" / "*.pdf"), recursive=True))
-        targets = [{"doc_id": Path(p).stem, "pdf_path": str(Path(p).resolve())} for p in all_pdfs]
+        targets = [
+            {"doc_id": Path(p).stem, "pdf_path": str(Path(p).resolve())}
+            for p in all_pdfs
+        ]
         if limit:
             targets = targets[:limit]
         return targets
@@ -89,7 +109,10 @@ class LiveStreamingPipeline:
         # Apply forced escalation on specific pages if requested by retry loop
         if force_docling_pages:
             for p in ext_result.pages:
-                if p.page_num in force_docling_pages or (p.page_num - 1) in force_docling_pages:
+                if (
+                    p.page_num in force_docling_pages
+                    or (p.page_num - 1) in force_docling_pages
+                ):
                     p.route = "docling_heavy"
 
         # 2. Build DOM
@@ -114,13 +137,22 @@ class LiveStreamingPipeline:
             "num_tables": dom.num_tables(),
             "num_references": len(dom.references),
             "elapsed_ms": doc_elapsed,
-            "pages_per_sec": (page_count / (doc_elapsed / 1000.0)) if doc_elapsed > 0 else 0.0,
-            "ram_rss_gb": round(mem_info.rss / (1024 ** 3), 3),
+            "pages_per_sec": (page_count / (doc_elapsed / 1000.0))
+            if doc_elapsed > 0
+            else 0.0,
+            "ram_rss_gb": round(mem_info.rss / (1024**3), 3),
         }
         out_telemetry_path.write_text(json.dumps(telemetry, indent=2), encoding="utf-8")
         return out_dom_path, telemetry
 
-    def _judge_task(self, doc_id: str, dom_path: Path, pdf_path: Path, out_path: Path, resume: bool = True) -> dict[str, Any]:
+    def _judge_task(
+        self,
+        doc_id: str,
+        dom_path: Path,
+        pdf_path: Path,
+        out_path: Path,
+        resume: bool = True,
+    ) -> dict[str, Any]:
         if resume and out_path.exists():
             try:
                 cached = json.loads(out_path.read_text(encoding="utf-8"))
@@ -130,7 +162,9 @@ class LiveStreamingPipeline:
         res = self.judge_evaluator.evaluate_doc(pdf_path, dom_path, out_path)
         return {"doc_id": doc_id, "cached": False, "data": res}
 
-    def run_streaming(self, limit: int | None = None, resume: bool = True) -> dict[str, Any]:
+    def run_streaming(
+        self, limit: int | None = None, resume: bool = True
+    ) -> dict[str, Any]:
         targets = self.discover_targets(limit=limit)
         total_docs = len(targets)
 
@@ -171,10 +205,19 @@ class LiveStreamingPipeline:
                         route_totals[r_type] = route_totals.get(r_type, 0) + count
 
                     p_sec = telem["pages_per_sec"]
-                    print(f"[{idx:4d}/{total_docs:4d}] [PARSED] {doc_id} ({telem['page_count']} pgs, {telem['elapsed_ms']:.1f}ms, {p_sec:.1f} p/s)")
+                    print(
+                        f"[{idx:4d}/{total_docs:4d}] [PARSED] {doc_id} ({telem['page_count']} pgs, {telem['elapsed_ms']:.1f}ms, {p_sec:.1f} p/s)"
+                    )
 
                     # Submit to judge
-                    fut = judge_pool.submit(self._judge_task, doc_id, dom_path, pdf_path, out_verdict_path, resume)
+                    fut = judge_pool.submit(
+                        self._judge_task,
+                        doc_id,
+                        dom_path,
+                        pdf_path,
+                        out_verdict_path,
+                        resume,
+                    )
                     judge_futures[fut] = (doc_id, dom_path, pdf_path, out_verdict_path)
 
                 except Exception as exc:
@@ -192,7 +235,9 @@ class LiveStreamingPipeline:
                     data = res.get("data") or {}
                     if not data:
                         # Judge was skipped or rate-limited
-                        print(f"[{completed_judgments:4d}/{total_docs:4d}] [JUDGE SKIPPED] {doc_id}")
+                        print(
+                            f"[{completed_judgments:4d}/{total_docs:4d}] [JUDGE SKIPPED] {doc_id}"
+                        )
                         continue
 
                     v_raw = data.get("verdict_status") or data.get("verdict")
@@ -202,7 +247,11 @@ class LiveStreamingPipeline:
                     else:
                         v_stat = str(v_raw or "UNKNOWN").upper()
                         m = data.get("metrics", {})
-                        if not m and "verdict" in data and isinstance(data["verdict"], dict):
+                        if (
+                            not m
+                            and "verdict" in data
+                            and isinstance(data["verdict"], dict)
+                        ):
                             m = data["verdict"].get("metrics", {})
 
                     if "PASS_WITH_ISSUES" in v_stat:
@@ -220,35 +269,53 @@ class LiveStreamingPipeline:
                                     val = float(m[k])
                                     metrics_sum[k] += val
                                     metric_counts[k] += 1
-                                    if val < self.score_threshold and k not in ("tables", "scans_ocr"):
+                                    if val < self.score_threshold and k not in (
+                                        "tables",
+                                        "scans_ocr",
+                                    ):
                                         has_low_metric = True
                                 except Exception:
                                     pass
 
                     cached_lbl = "[CACHED]" if res.get("cached") else "[JUDGED]"
-                    c_score = m.get("completeness", "N/A") if isinstance(m, dict) else "N/A"
+                    c_score = (
+                        m.get("completeness", "N/A") if isinstance(m, dict) else "N/A"
+                    )
                     t_score = m.get("tables", "N/A") if isinstance(m, dict) else "N/A"
-                    print(f"[{completed_judgments:4d}/{total_docs:4d}] {cached_lbl} {doc_id} -> {v_stat} (Compl: {c_score}, Tables: {t_score})")
+                    print(
+                        f"[{completed_judgments:4d}/{total_docs:4d}] {cached_lbl} {doc_id} -> {v_stat} (Compl: {c_score}, Tables: {t_score})"
+                    )
 
                     if v_stat == "FAIL" or has_low_metric:
-                        low_scoring_docs.append({
-                            "doc_id": doc_id,
-                            "pdf_path": pdf_path,
-                            "metrics": m,
-                            "verdict": v_stat,
-                        })
+                        low_scoring_docs.append(
+                            {
+                                "doc_id": doc_id,
+                                "pdf_path": pdf_path,
+                                "metrics": m,
+                                "verdict": v_stat,
+                            }
+                        )
 
                     # Live Scorecard every 10 docs
-                    if completed_judgments % 10 == 0 or completed_judgments == total_docs:
+                    if (
+                        completed_judgments % 10 == 0
+                        or completed_judgments == total_docs
+                    ):
                         cur_averages = {
-                            k: f"{(metrics_sum[k] / metric_counts[k] * 100):.1f}%" if metric_counts[k] > 0 else "0.0%"
+                            k: f"{(metrics_sum[k] / metric_counts[k] * 100):.1f}%"
+                            if metric_counts[k] > 0
+                            else "0.0%"
                             for k in metrics_sum
                         }
-                        print(f"--- [LIVE SCORECARD (n={completed_judgments}/{total_docs})] PASS: {verdicts_count['PASS']} | ISSUES: {verdicts_count['PASS_WITH_ISSUES']} | FAIL: {verdicts_count['FAIL']} | Struct: {cur_averages['structure']} | Compl: {cur_averages['completeness']} | Fmt: {cur_averages['fidelity']} ---")
+                        print(
+                            f"--- [LIVE SCORECARD (n={completed_judgments}/{total_docs})] PASS: {verdicts_count['PASS']} | ISSUES: {verdicts_count['PASS_WITH_ISSUES']} | FAIL: {verdicts_count['FAIL']} | Struct: {cur_averages['structure']} | Compl: {cur_averages['completeness']} | Fmt: {cur_averages['fidelity']} ---"
+                        )
 
                         # Write intermediate summary
                         inter_averages = {
-                            k: round((metrics_sum[k] / metric_counts[k]), 3) if metric_counts[k] > 0 else 0.0
+                            k: round((metrics_sum[k] / metric_counts[k]), 3)
+                            if metric_counts[k] > 0
+                            else 0.0
                             for k in metrics_sum
                         }
                         inter_summary = {
@@ -257,17 +324,25 @@ class LiveStreamingPipeline:
                             "route_totals": route_totals,
                             "verdicts": verdicts_count,
                             "metrics_mean": inter_averages,
-                            "metrics_percentage": {k: f"{v * 100:.1f}%" for k, v in inter_averages.items()},
+                            "metrics_percentage": {
+                                k: f"{v * 100:.1f}%" for k, v in inter_averages.items()
+                            },
                         }
-                        (self.judgment_dir / "pipeline_summary.json").write_text(json.dumps(inter_summary, indent=2), encoding="utf-8")
+                        (self.judgment_dir / "pipeline_summary.json").write_text(
+                            json.dumps(inter_summary, indent=2), encoding="utf-8"
+                        )
 
                 except Exception as exc:
-                    print(f"[{completed_judgments:4d}/{total_docs:4d}] [JUDGE ERROR] {doc_id}: {exc}")
+                    print(
+                        f"[{completed_judgments:4d}/{total_docs:4d}] [JUDGE ERROR] {doc_id}: {exc}"
+                    )
 
         # 3. Auto-Retry Escalation Loop on Failed / Low-Scoring Docs
         if low_scoring_docs:
             print("\n" + "=" * 70)
-            print(f">>> Auto-Retry Escalation on {len(low_scoring_docs)} Low-Scoring Documents...")
+            print(
+                f">>> Auto-Retry Escalation on {len(low_scoring_docs)} Low-Scoring Documents..."
+            )
             print("=" * 70)
 
             for l_item in low_scoring_docs:
@@ -276,21 +351,33 @@ class LiveStreamingPipeline:
 
                 # Identify specific target pages for escalation (tables, complex columns, OCR)
                 ext_peek = self.adapter.inspect_and_extract(p_path, doc_id=d_id)
-                target_pages = [p.page_num - 1 for p in ext_peek.pages if p.has_tables or p.has_columns or p.needs_ocr]
+                target_pages = [
+                    p.page_num - 1
+                    for p in ext_peek.pages
+                    if p.has_tables or p.has_columns or p.needs_ocr
+                ]
                 if not target_pages:
                     target_pages = [0]
 
-                print(f"[ESCALATE] Re-parsing {d_id} with single-page Docling escalation on pages {target_pages}...")
+                print(
+                    f"[ESCALATE] Re-parsing {d_id} with single-page Docling escalation on pages {target_pages}..."
+                )
                 try:
                     import gc
+
                     import torch
+
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                     gc.collect()
 
-                    esc_dom_path, _ = self.parse_single_doc(d_id, p_path, force_docling_pages=target_pages)
+                    esc_dom_path, _ = self.parse_single_doc(
+                        d_id, p_path, force_docling_pages=target_pages
+                    )
                     esc_verdict_path = self.escalation_dir / f"{d_id}.verdict.json"
-                    new_res = self.judge_evaluator.evaluate_doc(p_path, esc_dom_path, esc_verdict_path)
+                    new_res = self.judge_evaluator.evaluate_doc(
+                        p_path, esc_dom_path, esc_verdict_path
+                    )
                     if new_res:
                         v_obj = new_res.get("verdict_status") or new_res.get("verdict")
                         if isinstance(v_obj, dict):
@@ -305,7 +392,9 @@ class LiveStreamingPipeline:
 
         total_wall_s = time.perf_counter() - t_pipeline_start
         averages = {
-            k: round((metrics_sum[k] / metric_counts[k]), 3) if metric_counts[k] > 0 else 0.0
+            k: round((metrics_sum[k] / metric_counts[k]), 3)
+            if metric_counts[k] > 0
+            else 0.0
             for k in metrics_sum
         }
 
@@ -313,7 +402,11 @@ class LiveStreamingPipeline:
             "total_documents": total_docs,
             "total_pages": total_pages_parsed,
             "total_wall_seconds": round(total_wall_s, 2),
-            "effective_throughput_pages_per_sec": round((total_pages_parsed / total_wall_s), 2) if total_wall_s > 0 else 0.0,
+            "effective_throughput_pages_per_sec": round(
+                (total_pages_parsed / total_wall_s), 2
+            )
+            if total_wall_s > 0
+            else 0.0,
             "route_totals": route_totals,
             "verdicts": verdicts_count,
             "metrics_mean": averages,
@@ -325,10 +418,16 @@ class LiveStreamingPipeline:
 
         print("\n" + "=" * 70)
         print("FINAL PIPELINE SCORECARD")
-        print(f"Total Documents: {total_docs} | Pages: {total_pages_parsed} | Wall Time: {total_wall_s:.1f}s ({total_wall_s / 60.0:.2f} min)")
+        print(
+            f"Total Documents: {total_docs} | Pages: {total_pages_parsed} | Wall Time: {total_wall_s:.1f}s ({total_wall_s / 60.0:.2f} min)"
+        )
         print(f"Throughput: {summary['effective_throughput_pages_per_sec']} pages/sec")
-        print(f"Route Totals (Pages): Native: {route_totals.get('rust_native', 0)} | Docling: {route_totals.get('docling_heavy', 0)} | OCR: {route_totals.get('cuda_ocr', 0)}")
-        print(f"Verdicts: PASS: {verdicts_count['PASS']} | PASS_WITH_ISSUES: {verdicts_count['PASS_WITH_ISSUES']} | FAIL: {verdicts_count['FAIL']}")
+        print(
+            f"Route Totals (Pages): Native: {route_totals.get('rust_native', 0)} | Docling: {route_totals.get('docling_heavy', 0)} | OCR: {route_totals.get('cuda_ocr', 0)}"
+        )
+        print(
+            f"Verdicts: PASS: {verdicts_count['PASS']} | PASS_WITH_ISSUES: {verdicts_count['PASS_WITH_ISSUES']} | FAIL: {verdicts_count['FAIL']}"
+        )
         print("Metrics:")
         for k, v in averages.items():
             print(f"  - {k.capitalize()}: {v * 100:.1f}%")
@@ -339,12 +438,20 @@ class LiveStreamingPipeline:
 
 def main():
     parser = argparse.ArgumentParser(description="Run Live Streaming Hybrid Pipeline")
-    parser.add_argument("--corpus", default="corpus_b", help="Corpus name ('corpus_b' or 'corpus_945')")
+    parser.add_argument(
+        "--corpus", default="corpus_b", help="Corpus name ('corpus_b' or 'corpus_945')"
+    )
     parser.add_argument("--output-dir", default=None, help="Output directory")
     parser.add_argument("--limit", type=int, default=None, help="Document limit")
-    parser.add_argument("--workers", type=int, default=4, help="Concurrent judge workers")
-    parser.add_argument("--model", default="gemini-3.5-flash-lite", help="LLM Judge model")
-    parser.add_argument("--no-resume", action="store_true", help="Re-run without using cache")
+    parser.add_argument(
+        "--workers", type=int, default=4, help="Concurrent judge workers"
+    )
+    parser.add_argument(
+        "--model", default="gemini-3.5-flash-lite", help="LLM Judge model"
+    )
+    parser.add_argument(
+        "--no-resume", action="store_true", help="Re-run without using cache"
+    )
     args = parser.parse_args()
 
     out_dir = args.output_dir

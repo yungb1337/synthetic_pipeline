@@ -6,12 +6,10 @@ after writing the plan, wiping page updates a concurrent appender had written
 after the plan snapshot. These tests pin the new contract: updates written
 between snapshot and consolidation survive (or are folded); nothing is lost.
 """
+
 from __future__ import annotations
 
-import json
 import threading
-
-import pytest
 
 from app.parser.page_result import PageStatus
 from app.parser.storage_pages import Ledger
@@ -26,8 +24,22 @@ def test_i08_write_plan_folds_pending_journal_instead_of_wiping(tmp_path):
     led.update_page(doc, 1, PageStatus.OK, "cs1", "native", 1, [])
 
     # Thread A writes ITS plan (its snapshot has page 1 pending).
-    led.write_plan(doc, {"doc_id": doc, "pages": {"1": {"status": "pending", "checksum": "", "engine": None, "attempts": 0, "errors": []}},
-                         "assembly": {"status": "pending"}})
+    led.write_plan(
+        doc,
+        {
+            "doc_id": doc,
+            "pages": {
+                "1": {
+                    "status": "pending",
+                    "checksum": "",
+                    "engine": None,
+                    "attempts": 0,
+                    "errors": [],
+                }
+            },
+            "assembly": {"status": "pending"},
+        },
+    )
 
     plan = led.load_plan(doc)
     # I-08 contract: B's update survived consolidation (old code: wiped).
@@ -48,7 +60,9 @@ def test_i08_journal_and_consolidation_are_serialized(tmp_path):
 
     def rewriter():
         for _ in range(10):
-            led.write_plan(doc, {"doc_id": doc, "pages": {}, "assembly": {"status": "pending"}})
+            led.write_plan(
+                doc, {"doc_id": doc, "pages": {}, "assembly": {"status": "pending"}}
+            )
 
     threads = [threading.Thread(target=appender, args=(n,)) for n in range(3)]
     threads += [threading.Thread(target=rewriter) for _ in range(2)]

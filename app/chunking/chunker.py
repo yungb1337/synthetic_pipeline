@@ -14,6 +14,7 @@ is content-addressed over ``(doc_id, text, source_block_ids)`` (plus a
 oversized block, so byte-identical pieces stay distinct) — the same DOM + config
 + tokenizer yields byte-identical chunk JSON.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -143,8 +144,14 @@ class SemanticChunker:
                 current_anchor = block.text
                 # overlap only at heading seams (architecture §3.3)
                 ot, osrc = "", None
-                if config.overlap_at_heading_seams and prev_chunk is not None and prev_chunk.text:
-                    tail = tail_sentences(prev_chunk.text, self.counter, config.overlap_tokens)
+                if (
+                    config.overlap_at_heading_seams
+                    and prev_chunk is not None
+                    and prev_chunk.text
+                ):
+                    tail = tail_sentences(
+                        prev_chunk.text, self.counter, config.overlap_tokens
+                    )
                     if tail:
                         ot = "\n".join(tail)
                         osrc = prev_chunk.chunk_id
@@ -157,7 +164,9 @@ class SemanticChunker:
                 open_at(block, source)
                 continue
             cur = self.counter.count("\n".join(b.text for b in open_blocks))
-            joined = self.counter.count("\n".join([*[b.text for b in open_blocks], text]))
+            joined = self.counter.count(
+                "\n".join([*[b.text for b in open_blocks], text])
+            )
             if joined <= config.target_tokens or (
                 cur < config.min_band_tokens and joined <= config.soft_max_tokens
             ):
@@ -179,7 +188,9 @@ class SemanticChunker:
         report["chunks_created"] = len(chunks)
         report["tokens_total"] = sum(c.token_count for c in chunks)
 
-        return ChunkResult(chunks=chunks, report=report, dom_storage_key=dom_storage_key)
+        return ChunkResult(
+            chunks=chunks, report=report, dom_storage_key=dom_storage_key
+        )
 
     # ----------------------------------------------------------- order resolve
     def _resolve_order(self, doc: Document) -> tuple[list, dict]:
@@ -199,7 +210,9 @@ class SemanticChunker:
                     id_to_block[b.id] = b
         warnings = []
         if duplicates:
-            warnings.append(f"{duplicates} duplicate block id(s) across pages; first instance wins")
+            warnings.append(
+                f"{duplicates} duplicate block id(s) across pages; first instance wins"
+            )
 
         chain = doc.reading_order or []
         items: list = []
@@ -210,7 +223,9 @@ class SemanticChunker:
                 b = id_to_block.get(bid)
                 if b is None:
                     missing += 1
-                    warnings.append(f"reading_order references missing block id {bid!r}; skipped")
+                    warnings.append(
+                        f"reading_order references missing block id {bid!r}; skipped"
+                    )
                     continue
                 chain_seen.add(bid)
                 items.append((b, "reading_order"))
@@ -222,12 +237,22 @@ class SemanticChunker:
                         continue  # already consumed, or a duplicate instance
                     orphans += 1
                     items.append((b, "orphan"))
-            return items, {"missing": missing, "orphans": orphans, "warnings": warnings, "used": "reading_order"}
+            return items, {
+                "missing": missing,
+                "orphans": orphans,
+                "warnings": warnings,
+                "used": "reading_order",
+            }
         # fallback: page order (reading_order empty)
         for p in pages:
             for b in p.blocks:
                 items.append((b, "page_order"))
-        return items, {"missing": 0, "orphans": 0, "warnings": warnings, "used": "page_order"}
+        return items, {
+            "missing": 0,
+            "orphans": 0,
+            "warnings": warnings,
+            "used": "page_order",
+        }
 
     # -------------------------------------------------------------- oversized
     def _oversized_pieces(self, block) -> tuple[list, int]:
@@ -251,7 +276,10 @@ class SemanticChunker:
                 for piece in self._force_split(s, config.hard_max_tokens):
                     out.append(([piece], True))
                 continue
-            if parts and self.counter.count("\n".join([*parts, s])) > config.target_tokens:
+            if (
+                parts
+                and self.counter.count("\n".join([*parts, s])) > config.target_tokens
+            ):
                 out.append((parts, False))
                 parts = []
             parts.append(s)
@@ -278,10 +306,16 @@ class SemanticChunker:
                 return pieces
             out = []
             for p in pieces:
-                out.extend(self._force_split(p, limit) if self.counter.count(p) > limit else [p])
+                out.extend(
+                    self._force_split(p, limit)
+                    if self.counter.count(p) > limit
+                    else [p]
+                )
             return out
         mid = len(text) // 2
-        return self._force_split(text[:mid], limit) + self._force_split(text[mid:], limit)
+        return self._force_split(text[:mid], limit) + self._force_split(
+            text[mid:], limit
+        )
 
     @staticmethod
     def _cut_positions(text: str, sep: str) -> list[int]:
@@ -334,14 +368,18 @@ class SemanticChunker:
             chunker_version=config.chunker_version,
             chunker_params=config.snapshot(),
             dom_schema_version=config.dom_schema_version,
-            normalizer_version=doc.provenance.normalizer_version if doc.provenance else None,
+            normalizer_version=doc.provenance.normalizer_version
+            if doc.provenance
+            else None,
             dom_storage_key=dom_storage_key,
             tokenizer=self.counter.tokenizer,
             tokenizer_ref_hash=self.counter.tokenizer_ref_hash,
             forced_split=forced_split,
         )
         return Chunk(
-            chunk_id=compute_chunk_id(doc.document_id, text, source_block_ids, piece_index=piece_index),
+            chunk_id=compute_chunk_id(
+                doc.document_id, text, source_block_ids, piece_index=piece_index
+            ),
             doc_id=doc.document_id,
             seq=seq,
             kind=kind,

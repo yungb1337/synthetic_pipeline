@@ -9,11 +9,10 @@ refactor removed the mid-run rescale entirely; the pool is built once from
 I-12 — no fabricated RAM: both governor derive paths return the safe floor 1
 when psutil is unavailable, instead of assuming a 16 GiB box.
 """
+
 from __future__ import annotations
 
 import sys
-
-import pytest
 
 from app.parser.config import ParserConfig
 from app.parser.scheduler import ResourceGovernor, Scheduler
@@ -45,8 +44,9 @@ def test_i11_pool_built_from_declared_heavy_concurrency(monkeypatch):
 
         return FakePool()
 
-    monkeypatch.setattr("app.parser.scheduler.ProcessPoolExecutor",
-                        mock_pool_constructor)
+    monkeypatch.setattr(
+        "app.parser.scheduler.ProcessPoolExecutor", mock_pool_constructor
+    )
     sched._get_heavy_pool()
     assert captured.get("max_workers") == 3
     sched.close()
@@ -60,7 +60,8 @@ def test_i11_recheck_updates_only_the_declared_value(monkeypatch):
     g = ResourceGovernor()
     g.measured_f = 1024**3
     fake_psutil = types.SimpleNamespace(
-        virtual_memory=lambda: types.SimpleNamespace(available=2.5 * 1024**3))
+        virtual_memory=lambda: types.SimpleNamespace(available=2.5 * 1024**3)
+    )
     monkeypatch.setattr(g, "_cgroup_max", lambda: None)
     monkeypatch.setitem(sys.modules, "psutil", fake_psutil)
     assert g.periodic_recheck(4) == 1  # downward only

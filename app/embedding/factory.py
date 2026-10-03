@@ -11,6 +11,7 @@ by `scripts/download_models.py`) — runtime is on-prem, no fetch from the HF hu
 — and still meets the larger `Embedder` contract (list-in -> vectors-out,
 batched).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,10 +23,12 @@ from .sbert import SentenceTransformerEmbedder
 
 @dataclass(frozen=True)
 class EmbeddingOptions:
-    model: str = "BAAI/bge-m3"    # 1024-dim, multilingual; loads from models/bge-m3
-    device: str = "auto"          # "auto" | "cuda" | "cpu"
-    batch_size: int = 32          # fp16 envelope on the 4 GB RTX 3050: B≈32 @ L=1024 is near-OOM
-    fp16: bool = True             # lower VRAM on GPU (fits RTX 3050 4GB)
+    model: str = "BAAI/bge-m3"  # 1024-dim, multilingual; loads from models/bge-m3
+    device: str = "auto"  # "auto" | "cuda" | "cpu"
+    batch_size: int = (
+        32  # fp16 envelope on the 4 GB RTX 3050: B≈32 @ L=1024 is near-OOM
+    )
+    fp16: bool = True  # lower VRAM on GPU (fits RTX 3050 4GB)
     real_if_available: bool = True
 
 
@@ -33,8 +36,12 @@ def default_embedder(opts: EmbeddingOptions | None = None) -> Embedder:
     opts = opts or EmbeddingOptions()
     if opts.real_if_available:
         try:
-            s = SentenceTransformerEmbedder(model=opts.model, device=opts.device,
-                                            batch_size=opts.batch_size, fp16=opts.fp16)
+            s = SentenceTransformerEmbedder(
+                model=opts.model,
+                device=opts.device,
+                batch_size=opts.batch_size,
+                fp16=opts.fp16,
+            )
             if s.ok:
                 return s
         except Exception:

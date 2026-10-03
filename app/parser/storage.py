@@ -5,6 +5,7 @@ defaults for v1: raw bytes, DOM JSON, and extracted images go to an immutable,
 hash-keyed layout. Swapping to S3/GCS/Postgres means a new Store impl — the
 parser pipeline is unchanged (dependency inversion).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -59,14 +60,24 @@ class FilesystemStore(Store):
         return key
 
     def put_dom(self, doc_id: str, doc: Document) -> str:
-        version = version_suffix(doc.provenance.parser_version) if doc.provenance else "unknown"
+        version = (
+            version_suffix(doc.provenance.parser_version)
+            if doc.provenance
+            else "unknown"
+        )
         return self._put_dom_json(doc_id, "dom", version, doc)
 
     def put_normalized(self, doc_id: str, doc: Document) -> str:
-        version = version_suffix(doc.provenance.normalizer_version) if doc.provenance else "unknown"
+        version = (
+            version_suffix(doc.provenance.normalizer_version)
+            if doc.provenance
+            else "unknown"
+        )
         return self._put_dom_json(doc_id, "norm", version, doc)
 
-    def _put_dom_json(self, doc_id: str, prefix: str, version: str, doc: Document) -> str:
+    def _put_dom_json(
+        self, doc_id: str, prefix: str, version: str, doc: Document
+    ) -> str:
         # versioned output (ADR #8): each parser/normalizer version gets its own
         # file under dom/<doc_id>/ so prior versions are retained. A re-write of
         # the SAME version overwrites that file — a deterministic no-op since a
@@ -94,7 +105,12 @@ class FilesystemStore(Store):
 
 
 def _img_ext(mime: str) -> str:
-    return {"image/png": "png", "image/jpeg": "jpg", "image/tiff": "tiff", "image/gif": "gif"}.get(mime, "bin")
+    return {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/tiff": "tiff",
+        "image/gif": "gif",
+    }.get(mime, "bin")
 
 
 def version_suffix(version: str) -> str:

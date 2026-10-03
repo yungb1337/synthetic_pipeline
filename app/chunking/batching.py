@@ -5,6 +5,7 @@ Greedy, order-preserving accumulation over the chunk sequence (embed row order
 exceed ``max_tokens_per_call`` or the group would exceed ``max_texts_per_call``.
 A chunk that alone exceeds a cap still gets its own group (never dropped).
 """
+
 from __future__ import annotations
 
 from .schema import Chunk
@@ -31,7 +32,9 @@ def group_by_token_budget(
     tokens = 0
     for c in chunks:
         count = c.token_count if c.token_count else counter.count(c.text)
-        if current and (tokens + count > max_tokens_per_call or len(current) >= max_texts_per_call):
+        if current and (
+            tokens + count > max_tokens_per_call or len(current) >= max_texts_per_call
+        ):
             groups.append(current)
             current = []
             tokens = 0

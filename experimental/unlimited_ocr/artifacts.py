@@ -17,6 +17,7 @@ evaluation/unlimited_ocr/
   judge_results.json
   report.json
 """
+
 from __future__ import annotations
 
 import json
@@ -43,36 +44,50 @@ class ArtifactManager:
     def save_source_metadata(self, doc_id: str, metadata: dict[str, Any]) -> Path:
         doc_dir = self.get_doc_dir(doc_id)
         p = doc_dir / "source_metadata.json"
-        p.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p
 
-    def save_raw_output(self, doc_id: str, raw_data: dict[str, Any], raw_markdown: str) -> tuple[Path, Path]:
+    def save_raw_output(
+        self, doc_id: str, raw_data: dict[str, Any], raw_markdown: str
+    ) -> tuple[Path, Path]:
         doc_dir = self.get_doc_dir(doc_id)
         p_json = doc_dir / "raw_output.json"
         p_md = doc_dir / "raw_output.md"
-        p_json.write_text(json.dumps(raw_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        p_json.write_text(
+            json.dumps(raw_data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         p_md.write_text(raw_markdown, encoding="utf-8")
         return p_json, p_md
 
     def save_normalized_dom(self, doc_id: str, dom_dict: dict[str, Any]) -> Path:
         doc_dir = self.get_doc_dir(doc_id)
         p = doc_dir / "normalized_output.json"
-        p.write_text(json.dumps(dom_dict, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(dom_dict, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p
 
     def save_metrics(self, doc_id: str, metrics_dict: dict[str, Any]) -> Path:
         doc_dir = self.get_doc_dir(doc_id)
         p = doc_dir / "metrics.json"
-        p.write_text(json.dumps(metrics_dict, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(metrics_dict, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p
 
     def save_runtime(self, doc_id: str, runtime_info: dict[str, Any]) -> Path:
         doc_dir = self.get_doc_dir(doc_id)
         p = doc_dir / "runtime.json"
-        p.write_text(json.dumps(runtime_info, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(runtime_info, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p
 
-    def save_logs(self, doc_id: str, stdout_text: str, stderr_text: str) -> tuple[Path, Path]:
+    def save_logs(
+        self, doc_id: str, stdout_text: str, stderr_text: str
+    ) -> tuple[Path, Path]:
         doc_dir = self.get_doc_dir(doc_id)
         p_out = doc_dir / "logs" / "stdout.log"
         p_err = doc_dir / "logs" / "stderr.log"
@@ -83,23 +98,31 @@ class ArtifactManager:
     def save_evaluation_manifest(self, manifest: list[dict[str, Any]]) -> Path:
         self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "manifest.json"
-        p.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p
 
     def save_evaluation_results(self, results: list[dict[str, Any]]) -> Path:
         self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "results.json"
-        p.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p
 
     def save_judge_results(self, judge_results: dict[str, Any]) -> Path:
         self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "judge_results.json"
-        p.write_text(json.dumps(judge_results, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(judge_results, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p
 
     def save_summary_report(self, report_dict: dict[str, Any]) -> Path:
         self.evaluation_dir.mkdir(parents=True, exist_ok=True)
         p = self.evaluation_dir / "report.json"
-        p.write_text(json.dumps(report_dict, indent=2, ensure_ascii=False), encoding="utf-8")
+        p.write_text(
+            json.dumps(report_dict, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         return p

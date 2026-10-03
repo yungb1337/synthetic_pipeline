@@ -5,6 +5,7 @@ cheap heuristic from short-label density. A doc where forms are impossible is
 `not_applicable`, never a quiet "no form". A missing measurement is never
 treated as no-form (spec §4, §11).
 """
+
 from __future__ import annotations
 
 from ..inspectors import InspectorFeatures
@@ -24,9 +25,16 @@ class FormDetector(Detector):
         total_chars = sum(feats.pages_char_count.values())
         blocks = sum(feats.block_count_per_page)
         if blocks <= 0 or total_chars <= 0:
-            return DetectorResult(self.name, self.version, "ok", signals=[
-                self._sig_missing("metric_form_probability", "no text to assess form-ness"),
-            ])
+            return DetectorResult(
+                self.name,
+                self.version,
+                "ok",
+                signals=[
+                    self._sig_missing(
+                        "metric_form_probability", "no text to assess form-ness"
+                    ),
+                ],
+            )
         avg_len = total_chars / blocks
         # forms tend to have short cells; more blocks/page + short avg => form-ish
         density = min(1.0, blocks / max(1, feats.page_count) / 40.0)
@@ -38,5 +46,9 @@ class FormDetector(Detector):
         else:
             conf = 0.9
             evidence = "no form-like structure observed"
-        sigs = [self._signal("metric_form_probability", prob, confidence=conf, evidence=evidence)]
+        sigs = [
+            self._signal(
+                "metric_form_probability", prob, confidence=conf, evidence=evidence
+            )
+        ]
         return DetectorResult(self.name, self.version, "ok", signals=sigs)

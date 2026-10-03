@@ -5,18 +5,17 @@
 2. BatchReport exposes pages/s, turnaround percentiles and band/status mix,
    merged from scheduler metrics events.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 import fitz
 
 from app.parser.config import ParserConfig
+from app.parser.planner import Planner
 from app.parser.scheduler import Scheduler
+from app.parser.source import SourceScan
 from app.parser.storage import FilesystemStore
 from app.parser.storage_pages import Ledger, PageStore
-from app.parser.planner import Planner
-from app.parser.source import SourceScan
 
 
 def _pdf_bytes(pages: int = 3) -> bytes:
@@ -36,8 +35,12 @@ def test_i13_run_plan_emits_metrics_event(tmp_path):
     ps = PageStore(str(root))
     led = Ledger(str(root))
 
-    sched = Scheduler(ParserConfig(), page_store=ps, ledger=led,
-                      metrics_sink=lambda n, p: events.append((n, p)))
+    sched = Scheduler(
+        ParserConfig(),
+        page_store=ps,
+        ledger=led,
+        metrics_sink=lambda n, p: events.append((n, p)),
+    )
 
     manifest = SourceScan.scan(_pdf_bytes(3), "m.pdf", store)
     planner = Planner(ps, led)
@@ -89,20 +92,24 @@ def test_i13_batchreport_merges_metrics():
     from app.processing.executor import BatchReport
 
     r = BatchReport()
-    r.merge_metrics({
-        "pages_total": 7,
-        "by_band": {"native": 5, "docling": 2},
-        "by_status": {"ok": 6, "failed": 1},
-        "page_turnaround_ms": {"p50": 10.0, "p95": 20.0, "p99": 30.0},
-        "rss_mb": 512.5,
-    })
-    r.merge_metrics({
-        "pages_total": 3,
-        "by_band": {"native": 3},
-        "by_status": {"ok": 3},
-        "page_turnaround_ms": {"p50": 12.0, "p95": 25.0},
-        "rss_mb": 600.0,
-    })
+    r.merge_metrics(
+        {
+            "pages_total": 7,
+            "by_band": {"native": 5, "docling": 2},
+            "by_status": {"ok": 6, "failed": 1},
+            "page_turnaround_ms": {"p50": 10.0, "p95": 20.0, "p99": 30.0},
+            "rss_mb": 512.5,
+        }
+    )
+    r.merge_metrics(
+        {
+            "pages_total": 3,
+            "by_band": {"native": 3},
+            "by_status": {"ok": 3},
+            "page_turnaround_ms": {"p50": 12.0, "p95": 25.0},
+            "rss_mb": 600.0,
+        }
+    )
     assert r.pages_seen == 10
     assert r.by_band == {"native": 8, "docling": 2}
     assert r.by_page_status == {"ok": 9, "failed": 1}
@@ -116,6 +123,7 @@ def test_i13_batchreport_merges_metrics():
     r.ok = 10
     r.elapsed_ms = 5000.0
     from app.processing.executor import BatchWorker  # noqa: F401  (import sanity)
+
     # docs_per_s/pages_per_s are set by BatchWorker.run; compute directly here:
     secs = r.elapsed_ms / 1000.0
     assert round(r.ok / secs, 3) == 2.0

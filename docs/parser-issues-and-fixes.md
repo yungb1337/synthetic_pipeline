@@ -275,7 +275,9 @@ Give `EnrichmentEngine` a single cached `NativePdfEngine` instance:
 ```python
 def __init__(self, config):
     self.config = config
-    self._native = NativePdfEngine(config)   # created once, reused per page
+    self._native = NativePdfEngine(config)  # created once, reused per page
+
+
 def process(self, item):
     res = self._native.process(item)
     ...
@@ -338,6 +340,7 @@ Key the converter cache by the options that affect construction:
 ```python
 _engine_cache: dict[tuple, object] = {}
 # (ocr, table_mode, generate_picture_images) -> converter
+
 
 def get_engine(ocr=None, table_mode="", generate_picture_images=True):
     key = (bool(ocr), (table_mode or "").upper(), bool(generate_picture_images))

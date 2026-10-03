@@ -1,8 +1,7 @@
-"""10-Document Sanity Verification for pdf-inspector hybrid extraction.
-"""
+"""10-Document Sanity Verification for pdf-inspector hybrid extraction."""
+
 from __future__ import annotations
 
-import glob
 import sys
 from pathlib import Path
 
@@ -16,7 +15,9 @@ from experimental.pdf_inspector_eval.stream_judge import PDFInspectorStreamJudge
 
 def run_sanity():
     print(">>> Running 10-Document Sanity Check on Corpus B...")
-    evaluator = PDFInspectorBatchEvaluator(output_dir="artifacts/pdf_inspector_eval/sanity_10")
+    evaluator = PDFInspectorBatchEvaluator(
+        output_dir="artifacts/pdf_inspector_eval/sanity_10"
+    )
     targets = evaluator.discover_corpus_targets("corpus_b")
 
     # Run 10 docs

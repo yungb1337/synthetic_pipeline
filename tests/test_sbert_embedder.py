@@ -1,4 +1,5 @@
 """Tests for the real local embedder (skipped when torch/the model is absent)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,13 +13,16 @@ def _available() -> bool:
     try:
         import sentence_transformers  # noqa: F401
         import torch  # noqa: F401
+
         # production model must be local, not a download-on-demand HF fetch
         return Path("models/bge-m3/config.json").exists()
     except Exception:
         return False
 
 
-pytestmark = pytest.mark.skipif(not _available(), reason="sentence-transformers/torch/bge-m3 unavailable")
+pytestmark = pytest.mark.skipif(
+    not _available(), reason="sentence-transformers/torch/bge-m3 unavailable"
+)
 
 
 @pytest.fixture(scope="module")

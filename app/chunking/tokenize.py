@@ -11,6 +11,7 @@ Two modes, both deterministic, both recorded in ``ChunkProvenance``:
   * ``char4`` (fallback)  — ``max(1, len(text) // 4)``. Dependency-free, used
     when the tokenizer file is absent or fails to load (hermetic CI/tests).
 """
+
 from __future__ import annotations
 
 import hashlib

@@ -5,6 +5,7 @@ exact existing `Loaders._*` helpers (now returning only page-0 parts) and
 detects the format from the source bytes (cheap, accurate). Returns one
 `PageResult(page_index=0)`.
 """
+
 from __future__ import annotations
 
 from ..config import ParserConfig
@@ -27,7 +28,10 @@ class SimpleEngine:
             data = open(item.src_path, "rb").read()
         except Exception as e:
             return PageResult(
-                doc_id=item.doc_id, page_index=0, route=SIMPLE, status=PageStatus.FAILED,
+                doc_id=item.doc_id,
+                page_index=0,
+                route=SIMPLE,
+                status=PageStatus.FAILED,
                 errors=[{"page_no": 1, "category": "simple_read", "message": str(e)}],
                 source_hash=item.source_hash,
             )
@@ -38,7 +42,10 @@ class SimpleEngine:
             rec = loaders.load(detected, data, route=None)
         except Exception as e:
             return PageResult(
-                doc_id=item.doc_id, page_index=0, route=SIMPLE, status=PageStatus.FAILED,
+                doc_id=item.doc_id,
+                page_index=0,
+                route=SIMPLE,
+                status=PageStatus.FAILED,
                 errors=[{"page_no": 1, "category": "simple_load", "message": str(e)}],
                 source_hash=item.source_hash,
             )
@@ -48,8 +55,14 @@ class SimpleEngine:
 
         content_present = bool(rec.blocks) or any(t.rows for t in rec.tables)
         return PageResult(
-            doc_id=item.doc_id, page_index=0, route=SIMPLE, status=PageStatus.OK,
-            blocks=rec.blocks, tables=rec.tables, images=rec.images,
-            annotations=rec.annotations, content_present=content_present,
+            doc_id=item.doc_id,
+            page_index=0,
+            route=SIMPLE,
+            status=PageStatus.OK,
+            blocks=rec.blocks,
+            tables=rec.tables,
+            images=rec.images,
+            annotations=rec.annotations,
+            content_present=content_present,
             source_hash=item.source_hash,
         )

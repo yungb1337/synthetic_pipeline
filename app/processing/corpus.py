@@ -5,6 +5,7 @@ hash per file, persisted to JSON. A re-run only processes files whose hash is
 NOT yet in the manifest — a resume after a crash or a weekly incremental pass
 touch only new/changed files.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -38,8 +39,7 @@ def _hash_file(path: str, chunk: int = 1 << 20) -> tuple[str, int]:
 
 def scan_dir(root: str, exts: tuple[str, ...]) -> list[str]:
     rp = Path(root)
-    return [str(p) for p in rp.rglob("*")
-            if p.is_file() and p.suffix.lower() in exts]
+    return [str(p) for p in rp.rglob("*") if p.is_file() and p.suffix.lower() in exts]
 
 
 def hash_paths(paths: list[str], concurrency: int | None = None) -> list[DocRef]:
@@ -56,7 +56,7 @@ def hash_paths(paths: list[str], concurrency: int | None = None) -> list[DocRef]
 def _hash_one(path: str) -> DocRef:
     p = Path(path)
     try:
-        sha, size = _hash_file(path)   # streaming/chunked; never whole-file read
+        sha, size = _hash_file(path)  # streaming/chunked; never whole-file read
     except OSError:
         sha, size = "", 0
     return DocRef(path=path, name=p.name, size=size, sha256=sha)
@@ -78,7 +78,9 @@ def save_manifest(path: str, shas: set[str]) -> None:
     Path(path).write_text(json.dumps(sorted(shas)), encoding="utf-8")
 
 
-def shard_doc_refs(refs: list[DocRef], shard_index: int = 0, shard_total: int = 1) -> list[DocRef]:
+def shard_doc_refs(
+    refs: list[DocRef], shard_index: int = 0, shard_total: int = 1
+) -> list[DocRef]:
     """B3: Partition a list of DocRefs deterministically for multi-node / multi-box cluster execution.
 
     Uses SHA256 modulo for a stable, uniform distribution across cluster nodes.
@@ -86,7 +88,9 @@ def shard_doc_refs(refs: list[DocRef], shard_index: int = 0, shard_total: int = 
     if shard_total <= 1:
         return refs
     if not (0 <= shard_index < shard_total):
-        raise ValueError(f"shard_index {shard_index} out of bounds for shard_total {shard_total}")
+        raise ValueError(
+            f"shard_index {shard_index} out of bounds for shard_total {shard_total}"
+        )
     out = []
     for r in refs:
         h_str = r.sha256 or hashlib.sha256(r.name.encode("utf-8")).hexdigest()

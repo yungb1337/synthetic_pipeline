@@ -1,5 +1,6 @@
 """ReadingOrderDetector: ambiquity in the reading order. Decision-free: it
 REPORTS ambiguity; it never reorders any blocks (spec §3, §5)."""
+
 from __future__ import annotations
 
 from ..inspectors import InspectorFeatures
@@ -22,10 +23,21 @@ class ReadingOrderDetector(Detector):
         frag = min(1.0, (blocks_total / max(1, pages)) / 40.0)
         ambiguity = round(min(1.0, 0.7 * col_ratio + 0.3 * frag), 3)
         if ambiguity == 0.0:
-            sigs.append(self._signal("metric_reading_order_ambiguity", 0.0,
-                                     confidence=0.9, evidence="linear reading order"))
+            sigs.append(
+                self._signal(
+                    "metric_reading_order_ambiguity",
+                    0.0,
+                    confidence=0.9,
+                    evidence="linear reading order",
+                )
+            )
         else:
-            sigs.append(self._signal("metric_reading_order_ambiguity", ambiguity,
-                                     confidence=0.8,
-                                     evidence=f"reading-order ambiguity {ambiguity:.2f}"))
+            sigs.append(
+                self._signal(
+                    "metric_reading_order_ambiguity",
+                    ambiguity,
+                    confidence=0.8,
+                    evidence=f"reading-order ambiguity {ambiguity:.2f}",
+                )
+            )
         return DetectorResult(self.name, self.version, "ok", signals=sigs)

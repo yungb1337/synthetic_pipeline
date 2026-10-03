@@ -1,13 +1,11 @@
-"""Concurrent Streaming LLM Judge Evaluator for pdf-inspector extraction DOMs.
-"""
+"""Concurrent Streaming LLM Judge Evaluator for pdf-inspector extraction DOMs."""
+
 from __future__ import annotations
 
 import argparse
 import glob
 import json
-import os
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
@@ -35,9 +33,23 @@ class PDFInspectorStreamJudge:
         self.judgment_dir.mkdir(parents=True, exist_ok=True)
 
         if corpus_type == "corpus_b":
-            self.pdf_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf"
+            self.pdf_dir = (
+                ROOT_DIR
+                / "checkpoints"
+                / "run"
+                / "run-2026-09-14-eval-1000"
+                / "sources"
+                / "pdf"
+            )
         elif corpus_type == "corpus_945":
-            self.pdf_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "sources" / "pdf"
+            self.pdf_dir = (
+                ROOT_DIR
+                / "checkpoints"
+                / "run"
+                / "run-2026-09-04-parser-reliability"
+                / "sources"
+                / "pdf"
+            )
         elif corpus_type in ("curated_hard", "curated_easy"):
             self.pdf_dir = ROOT_DIR / "artifacts" / corpus_type
         else:
@@ -47,7 +59,14 @@ class PDFInspectorStreamJudge:
         self.model = model
         self.evaluator = TableBenchmarkJudgeEvaluator(model=model, pacing_seconds=0.5)
 
-    def _judge_task(self, doc_id: str, dom_path: Path, pdf_path: Path, out_path: Path, resume: bool = True) -> dict[str, Any]:
+    def _judge_task(
+        self,
+        doc_id: str,
+        dom_path: Path,
+        pdf_path: Path,
+        out_path: Path,
+        resume: bool = True,
+    ) -> dict[str, Any]:
         if resume and out_path.exists():
             try:
                 cached = json.loads(out_path.read_text(encoding="utf-8"))
@@ -60,7 +79,9 @@ class PDFInspectorStreamJudge:
 
     def run(self, max_eval: int | None = None, resume: bool = True) -> dict[str, Any]:
         print("=" * 60)
-        print(f"Starting Streaming LLM Judge ({self.max_workers} Workers, Model: {self.model})")
+        print(
+            f"Starting Streaming LLM Judge ({self.max_workers} Workers, Model: {self.model})"
+        )
         print(f"DOM Directory: {self.normalized_dir}")
         print(f"Judgment Directory: {self.judgment_dir}")
         print("=" * 60)
@@ -103,7 +124,9 @@ class PDFInspectorStreamJudge:
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
-                executor.submit(self._judge_task, doc_id, dom_path, pdf_path, out_path, resume): doc_id
+                executor.submit(
+                    self._judge_task, doc_id, dom_path, pdf_path, out_path, resume
+                ): doc_id
                 for doc_id, dom_path, pdf_path, out_path in tasks
             }
 
@@ -122,7 +145,11 @@ class PDFInspectorStreamJudge:
                     else:
                         v_stat_str = str(v_raw).upper()
                         m = data.get("metrics", {})
-                        if not m and "verdict" in data and isinstance(data["verdict"], dict):
+                        if (
+                            not m
+                            and "verdict" in data
+                            and isinstance(data["verdict"], dict)
+                        ):
                             m = data["verdict"].get("metrics", {})
 
                     if "PASS_WITH_ISSUES" in v_stat_str:
@@ -144,11 +171,17 @@ class PDFInspectorStreamJudge:
 
                     cached_label = "[CACHED]" if res.get("cached") else "[NEW]"
                     t_score = m.get("tables", "N/A") if isinstance(m, dict) else "N/A"
-                    c_score = m.get("completeness", "N/A") if isinstance(m, dict) else "N/A"
-                    print(f"[{completed:4d}/{total_tasks:4d}] {cached_label} {doc_id} -> {v_stat_str} (Compl: {c_score}, Tables: {t_score})")
+                    c_score = (
+                        m.get("completeness", "N/A") if isinstance(m, dict) else "N/A"
+                    )
+                    print(
+                        f"[{completed:4d}/{total_tasks:4d}] {cached_label} {doc_id} -> {v_stat_str} (Compl: {c_score}, Tables: {t_score})"
+                    )
 
                 except Exception as exc:
-                    print(f"[{completed:4d}/{total_tasks:4d}] {doc_id} -> ERROR ({exc})")
+                    print(
+                        f"[{completed:4d}/{total_tasks:4d}] {doc_id} -> ERROR ({exc})"
+                    )
 
         # Compute averages
         averages = {}
@@ -171,14 +204,20 @@ class PDFInspectorStreamJudge:
                 except Exception:
                     pass
 
-        table_evaluable_avg = round(sum(table_present_scores) / len(table_present_scores), 3) if table_present_scores else 0.0
+        table_evaluable_avg = (
+            round(sum(table_present_scores) / len(table_present_scores), 3)
+            if table_present_scores
+            else 0.0
+        )
 
         summary = {
             "total_judged": completed,
             "verdicts": verdicts,
             "metrics_mean": averages,
             "metrics_percentage": {k: f"{v * 100:.1f}%" for k, v in averages.items()},
-            "table_accuracy_evaluable": f"{table_evaluable_avg * 100:.1f}%" if table_present_scores else "N/A",
+            "table_accuracy_evaluable": f"{table_evaluable_avg * 100:.1f}%"
+            if table_present_scores
+            else "N/A",
         }
 
         summary_path = self.judgment_dir / "judgment_summary.json"
@@ -187,12 +226,16 @@ class PDFInspectorStreamJudge:
         print("\n" + "=" * 60)
         print("LLM Judge Summary Scorecard")
         print(f"Total Judged: {completed}")
-        print(f"Verdicts: PASS: {verdicts['PASS']} | PASS_WITH_ISSUES: {verdicts['PASS_WITH_ISSUES']} | FAIL: {verdicts['FAIL']}")
+        print(
+            f"Verdicts: PASS: {verdicts['PASS']} | PASS_WITH_ISSUES: {verdicts['PASS_WITH_ISSUES']} | FAIL: {verdicts['FAIL']}"
+        )
         print("Average Metrics:")
         for k, v in averages.items():
             print(f"  - {k.capitalize()}: {v * 100:.1f}%")
         if table_present_scores:
-            print(f"  - Table Accuracy (Docs with Tables, n={len(table_present_scores)}): {table_evaluable_avg * 100:.1f}%")
+            print(
+                f"  - Table Accuracy (Docs with Tables, n={len(table_present_scores)}): {table_evaluable_avg * 100:.1f}%"
+            )
         print("=" * 60)
 
         return summary
@@ -200,12 +243,28 @@ class PDFInspectorStreamJudge:
 
 def main():
     parser = argparse.ArgumentParser(description="Run concurrent streaming LLM judge")
-    parser.add_argument("--artifact-dir", default="artifacts/pdf_inspector_eval/corpus_b", help="Artifacts directory containing normalized_output")
-    parser.add_argument("--corpus", default="corpus_b", help="Corpus type ('corpus_b' or 'corpus_945')")
-    parser.add_argument("--workers", type=int, default=4, help="Number of concurrent judge threads")
-    parser.add_argument("--limit", type=int, default=None, help="Limit number of documents to judge")
-    parser.add_argument("--model", default="gemini-3.5-flash-lite", help="Gemini judge model")
-    parser.add_argument("--no-resume", action="store_true", help="Do not use cached verdicts; re-run all judgments")
+    parser.add_argument(
+        "--artifact-dir",
+        default="artifacts/pdf_inspector_eval/corpus_b",
+        help="Artifacts directory containing normalized_output",
+    )
+    parser.add_argument(
+        "--corpus", default="corpus_b", help="Corpus type ('corpus_b' or 'corpus_945')"
+    )
+    parser.add_argument(
+        "--workers", type=int, default=4, help="Number of concurrent judge threads"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Limit number of documents to judge"
+    )
+    parser.add_argument(
+        "--model", default="gemini-3.5-flash-lite", help="Gemini judge model"
+    )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Do not use cached verdicts; re-run all judgments",
+    )
     args = parser.parse_args()
 
     judge = PDFInspectorStreamJudge(

@@ -12,6 +12,7 @@ Usage
 Each check prints the observed behaviour and a PASS/FAIL verdict, where
 FAIL means "the failure point reproduced" (i.e. the defect is present).
 """
+
 from __future__ import annotations
 
 import sys
@@ -47,7 +48,9 @@ def _make_pdf(pages: int = 4, blank: tuple[int, ...] = (), lines: int = 1) -> by
         if i in blank:
             continue
         for r in range(lines):
-            page.insert_text((72, 60 + r * 18), f"Page {i} line {r}: body text.", fontsize=11)
+            page.insert_text(
+                (72, 60 + r * 18), f"Page {i} line {r}: body text.", fontsize=11
+            )
     return doc.tobytes()
 
 
@@ -65,17 +68,23 @@ def check_F01_blank_page_destroys_document() -> None:
 
     ex, _ = _extractor()
     po = ex.extract(_make_pdf(4, blank=(2,)), "blank.pdf")
-    print(f"      blank-page doc  : status={po.status!r} pages={po.report.get('pages')}"
-          f"/{po.report.get('expected_pages')} dom_key={po.report.get('dom_key')!r}")
+    print(
+        f"      blank-page doc  : status={po.status!r} pages={po.report.get('pages')}"
+        f"/{po.report.get('expected_pages')} dom_key={po.report.get('dom_key')!r}"
+    )
 
     ex2, _ = _extractor()
     po2 = ex2.extract(_make_pdf(4), "full.pdf")
-    print(f"      control (no blank): status={po2.status!r} pages={po2.report.get('pages')}"
-          f"/{po2.report.get('expected_pages')} dom_key={po2.report.get('dom_key')!r}")
+    print(
+        f"      control (no blank): status={po2.status!r} pages={po2.report.get('pages')}"
+        f"/{po2.report.get('expected_pages')} dom_key={po2.report.get('dom_key')!r}"
+    )
 
     reproduced = po.status != "parsed" or po.report.get("dom_key") is None
     if reproduced:
-        print("      -> the 3 content-bearing pages were discarded; no DOM was written.")
+        print(
+            "      -> the 3 content-bearing pages were discarded; no DOM was written."
+        )
     _report("F-01", "blank page destroys the document", reproduced)
 
 
@@ -95,27 +104,43 @@ def check_F02_resume_destroys_completed_work() -> None:
     doc_id = po1.document_id
     ledger = Ledger(root)
     plan1 = ledger.load_plan(doc_id) or {}
-    print(f"      run 1 (resume=False): status={po1.status!r} "
-          f"pages={po1.report.get('pages')}/{po1.report.get('expected_pages')}")
-    print(f"                            ledger={ {k: v['status'] for k, v in sorted(plan1.get('pages', {}).items())} }")
+    print(
+        f"      run 1 (resume=False): status={po1.status!r} "
+        f"pages={po1.report.get('pages')}/{po1.report.get('expected_pages')}"
+    )
+    print(
+        f"                            ledger={ {k: v['status'] for k, v in sorted(plan1.get('pages', {}).items())} }"
+    )
 
     stored = sorted(Path(root, "pages", doc_id).glob("p*/*.docJSON"))
     print(f"      page artifacts on disk: {len(stored)}")
 
-    ex2 = Extractor(NATIVE_CFG, FilesystemStore(root), events=EventPublisher(sink=silent_sink()))
+    ex2 = Extractor(
+        NATIVE_CFG, FilesystemStore(root), events=EventPublisher(sink=silent_sink())
+    )
     po2 = ex2.extract(data, "doc.pdf", resume=True)
     plan2 = ledger.load_plan(doc_id) or {}
-    print(f"      run 2 (resume=True ): status={po2.status!r} "
-          f"pages={po2.report.get('pages')}/{po2.report.get('expected_pages')} "
-          f"dom_key={po2.report.get('dom_key')!r}")
-    print(f"                            ledger={ {k: v['status'] for k, v in sorted(plan2.get('pages', {}).items())} }")
-    print(f"                            assembly={plan2.get('assembly', {}).get('status')!r} "
-          f"{plan2.get('assembly', {}).get('report')}")
+    print(
+        f"      run 2 (resume=True ): status={po2.status!r} "
+        f"pages={po2.report.get('pages')}/{po2.report.get('expected_pages')} "
+        f"dom_key={po2.report.get('dom_key')!r}"
+    )
+    print(
+        f"                            ledger={ {k: v['status'] for k, v in sorted(plan2.get('pages', {}).items())} }"
+    )
+    print(
+        f"                            assembly={plan2.get('assembly', {}).get('status')!r} "
+        f"{plan2.get('assembly', {}).get('report')}"
+    )
 
     reproduced = po2.status != "parsed"
     if reproduced:
-        print(f"      -> {len(stored)} valid page artifacts remain on disk but were excluded from")
-        print("         work_items, never loaded, then dead-lettered. app/processing/executor.py:114")
+        print(
+            f"      -> {len(stored)} valid page artifacts remain on disk but were excluded from"
+        )
+        print(
+            "         work_items, never loaded, then dead-lettered. app/processing/executor.py:114"
+        )
         print("         passes resume=True unconditionally.")
     _report("F-02", "resume destroys completed work", reproduced)
 
@@ -124,25 +149,37 @@ def check_F02_resume_destroys_completed_work() -> None:
 def check_F03_torn_ledger_erases_audit_trail() -> None:
     """F-03 — a truncated plan.json silently discards all page state."""
     print("F-03  Ledger write interrupted by a crash")
-    print("      app/parser/storage_pages.py:57-60 (non-atomic) + :74-76 (silent return)")
+    print(
+        "      app/parser/storage_pages.py:57-60 (non-atomic) + :74-76 (silent return)"
+    )
 
     root = tempfile.mkdtemp()
     ledger = Ledger(root)
     doc_id = "d-torn"
-    ledger.write_plan(doc_id, {
-        "doc_id": doc_id,
-        "pages": {str(i): {"status": "pending", "attempts": 0, "errors": []} for i in range(5)},
-        "assembly": {"status": "pending"},
-    })
+    ledger.write_plan(
+        doc_id,
+        {
+            "doc_id": doc_id,
+            "pages": {
+                str(i): {"status": "pending", "attempts": 0, "errors": []}
+                for i in range(5)
+            },
+            "assembly": {"status": "pending"},
+        },
+    )
 
     plan_path = Path(root, "manifest", doc_id, "plan.json")
-    plan_path.write_text('{"doc_id": "d-torn", "pages": {"0": {"stat')  # crash mid-write
+    plan_path.write_text(
+        '{"doc_id": "d-torn", "pages": {"0": {"stat'
+    )  # crash mid-write
     print("      simulated a torn write (truncated JSON)")
 
     raised = None
     try:
         ledger.update_page(doc_id, 0, PageStatus.OK, "chk", "native", 1, [])
-        ledger.update_page(doc_id, 1, PageStatus.FAILED, "", "native", 1, [{"m": "boom"}])
+        ledger.update_page(
+            doc_id, 1, PageStatus.FAILED, "", "native", 1, [{"m": "boom"}]
+        )
         ledger.update_assembly(doc_id, PageStatus.FAILED, [], {"expected_pages": 5})
     except Exception as exc:  # noqa: BLE001
         raised = exc
@@ -155,8 +192,12 @@ def check_F03_torn_ledger_erases_audit_trail() -> None:
 
     reproduced = raised is None and not (final or {}).get("pages")
     if reproduced:
-        print("      -> all page statuses and all recorded errors are gone, with no error signal.")
-        print("         With events routed to silent_sink() in batch mode this is the only record.")
+        print(
+            "      -> all page statuses and all recorded errors are gone, with no error signal."
+        )
+        print(
+            "         With events routed to silent_sink() in batch mode this is the only record."
+        )
     _report("F-03", "torn ledger erases the audit trail", reproduced)
 
 
@@ -171,23 +212,33 @@ def check_F04_ledger_rewrite_is_quadratic() -> None:
         root = tempfile.mkdtemp()
         ledger = Ledger(root)
         doc_id = "d-cost"
-        ledger.write_plan(doc_id, {
-            "doc_id": doc_id,
-            "pages": {str(i): {"status": "pending", "attempts": 0, "errors": []} for i in range(n)},
-            "assembly": {"status": "pending"},
-        })
+        ledger.write_plan(
+            doc_id,
+            {
+                "doc_id": doc_id,
+                "pages": {
+                    str(i): {"status": "pending", "attempts": 0, "errors": []}
+                    for i in range(n)
+                },
+                "assembly": {"status": "pending"},
+            },
+        )
         t0 = time.time()
         for i in range(n):
             ledger.update_page(doc_id, i, PageStatus.OK, "c" * 64, "native", 1, [])
         elapsed = (time.time() - t0) * 1000
         size = Path(root, "manifest", doc_id, "plan.json").stat().st_size
         per_page.append(elapsed / n)
-        print(f"      {n:>4} pages: {elapsed:8.1f} ms total  {elapsed / n:5.2f} ms/page  "
-              f"plan.json={size / 1024:.0f} KiB")
+        print(
+            f"      {n:>4} pages: {elapsed:8.1f} ms total  {elapsed / n:5.2f} ms/page  "
+            f"plan.json={size / 1024:.0f} KiB"
+        )
 
     reproduced = per_page[-1] > per_page[0] * 1.15
     if reproduced:
-        print(f"      -> ms/page grew {per_page[0]:.2f} -> {per_page[-1]:.2f}: superlinear.")
+        print(
+            f"      -> ms/page grew {per_page[0]:.2f} -> {per_page[-1]:.2f}: superlinear."
+        )
         print("         This is pure bookkeeping I/O, on top of extraction.")
     _report("F-04", "ledger rewrite is quadratic", reproduced)
 
@@ -196,7 +247,9 @@ def check_F04_ledger_rewrite_is_quadratic() -> None:
 def check_F05_native_path_is_quadratic() -> None:
     """F-05 — extract_page rescans every page to compute a document median."""
     print("F-05  Native extraction cost vs page count")
-    print("      app/parser/engines/native_pdf.py:162-171 (document-wide rescan per page)")
+    print(
+        "      app/parser/engines/native_pdf.py:162-171 (document-wide rescan per page)"
+    )
 
     rows = []
     for n in (5, 10, 20, 40):
@@ -206,12 +259,16 @@ def check_F05_native_path_is_quadratic() -> None:
         ex.extract(data, "p.pdf")
         elapsed = (time.time() - t0) * 1000
         rows.append((n, elapsed, elapsed / n))
-        print(f"      {n:>3} pages: {elapsed:8.0f} ms total  {elapsed / n:6.1f} ms/page")
+        print(
+            f"      {n:>3} pages: {elapsed:8.0f} ms total  {elapsed / n:6.1f} ms/page"
+        )
 
     growth = rows[-1][2] / rows[0][2]
     reproduced = growth > 1.3
     if reproduced:
-        print(f"      -> ms/page grew {growth:.2f}x from {rows[0][0]} to {rows[-1][0]} pages: O(n^2).")
+        print(
+            f"      -> ms/page grew {growth:.2f}x from {rows[0][0]} to {rows[-1][0]} pages: O(n^2)."
+        )
         print("         Every page re-opens the PDF and re-scans all N pages' text to")
         print("         recompute the same document-wide median font size.")
     _report("F-05", "native path is quadratic in page count", reproduced)
@@ -258,18 +315,29 @@ def check_F07_page_exists_treats_failed_as_done() -> None:
     root = tempfile.mkdtemp()
     store = PageStore(root)
     doc_id = "d-fail"
-    failed = PageResult(doc_id=doc_id, page_index=3, route="native",
-                        status=PageStatus.FAILED, errors=[{"m": "crashed"}])
+    failed = PageResult(
+        doc_id=doc_id,
+        page_index=3,
+        route="native",
+        status=PageStatus.FAILED,
+        errors=[{"m": "crashed"}],
+    )
     store.put_page(doc_id, 3, failed)
 
     exists = store.page_exists(doc_id, 3)
     roundtrip = store.get_page(doc_id, 3)
     print(f"      persisted a FAILED PageResult; page_exists(3) = {exists}")
-    print(f"      stored status on disk    = {roundtrip.status.value if roundtrip else None!r}")
+    print(
+        f"      stored status on disk    = {roundtrip.status.value if roundtrip else None!r}"
+    )
 
-    reproduced = exists and roundtrip is not None and roundtrip.status == PageStatus.FAILED
+    reproduced = (
+        exists and roundtrip is not None and roundtrip.status == PageStatus.FAILED
+    )
     if reproduced:
-        print("      -> _fail_document() skips any page where page_exists() is True, so a page")
+        print(
+            "      -> _fail_document() skips any page where page_exists() is True, so a page"
+        )
         print("         that failed is never recorded as FAILED by the safety net.")
     _report("F-07", "page_exists treats FAILED as done", reproduced)
 
@@ -313,7 +381,9 @@ def check_F08_no_logging_no_timeouts() -> None:
 
     reproduced = logging_hits == 0 or timeout_hits == 0 or atomic_hits == 0
     if reproduced:
-        print("      -> there is no logging subsystem, no timeout on any operation, and no")
+        print(
+            "      -> there is no logging subsystem, no timeout on any operation, and no"
+        )
         print("         atomic-write primitive anywhere in app/.")
     _report("F-08", "no logging / timeouts / atomic writes", reproduced)
 
@@ -346,7 +416,9 @@ def main(argv: list[str]) -> int:
     print("\n" + "=" * 78)
     print("SUMMARY")
     for cid, title, reproduced in _results:
-        print(f"  {cid}  {'REPRODUCED' if reproduced else 'not reproduced':<15}  {title}")
+        print(
+            f"  {cid}  {'REPRODUCED' if reproduced else 'not reproduced':<15}  {title}"
+        )
     n = sum(1 for _, _, r in _results if r)
     print(f"\n{n}/{len(_results)} failure points reproduced on this machine.")
     return 0

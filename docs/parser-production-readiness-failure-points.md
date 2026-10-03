@@ -49,8 +49,7 @@ The hard gate `DocumentValidator.assembled_page_set` counts a page as "assembled
 **only if** its `PageResult` has `content_present == True`:
 
 ```python
-ok = {r.page_index for r in results
-      if r.status == PageStatus.OK and r.content_present}
+ok = {r.page_index for r in results if r.status == PageStatus.OK and r.content_present}
 ```
 
 `content_present` is `True` whenever a page has *any* block/table/image. A
@@ -134,7 +133,7 @@ so a crash mid-write leaves a **truncated JSON** file. `load_plan` then does:
 try:
     return json.loads(p.read_text(...))
 except Exception:
-    return None          # silently swallowed
+    return None  # silently swallowed
 ```
 
 and `update_page`/`update_assembly` both do `plan = self.load_plan(doc_id); if plan is None: return`
@@ -206,7 +205,7 @@ The document-level safety net decides whether to mark a page FAILED like this:
 
 ```python
 for p in plan.expected_page_set:
-    if not self.page_store.page_exists(doc_id, p):   # file exists at all?
+    if not self.page_store.page_exists(doc_id, p):  # file exists at all?
         self.ledger.update_page(doc_id, p, PageStatus.FAILED, ...)
 ```
 

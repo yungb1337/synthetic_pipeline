@@ -8,29 +8,29 @@ documents using a worker pool, with:
     re-runs are incremental,
   * a BatchReport with per-format breakdown for monitoring.
 """
+
 from __future__ import annotations
 
 import threading
 import time
-from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..normalizer.config import NormalizerConfig
+from ..normalizer.normalizer import Normalizer
 from ..parser import ocr as parser_ocr
 from ..parser.events import EventPublisher, file_sink
-from ..parser.extraction import Extractor, set_shared_scheduler
+from ..parser.extraction import Extractor
 from ..parser.scheduler import Scheduler
 from ..parser.storage import FilesystemStore, Store
 from ..parser.storage_pages import Ledger, PageStore
-from ..normalizer.config import NormalizerConfig
-from ..normalizer.normalizer import Normalizer
-
 from .config import ProcessingConfig
 from .corpus import DocRef, load_manifest, pending, save_manifest, shard_doc_refs
 
 # --- I-13: bridge scheduler metrics events into the live BatchReport --------
 _metrics_lock = threading.Lock()
-_metrics_report: "BatchReport | None" = None
+_metrics_report: BatchReport | None = None
 
 
 def _metrics_sink(name: str, payload: dict) -> None:
@@ -46,7 +46,7 @@ def _metrics_sink(name: str, payload: dict) -> None:
                 pass
 
 
-def _set_metrics_report(report: "BatchReport | None") -> None:
+def _set_metrics_report(report: BatchReport | None) -> None:
     global _metrics_report
     with _metrics_lock:
         _metrics_report = report
@@ -55,12 +55,12 @@ def _set_metrics_report(report: "BatchReport | None") -> None:
 @dataclass
 class DocResult:
     docref: DocRef
-    status: str = "ok"           # ok | failed | skipped
+    status: str = "ok"  # ok | failed | skipped
     document_id: str = ""
     result_type: str = ""
     error: str = ""
     ms: float = 0.0
-    retriable: bool = True       # False => deterministic failure, do not retry
+    retriable: bool = True  # False => deterministic failure, do not retry
 
 
 @dataclass
@@ -75,8 +75,8 @@ class BatchReport:
     errors: list[str] = field(default_factory=list)
     manifest_path: str = ""
     # I-13: aggregate observability (additive; derived at run end).
-    retried_docs: int = 0            # documents that needed >1 attempt
-    pages_seen: int = 0              # page-turnaround samples seen via metrics
+    retried_docs: int = 0  # documents that needed >1 attempt
+    pages_seen: int = 0  # page-turnaround samples seen via metrics
     docs_per_s: float = 0.0
     pages_per_s: float = 0.0
     page_turnaround_p50_ms: float | None = None
@@ -94,9 +94,11 @@ class BatchReport:
         for k, v in (payload.get("by_status") or {}).items():
             self.by_page_status[k] = self.by_page_status.get(k, 0) + int(v)
         ta = payload.get("page_turnaround_ms") or {}
-        for q, attr in (("p50", "page_turnaround_p50_ms"),
-                        ("p95", "page_turnaround_p95_ms"),
-                        ("p99", "page_turnaround_p99_ms")):
+        for q, attr in (
+            ("p50", "page_turnaround_p50_ms"),
+            ("p95", "page_turnaround_p95_ms"),
+            ("p99", "page_turnaround_p99_ms"),
+        ):
             val = ta.get(q)
             if val is not None:
                 setattr(self, attr, val)
@@ -115,7 +117,7 @@ class ParseNormalizePipeline:
 
     _scheduler: Scheduler | None = None
 
-    def __init__(self, store: Store, config: "ProcessingConfig | None" = None):
+    def __init__(self, store: Store, config: ProcessingConfig | None = None):
         from ..parser.config import default_config as parser_cfg
 
         parser_config = parser_cfg()
@@ -129,7 +131,8 @@ class ParseNormalizePipeline:
                 parser_config,
                 native_concurrency=proc_cfg.native_concurrency,
                 heavy_concurrency=proc_cfg.heavy_concurrency,
-                page_store=page_store, ledger=ledger,
+                page_store=page_store,
+                ledger=ledger,
             )
         # I-13: route scheduler metrics events into the current run's report.
         # The scheduler is process-wide while reports are per-run, so the sink
@@ -138,9 +141,12 @@ class ParseNormalizePipeline:
         # batch pipelines emit to a file sink (events.jsonl), not stdout
         events_path = str(Path(root) / "events.jsonl")
         self.extractor = Extractor(
-            parser_config, store, events=EventPublisher(sink=file_sink(events_path)),
+            parser_config,
+            store,
+            events=EventPublisher(sink=file_sink(events_path)),
             scheduler=ParseNormalizePipeline._scheduler,
-            page_store=page_store, ledger=ledger,
+            page_store=page_store,
+            ledger=ledger,
         )
         self.normalizer = Normalizer(NormalizerConfig())
         self.store = store
@@ -148,8 +154,9 @@ class ParseNormalizePipeline:
         self._ledger = ledger
 
     @staticmethod
-    def _processing_cfg() -> "ProcessingConfig":
+    def _processing_cfg() -> ProcessingConfig:
         from .config import ProcessingConfig
+
         return ProcessingConfig()
 
     @classmethod
@@ -163,25 +170,44 @@ class ParseNormalizePipeline:
         try:
             data = open(ref.path, "rb").read()
         except OSError as e:
-            return DocResult(ref, status="failed", error=str(e), ms=(time.time()-t0)*1000, retriable=False)
+            return DocResult(
+                ref,
+                status="failed",
+                error=str(e),
+                ms=(time.time() - t0) * 1000,
+                retriable=False,
+            )
         try:
             # sha256 is already known from the corpus scan; hand it through so
             # extract does not re-hash the full file (idempotency + scale).
-            po = self.extractor.extract(data, filename=ref.name, sha256=ref.sha256,
-                                         resume=True)
+            po = self.extractor.extract(
+                data, filename=ref.name, sha256=ref.sha256, resume=True
+            )
             if not po.ok:
                 # unsupported/unresolved/too-large are deterministic outcomes
-                return DocResult(ref, status="failed", error=po.status, ms=(time.time()-t0)*1000, retriable=False)
+                return DocResult(
+                    ref,
+                    status="failed",
+                    error=po.status,
+                    ms=(time.time() - t0) * 1000,
+                    retriable=False,
+                )
             normalized = self.normalizer.normalize(po.document)
             self.store.put_normalized(po.document_id, normalized)
             return DocResult(
-                ref, status="ok", document_id=po.document_id,
+                ref,
+                status="ok",
+                document_id=po.document_id,
                 result_type=po.detected.slug if po.detected else "?",
-                ms=(time.time()-t0)*1000,
+                ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
-            return DocResult(ref, status="failed", error=f"{type(e).__name__}: {e}",
-                             ms=(time.time()-t0)*1000)
+            return DocResult(
+                ref,
+                status="failed",
+                error=f"{type(e).__name__}: {e}",
+                ms=(time.time() - t0) * 1000,
+            )
 
 
 class BatchWorker:
@@ -190,7 +216,7 @@ class BatchWorker:
         self.pipeline = pipeline
         self._lock = threading.Lock()
         self._manifest: set[str] = set()
-        self._manifest_dirty = False      # set on new sha; _flush rewrites only if set
+        self._manifest_dirty = False  # set on new sha; _flush rewrites only if set
         self._report = BatchReport(manifest_path=config.manifest_path)
         self._flush_every = 256
         # I-13: give the shared scheduler's metrics sink the live report.
@@ -199,11 +225,13 @@ class BatchWorker:
     def run(self, refs: list[DocRef]) -> BatchReport:
         t_start = time.time()
         if self.config.ocr_warm:
-            parser_ocr.engine_available()          # preload once for the pool
+            parser_ocr.engine_available()  # preload once for the pool
 
         # B3: Partition corpus if cluster sharding is active
         if getattr(self.config, "shard_total", 1) > 1:
-            refs = shard_doc_refs(refs, self.config.shard_index, self.config.shard_total)
+            refs = shard_doc_refs(
+                refs, self.config.shard_index, self.config.shard_total
+            )
 
         # fresh report + manifest per run (a worker may be reused across runs)
         self._report = BatchReport(manifest_path=self.config.manifest_path)
@@ -266,7 +294,7 @@ class BatchWorker:
             # not going to fix themselves; retry only transient exceptions.
             if not res.retriable or attempt >= self.config.max_retries - 1:
                 return res
-            time.sleep(self.config.base_backoff_s * (2 ** attempt))
+            time.sleep(self.config.base_backoff_s * (2**attempt))
         return res
 
     def _record(self, res: DocResult) -> None:

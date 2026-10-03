@@ -56,32 +56,46 @@ Dependencies: `app/parser.dom` (Document + `Store` for reading the normalized DO
 ```python
 class ChunkProvenance(BaseModel):
     chunker_version: str
-    chunker_params: dict          # target_tokens, hard_max, band, overlap, order fallback, ...
+    chunker_params: dict  # target_tokens, hard_max, band, overlap, order fallback, ...
     dom_schema_version: str
     normalizer_version: str | None
-    dom_storage_key: str          # which norm-v{ver}.docJSON was consumed (traceability)
-    tokenizer: str                # "bge-m3" | "char4" (exactly which token counts came from)
+    dom_storage_key: str  # which norm-v{ver}.docJSON was consumed (traceability)
+    tokenizer: str  # "bge-m3" | "char4" (exactly which token counts came from)
     tokenizer_ref_hash: str | None
-    forced_split: bool            # True only when a single sentence exceeded hard_max (pathological)
+    forced_split: (
+        bool  # True only when a single sentence exceeded hard_max (pathological)
+    )
+
 
 class Chunk(BaseModel):
-    chunk_id: str                 # content-addressed sha256 (see below) — NEVER position or embedder dependent
+    chunk_id: str  # content-addressed sha256 (see below) — NEVER position or embedder dependent
     doc_id: str
-    seq: int                      # position in document order (stable for a given DOM version)
-    kind: str                     # paragraph|heading|list_item|code|formula|caption|mixed
-    text: str                     # faithful join of source Block.text; None is never fabricated
-    source_block_ids: list[str]   # block ids (in reading order) fully covered by this chunk
-    overlap_source_chunk_id: str | None = None   # set only when head repeats a prior chunk's tail (heading seams)
-    page: int                     # first page touched
+    seq: int  # position in document order (stable for a given DOM version)
+    kind: str  # paragraph|heading|list_item|code|formula|caption|mixed
+    text: str  # faithful join of source Block.text; None is never fabricated
+    source_block_ids: list[
+        str
+    ]  # block ids (in reading order) fully covered by this chunk
+    overlap_source_chunk_id: str | None = (
+        None  # set only when head repeats a prior chunk's tail (heading seams)
+    )
+    page: int  # first page touched
     pages: list[int]
-    heading_anchor: str = ""      # nearest preceding heading text; "" when none (metadata only, NOT embedded)
-    parent_chunk_id: str | None = None   # RESERVED for parent-child retrieval (not built this run)
+    heading_anchor: str = (
+        ""  # nearest preceding heading text; "" when none (metadata only, NOT embedded)
+    )
+    parent_chunk_id: str | None = (
+        None  # RESERVED for parent-child retrieval (not built this run)
+    )
     token_count: int
     char_count: int
     tokenizer: str
-    order_source: str = "reading_order"   # "reading_order" | "page_order" | "orphan"
+    order_source: str = "reading_order"  # "reading_order" | "page_order" | "orphan"
     provenance: ChunkProvenance
-    embedding_ref: str = ""       # emb storage key; populated by the embed pass (deterministic overwrite)
+    embedding_ref: str = (
+        ""  # emb storage key; populated by the embed pass (deterministic overwrite)
+    )
+
 
 class ChunksArtifact(BaseModel):
     schema: str = "chunks-v1"
@@ -89,8 +103,8 @@ class ChunksArtifact(BaseModel):
     chunker_version: str
     dom_storage_key: str
     chunks: list[Chunk]
-    report: dict                  # blocks_seen, blocks_orphaned, chunks_created, forced_splits,
-                                  # overlap_chunks, tokens_total, order_source_used, warnings
+    report: dict  # blocks_seen, blocks_orphaned, chunks_created, forced_splits,
+    # overlap_chunks, tokens_total, order_source_used, warnings
 ```
 
 **`chunk_id` definition (Recommendation):**
@@ -177,16 +191,27 @@ embeddings/{doc_id}/emb-v{chunker_version}-{embedder_id}.npy       # float32 mat
 class ChunkStore(ABC):
     # chunks
     def put_chunks(self, doc_id: str, artifact: ChunksArtifact) -> str: ...
-    def get_chunks(self, doc_id: str, chunker_version: str) -> ChunksArtifact | None: ...
+    def get_chunks(
+        self, doc_id: str, chunker_version: str
+    ) -> ChunksArtifact | None: ...
     def latest_chunks(self, doc_id: str) -> ChunksArtifact | None: ...
     def iter_all_chunks(self) -> Iterator[ChunksArtifact]: ...
     # embeddings
-    def put_embeddings(self, doc_id, chunker_version, embedder_id,
-                       chunk_ids: list[str], matrix: np.ndarray, meta: dict) -> str: ...
-    def get_embeddings(self, doc_id, chunker_version, embedder_id
-                       ) -> tuple[list[str], np.ndarray, dict] | None: ...
-    def get_embedding(self, doc_id, chunk_id, chunker_version, embedder_id
-                      ) -> list[float] | None: ...
+    def put_embeddings(
+        self,
+        doc_id,
+        chunker_version,
+        embedder_id,
+        chunk_ids: list[str],
+        matrix: np.ndarray,
+        meta: dict,
+    ) -> str: ...
+    def get_embeddings(
+        self, doc_id, chunker_version, embedder_id
+    ) -> tuple[list[str], np.ndarray, dict] | None: ...
+    def get_embedding(
+        self, doc_id, chunk_id, chunker_version, embedder_id
+    ) -> list[float] | None: ...
     def iter_embeddings(self) -> Iterator[tuple[str, list[str], np.ndarray, dict]]: ...
 ```
 

@@ -1,15 +1,13 @@
-"""Converts raw Unlimited-OCR outputs into the canonical Document DOM and applies Normalization.
-"""
+"""Converts raw Unlimited-OCR outputs into the canonical Document DOM and applies Normalization."""
+
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from app.normalizer.normalizer import Normalizer
 from app.parser.dom.models import (
     BBox,
     Block,
-    Cell,
     Document,
     ImageObject,
     Metadata,
@@ -17,11 +15,10 @@ from app.parser.dom.models import (
     Provenance,
     ReadingOrderEntry,
     Reference,
-    Row,
     Table,
 )
 
-from .adapter import DocumentRawOCR, PageRawOCR
+from .adapter import DocumentRawOCR
 
 
 class UnlimitedOCRConverter:
@@ -42,7 +39,11 @@ class UnlimitedOCRConverter:
         if not t:
             return "paragraph"
         # Heading checks
-        if re.match(r"^(?:[0-9]+(?:\.[0-9]+)*\s+[A-Z]|Abstract\b|Introduction\b|Methods\b|Results\b|Discussion\b|Conclusion\b|References\b)", t, re.IGNORECASE):
+        if re.match(
+            r"^(?:[0-9]+(?:\.[0-9]+)*\s+[A-Z]|Abstract\b|Introduction\b|Methods\b|Results\b|Discussion\b|Conclusion\b|References\b)",
+            t,
+            re.IGNORECASE,
+        ):
             return "heading"
         if len(t) < 60 and (t.isupper() or t.istitle()) and not t.endswith("."):
             return "heading"
@@ -69,7 +70,9 @@ class UnlimitedOCRConverter:
 
             # Sort lines geometrically: primary y (with ~10px tolerance for columns), secondary x
             indexed_lines = []
-            for i, (txt, score, box) in enumerate(zip(raw_page.texts, raw_page.scores, raw_page.boxes)):
+            for i, (txt, score, box) in enumerate(
+                zip(raw_page.texts, raw_page.scores, raw_page.boxes)
+            ):
                 bbox = self._quad_to_bbox(box)
                 indexed_lines.append((i, txt, score, box, bbox))
 
@@ -79,7 +82,9 @@ class UnlimitedOCRConverter:
                 if b is None:
                     return (0, 0)
                 # Two-column layout heuristic: if page width > 400 and x0 > width/2, sort column 2 after column 1
-                col = 1 if (raw_page.width > 300 and b.x0 > raw_page.width * 0.48) else 0
+                col = (
+                    1 if (raw_page.width > 300 and b.x0 > raw_page.width * 0.48) else 0
+                )
                 return (col, round(b.y0 / 12.0), b.x0)
 
             indexed_lines.sort(key=_sort_key)

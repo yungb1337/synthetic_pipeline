@@ -7,6 +7,7 @@ Default: BAAI/bge-m3 (1024-dim, multilingual) -> models/bge-m3, so the embedder
 loads fully offline from inside the pipeline (not the shared HF cache).
 Adheres to the "no data leaves the machine" + "models live in the repo" policy.
 """
+
 from __future__ import annotations
 
 import os

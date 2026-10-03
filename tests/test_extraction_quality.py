@@ -14,10 +14,10 @@ Two layers:
   2. The exact uploaded fixture PDF, run when present on disk (skips otherwise),
      asserting the real before/after numbers from the investigation.
 """
+
 from __future__ import annotations
 
 import os
-import re
 
 import pytest
 
@@ -57,7 +57,9 @@ def _gen_structural_pdf(path: str) -> None:
     doc = fitz.open()
     p1 = doc.new_page(width=595, height=842)
     p1.insert_text((72, 80), "Survey of Synthetic Data", fontsize=18)
-    p1.insert_text((72, 110), "We build on prior work [1] and extend it [2].", fontsize=11)
+    p1.insert_text(
+        (72, 110), "We build on prior work [1] and extend it [2].", fontsize=11
+    )
 
     # Ruled 4x3 grid table (x0,y0,x1,y1 = 72,160 -> 320,280).
     cols = [72, 200, 320]
@@ -119,9 +121,9 @@ def test_generated_pdf_structural_fidelity(tmp_path):
     # only require that IF a table is detected it is NOT a single collapsed row.
     tables = [t for p in d.pages for t in p.tables]
     for t in tables:
-        assert len(t.rows) != 1 or not any(
-            " " in c for row in t.rows for c in row
-        ), f"collapsed table row detected: {t.rows}"
+        assert len(t.rows) != 1 or not any(" " in c for row in t.rows for c in row), (
+            f"collapsed table row detected: {t.rows}"
+        )
 
     # D4: reading_order_full covers every block, table, image exactly once
     ids = {b.id for p in d.pages for b in p.blocks}
@@ -142,7 +144,9 @@ def test_generated_pdf_structural_fidelity(tmp_path):
     # detector unreliability on synthetic fitz grids), so this only asserts when
     # tables ARE present. The real fixture below validates this on real data.
     if tables:
-        cell_with_bbox = any(c.bbox is not None for t in tables for r in t.rows for c in r.cells)
+        cell_with_bbox = any(
+            c.bbox is not None for t in tables for r in t.rows for c in r.cells
+        )
         assert cell_with_bbox, "cell geometry discarded"
 
 
@@ -158,20 +162,30 @@ def test_builder_keeps_empty_continuation_page():
     the observed index convention (0-based native, 1-based docling).
     """
     from app.parser.dom.builder import DocumentBuilder
-    from app.parser.parts import RecoveredDocument, RecoveredTable, RecoveredBlock
+    from app.parser.parts import RecoveredBlock, RecoveredDocument, RecoveredTable
 
     cfg = _cfg()
 
     # 0-based convention (native): page 0 has content, page 1 is an empty
     # continuation page (its table fragment lives inside page 0's merged table).
     rec = RecoveredDocument(
-        detected_type="pdf", mime="application/pdf", declared_extension="pdf",
-        probe="magic", page_count=2, 
+        detected_type="pdf",
+        mime="application/pdf",
+        declared_extension="pdf",
+        probe="magic",
+        page_count=2,
         blocks=[RecoveredBlock(text="body", kind="text", page=0, seq=0)],
-        tables=[RecoveredTable(
-            page=0, header=["A", "B"], rows=[["x", "y"]], source="docling",
-            confidence=1.0, cell_bboxes=[[(0, 0, 1, 1), (0, 0, 1, 1)]],
-            row_bboxes=[(0, 0, 1, 1)])],
+        tables=[
+            RecoveredTable(
+                page=0,
+                header=["A", "B"],
+                rows=[["x", "y"]],
+                source="docling",
+                confidence=1.0,
+                cell_bboxes=[[(0, 0, 1, 1), (0, 0, 1, 1)]],
+                row_bboxes=[(0, 0, 1, 1)],
+            )
+        ],
     )
     doc = DocumentBuilder(cfg).build(rec, "d-test", "sha")
     assert len(doc.pages) == 2, f"expected 2 pages, got {len(doc.pages)}"
@@ -181,14 +195,23 @@ def test_builder_keeps_empty_continuation_page():
 
     # 1-based convention (docling): page 8 continuation of a page-7 table.
     rec2 = RecoveredDocument(
-        detected_type="pdf", mime="application/pdf", declared_extension="pdf",
-        probe="magic", page_count=8, 
+        detected_type="pdf",
+        mime="application/pdf",
+        declared_extension="pdf",
+        probe="magic",
+        page_count=8,
         blocks=[RecoveredBlock(text="h", kind="heading", page=1, seq=0)],
-        tables=[RecoveredTable(
-            page=7, header=["C", "D"], rows=[["a", "b"], ["c", "d"]],
-            source="docling", confidence=1.0,
-            cell_bboxes=[[(0, 0, 1, 1), (0, 0, 1, 1)]] * 2,
-            row_bboxes=[(0, 0, 1, 1), (0, 0, 1, 1)])],
+        tables=[
+            RecoveredTable(
+                page=7,
+                header=["C", "D"],
+                rows=[["a", "b"], ["c", "d"]],
+                source="docling",
+                confidence=1.0,
+                cell_bboxes=[[(0, 0, 1, 1), (0, 0, 1, 1)]] * 2,
+                row_bboxes=[(0, 0, 1, 1), (0, 0, 1, 1)],
+            )
+        ],
     )
     doc2 = DocumentBuilder(cfg).build(rec2, "d-test2", "sha")
     assert len(doc2.pages) == 8, f"expected 8 pages, got {len(doc2.pages)}"
@@ -196,7 +219,9 @@ def test_builder_keeps_empty_continuation_page():
     assert next(p for p in doc2.pages if p.index == 8).blocks == []
 
 
-@pytest.mark.skipif(not os.path.exists(_FIXTURE), reason="uploaded fixture PDF not present")
+@pytest.mark.skipif(
+    not os.path.exists(_FIXTURE), reason="uploaded fixture PDF not present"
+)
 def test_uploaded_fixture_before_after(tmp_path):
     """Run the exact uploaded 24-page survey through the production pipeline and
     assert the fixes measured in the investigation report.
@@ -237,6 +262,9 @@ def test_uploaded_fixture_before_after(tmp_path):
     assert {e.id for e in d.reading_order_full} == ids
 
     # D3: bibliography recovered (uploaded PDF has 64 entries)
-    if any(getattr(b, "kind", "") == "heading" and "reference" in (b.text or "").lower()
-           for p in d.pages for b in p.blocks):
+    if any(
+        getattr(b, "kind", "") == "heading" and "reference" in (b.text or "").lower()
+        for p in d.pages
+        for b in p.blocks
+    ):
         assert len(d.references) >= 40, f"bibliography truncated: {len(d.references)}"

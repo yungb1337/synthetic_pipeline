@@ -10,6 +10,7 @@ The page store persists one `PageResult` per page (durable unit); the ledger
 records the per-page status + the assembly outcome so resume/retry/dead-letter
 are idempotent.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,7 +19,7 @@ import threading
 from pathlib import Path
 
 from .page_result import PAGE_SCHEMA_VERSION, PageResult, PageStatus
-from .utils import write_atomic, get_logger, LedgerCorruptionError
+from .utils import LedgerCorruptionError, get_logger, write_atomic
 
 logger = get_logger(__name__)
 
@@ -51,7 +52,13 @@ class PageStore:
         self.root = Path(root)
 
     def _page_path(self, doc_id: str, page_index: int) -> Path:
-        return self.root / "pages" / doc_id / f"p{page_index}" / f"page-{PAGE_SCHEMA_VERSION}.docJSON"
+        return (
+            self.root
+            / "pages"
+            / doc_id
+            / f"p{page_index}"
+            / f"page-{PAGE_SCHEMA_VERSION}.docJSON"
+        )
 
     def page_status(self, doc_id: str, page_index: int) -> str | None:
         """I-07: cheap status probe — extracts ONLY the top-level `status`
@@ -88,8 +95,10 @@ class PageStore:
         prior file probes as None and is overwritten, exactly as before.
         """
         prior_status = self.page_status(doc_id, page_index)
-        if result.status in (PageStatus.FAILED, PageStatus.DEAD) \
-                and prior_status == PageStatus.OK.value:
+        if (
+            result.status in (PageStatus.FAILED, PageStatus.DEAD)
+            and prior_status == PageStatus.OK.value
+        ):
             return self._page_path(doc_id, page_index)
         result.checksum = result.compute_checksum()
         p = self._page_path(doc_id, page_index)
@@ -162,7 +171,11 @@ class Ledger:
                             _fold_page_record(plan, rec)
                 except Exception as e:
                     logger.warning(f"Journal fold skipped for {doc_id}: {e}")
-            write_atomic(p, json.dumps(plan, indent=2, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+            write_atomic(
+                p,
+                json.dumps(plan, indent=2, ensure_ascii=False, sort_keys=True),
+                encoding="utf-8",
+            )
             if jp.exists():
                 try:
                     jp.unlink()
@@ -182,7 +195,9 @@ class Ledger:
             try:
                 plan = json.loads(p.read_text(encoding="utf-8"))
             except json.JSONDecodeError as e:
-                logger.warning(f"Ledger corrupted for {doc_id}, attempting .tmp recovery: {e}")
+                logger.warning(
+                    f"Ledger corrupted for {doc_id}, attempting .tmp recovery: {e}"
+                )
                 # Attempt recovery from .tmp file (from interrupted atomic write)
                 tmp_candidates = list(p.parent.glob(f"{p.name}.tmp*"))
                 for tmp in tmp_candidates:
@@ -190,14 +205,23 @@ class Ledger:
                         plan = json.loads(tmp.read_text(encoding="utf-8"))
                         logger.info(f"Recovered {doc_id} plan from {tmp.name}")
                         # Restore the main file atomically
-                        write_atomic(p, json.dumps(plan, indent=2, ensure_ascii=False, sort_keys=True))
+                        write_atomic(
+                            p,
+                            json.dumps(
+                                plan, indent=2, ensure_ascii=False, sort_keys=True
+                            ),
+                        )
                         break
                     except Exception:
                         continue
                 if plan is None:
                     # No recovery possible
-                    logger.error(f"Ledger corruption for {doc_id}: no valid .tmp recovery found")
-                    raise LedgerCorruptionError(f"plan.json corrupt for {doc_id}, no .tmp recovery: {e}")
+                    logger.error(
+                        f"Ledger corruption for {doc_id}: no valid .tmp recovery found"
+                    )
+                    raise LedgerCorruptionError(
+                        f"plan.json corrupt for {doc_id}, no .tmp recovery: {e}"
+                    )
             except Exception as e:
                 logger.error(f"Failed to load plan for {doc_id}: {e}")
                 raise LedgerCorruptionError(f"plan.json unreadable for {doc_id}: {e}")
@@ -226,8 +250,16 @@ class Ledger:
 
         return plan
 
-    def update_page(self, doc_id: str, page_index: int, status, checksum: str,
-                    engine: str | None, attempt: int, errors: list) -> None:
+    def update_page(
+        self,
+        doc_id: str,
+        page_index: int,
+        status,
+        checksum: str,
+        engine: str | None,
+        attempt: int,
+        errors: list,
+    ) -> None:
         """Record one page's status in the ledger.
 
         Uses an append-only journal (journal.jsonl) to ensure O(1) time per page
@@ -246,9 +278,8 @@ class Ledger:
             "errors": errors or [],
         }
         # I-08: append under the journal lock (see write_plan).
-        with self._jl:
-            with jp.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        with self._jl, jp.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def update_pages_batch(self, doc_id: str, updates: list[dict]) -> None:
         """A6: Record multiple page statuses in the journal in a single batch write."""
@@ -269,11 +300,12 @@ class Ledger:
                 "errors": u.get("errors") or [],
             }
             lines.append(json.dumps(entry, ensure_ascii=False) + "\n")
-        with self._jl:
-            with jp.open("a", encoding="utf-8") as f:
-                f.writelines(lines)
+        with self._jl, jp.open("a", encoding="utf-8") as f:
+            f.writelines(lines)
 
-    def update_assembly(self, doc_id: str, status, assembled_set: list, report: dict) -> None:
+    def update_assembly(
+        self, doc_id: str, status, assembled_set: list, report: dict
+    ) -> None:
         try:
             plan = self.load_plan(doc_id)
         except LedgerCorruptionError:

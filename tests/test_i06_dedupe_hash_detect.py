@@ -6,14 +6,13 @@ buffer even when the executor had already computed the sha256. These tests
 pin the new contract: exactly ONE hash of the data and ONE detect per
 `extract()` call.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 import fitz
 
 from app.parser import detection
-from app.parser.config import ParserConfig, default_config
+from app.parser.config import ParserConfig
 from app.parser.extraction import Extractor
 from app.parser.source import SourceScan
 from app.parser.storage import FilesystemStore
@@ -53,9 +52,13 @@ def test_i06_scan_reuses_supplied_detected_and_hash(monkeypatch):
 
     store = FilesystemStore("work/_i06_tmp_store")
     # Supply both -> scan must neither detect nor hash.
-    m = SourceScan.scan(_pdf_bytes(), "x.pdf", store,
-                        detected=real_detect(_pdf_bytes(), "x.pdf"),
-                        source_hash=real_sha256(_pdf_bytes()).hexdigest())
+    m = SourceScan.scan(
+        _pdf_bytes(),
+        "x.pdf",
+        store,
+        detected=real_detect(_pdf_bytes(), "x.pdf"),
+        source_hash=real_sha256(_pdf_bytes()).hexdigest(),
+    )
 
     assert calls["detect"] == 0, "scan re-detected despite supplied result"
     assert calls["hash"] == 0, "scan re-hashed despite supplied hash"
@@ -72,8 +75,13 @@ def test_i06_scan_standalone_still_works(tmp_path):
 
 def test_i06_extract_hashes_once_detects_once(tmp_path, monkeypatch):
     store = FilesystemStore(str(tmp_path / "store"))
-    ex = Extractor(ParserConfig(), store,
-                   events=__import__("app.parser.events", fromlist=["EventPublisher"]).EventPublisher(sink=lambda n, p: None))
+    ex = Extractor(
+        ParserConfig(),
+        store,
+        events=__import__(
+            "app.parser.events", fromlist=["EventPublisher"]
+        ).EventPublisher(sink=lambda n, p: None),
+    )
 
     counts = {"detect": 0}
     real_detect = detection.detect
@@ -94,7 +102,9 @@ def test_i06_extract_hashes_once_detects_once(tmp_path, monkeypatch):
 def test_i06_resume_fastpath_detects_once(tmp_path, monkeypatch):
     """The resume fast-path reuses the detect result instead of re-calling it."""
     store = FilesystemStore(str(tmp_path / "store"))
-    events = __import__("app.parser.events", fromlist=["EventPublisher"]).EventPublisher(sink=lambda n, p: None)
+    events = __import__(
+        "app.parser.events", fromlist=["EventPublisher"]
+    ).EventPublisher(sink=lambda n, p: None)
     ex = Extractor(ParserConfig(), store, events=events)
     blob = _pdf_bytes()
 
@@ -107,9 +117,9 @@ def test_i06_resume_fastpath_detects_once(tmp_path, monkeypatch):
 
     monkeypatch.setattr(detection, "detect", counting_detect)
 
-    po1 = ex.extract(blob, "x.pdf")           # full parse populates the ledger
+    po1 = ex.extract(blob, "x.pdf")  # full parse populates the ledger
     assert po1.status == "parsed"
-    counts["detect"] = 0                       # reset for the resume run
+    counts["detect"] = 0  # reset for the resume run
 
     po2 = ex.extract(blob, "x.pdf", resume=True)
     assert po2.status == "parsed"
@@ -122,6 +132,7 @@ def test_i06_doc_id_stable_with_supplied_hash(tmp_path):
     store = FilesystemStore(str(tmp_path / "store"))
     blob = _pdf_bytes()
     import hashlib
+
     sha = hashlib.sha256(blob).hexdigest()
 
     m1 = SourceScan.scan(blob, "a.pdf", store, source_hash=sha)

@@ -13,12 +13,13 @@ index is built this run. `_version_suffix` is imported from `app.parser.storage`
 (pure function; chunking already depends on `app.parser.dom`, not an internals
 leak).
 """
+
 from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 
@@ -73,7 +74,9 @@ class ChunkStore(ABC):
     @abstractmethod
     def put_chunks(self, doc_id: str, artifact: ChunksArtifact) -> str: ...
     @abstractmethod
-    def get_chunks(self, doc_id: str, chunker_version: str) -> ChunksArtifact | None: ...
+    def get_chunks(
+        self, doc_id: str, chunker_version: str
+    ) -> ChunksArtifact | None: ...
     @abstractmethod
     def latest_chunks(self, doc_id: str) -> ChunksArtifact | None: ...
     @abstractmethod
@@ -82,16 +85,28 @@ class ChunkStore(ABC):
     # embeddings
     @abstractmethod
     def put_embeddings(
-        self, doc_id: str, chunker_version: str, embedder_id: str,
-        chunk_ids: list[str], matrix: np.ndarray, meta: dict,
+        self,
+        doc_id: str,
+        chunker_version: str,
+        embedder_id: str,
+        chunk_ids: list[str],
+        matrix: np.ndarray,
+        meta: dict,
     ) -> str: ...
     @abstractmethod
     def get_embeddings(
-        self, doc_id: str, chunker_version: str, embedder_id: str,
+        self,
+        doc_id: str,
+        chunker_version: str,
+        embedder_id: str,
     ) -> tuple[list[str], np.ndarray, dict] | None: ...
     @abstractmethod
     def get_embedding(
-        self, doc_id: str, chunk_id: str, chunker_version: str, embedder_id: str,
+        self,
+        doc_id: str,
+        chunk_id: str,
+        chunker_version: str,
+        embedder_id: str,
     ) -> list[float] | None: ...
     @abstractmethod
     def iter_embeddings(self) -> Iterator[tuple[str, list[str], np.ndarray, dict]]: ...
@@ -125,11 +140,13 @@ class FilesystemChunkStore(ChunkStore):
     def latest_chunks(self, doc_id: str) -> ChunksArtifact | None:
         matches = sorted(
             (self.root / "chunks" / doc_id).glob("chunks-v*.json"),
-            key=lambda p: _version_key(p.stem[len("chunks-v"):]),
+            key=lambda p: _version_key(p.stem[len("chunks-v") :]),
         )
         if not matches:
             return None
-        return ChunksArtifact.model_validate_json(matches[-1].read_text(encoding="utf-8"))
+        return ChunksArtifact.model_validate_json(
+            matches[-1].read_text(encoding="utf-8")
+        )
 
     def iter_all_chunks(self) -> Iterator[ChunksArtifact]:
         for doc_dir in sorted(self.root.glob("chunks/*"), key=lambda p: p.name):
@@ -137,7 +154,9 @@ class FilesystemChunkStore(ChunkStore):
                 yield ChunksArtifact.model_validate_json(p.read_text(encoding="utf-8"))
 
     # ------------------------------------------------------------ embeddings
-    def _emb_paths(self, doc_id: str, version: str, embedder_id: str) -> tuple[Path, Path]:
+    def _emb_paths(
+        self, doc_id: str, version: str, embedder_id: str
+    ) -> tuple[Path, Path]:
         # build filenames explicitly — the version already carries the leading
         # "v" (suffix form) and contains dots, so `with_suffix` on a dotted
         # base would mangle the name.
@@ -146,8 +165,13 @@ class FilesystemChunkStore(ChunkStore):
         return d / f"{stem}.npy", d / f"{stem}.json"
 
     def put_embeddings(
-        self, doc_id: str, chunker_version: str, embedder_id: str,
-        chunk_ids: list[str], matrix: np.ndarray, meta: dict,
+        self,
+        doc_id: str,
+        chunker_version: str,
+        embedder_id: str,
+        chunk_ids: list[str],
+        matrix: np.ndarray,
+        meta: dict,
     ) -> str:
         version = version_suffix(chunker_version)
         npy_path, json_path = self._emb_paths(doc_id, version, embedder_id)
@@ -156,13 +180,20 @@ class FilesystemChunkStore(ChunkStore):
         sidecar = dict(meta)
         sidecar["chunk_ids"] = chunk_ids
         sidecar["npy_key"] = f"embeddings/{doc_id}/{npy_path.name}"
-        json_path.write_text(json.dumps(sidecar, sort_keys=True, indent=2, default=str), encoding="utf-8")
+        json_path.write_text(
+            json.dumps(sidecar, sort_keys=True, indent=2, default=str), encoding="utf-8"
+        )
         return f"embeddings/{doc_id}/{json_path.name}"
 
     def get_embeddings(
-        self, doc_id: str, chunker_version: str, embedder_id: str,
+        self,
+        doc_id: str,
+        chunker_version: str,
+        embedder_id: str,
     ) -> tuple[list[str], np.ndarray, dict] | None:
-        npy_path, json_path = self._emb_paths(doc_id, version_suffix(chunker_version), embedder_id)
+        npy_path, json_path = self._emb_paths(
+            doc_id, version_suffix(chunker_version), embedder_id
+        )
         if not json_path.exists() or not npy_path.exists():
             return None
         sidecar = json.loads(json_path.read_text(encoding="utf-8"))
@@ -171,7 +202,11 @@ class FilesystemChunkStore(ChunkStore):
         return chunk_ids, matrix, sidecar
 
     def get_embedding(
-        self, doc_id: str, chunk_id: str, chunker_version: str, embedder_id: str,
+        self,
+        doc_id: str,
+        chunk_id: str,
+        chunker_version: str,
+        embedder_id: str,
     ) -> list[float] | None:
         got = self.get_embeddings(doc_id, chunker_version, embedder_id)
         if got is None:

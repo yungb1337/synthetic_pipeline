@@ -8,6 +8,7 @@ Curates a 100-doc mixed corpus:
 Runs production Extractor and reports full telemetry, routing distributions,
 throughput, memory profile, and zero-silent-loss validation.
 """
+
 from __future__ import annotations
 
 import json
@@ -22,15 +23,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import pdf_inspector
 import psutil
+
 from app.parser.config import default_config
 from app.parser.events import EventPublisher
 from app.parser.extraction import Extractor, set_shared_scheduler
 from app.parser.scheduler import Scheduler
 from app.parser.storage import FilesystemStore
 from app.parser.storage_pages import Ledger, PageStore
-from app.routing import Router
-import pdf_inspector
 
 
 def curate_100_corpus(corpus_dir: Path) -> list[Path]:
@@ -43,8 +44,18 @@ def curate_100_corpus(corpus_dir: Path) -> list[Path]:
         Path(r"C:/Users/Asus/Downloads/test_cases"),
         Path(r"C:/Users/Asus/Downloads/Train_Tickets"),
         Path(r"C:/Users/Asus/Downloads/reimburse"),
-        REPO_ROOT / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "sources" / "pdf",
-        REPO_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf",
+        REPO_ROOT
+        / "checkpoints"
+        / "run"
+        / "run-2026-09-04-parser-reliability"
+        / "sources"
+        / "pdf",
+        REPO_ROOT
+        / "checkpoints"
+        / "run"
+        / "run-2026-09-14-eval-1000"
+        / "sources"
+        / "pdf",
     ]
 
     collected = []
@@ -114,7 +125,7 @@ def run_evaluation():
         return
 
     process = psutil.Process()
-    initial_rss_gb = process.memory_info().rss / (1024 ** 3)
+    initial_rss_gb = process.memory_info().rss / (1024**3)
     peak_rss_gb = initial_rss_gb
 
     # Setup parser
@@ -132,8 +143,12 @@ def run_evaluation():
     )
     set_shared_scheduler(scheduler)
     extractor = Extractor(
-        cfg, store, events=EventPublisher(),
-        scheduler=scheduler, page_store=page_store, ledger=ledger
+        cfg,
+        store,
+        events=EventPublisher(),
+        scheduler=scheduler,
+        page_store=page_store,
+        ledger=ledger,
     )
 
     print("\n" + "=" * 80)
@@ -166,9 +181,8 @@ def run_evaluation():
         t_doc = time.time() - t_doc_start
 
         # Track memory
-        current_rss = process.memory_info().rss / (1024 ** 3)
-        if current_rss > peak_rss_gb:
-            peak_rss_gb = current_rss
+        current_rss = process.memory_info().rss / (1024**3)
+        peak_rss_gb = max(peak_rss_gb, current_rss)
 
         # Gather metrics from outcome & ledger
         doc_id = event.document_id
@@ -177,12 +191,16 @@ def run_evaluation():
 
         page_count = rep.get("pages") or (plan.get("page_count") if plan else 1) or 1
         total_pages += page_count
-        doc_route = rep.get("route") or (plan.get("route") if plan else "native") or "native"
+        doc_route = (
+            rep.get("route") or (plan.get("route") if plan else "native") or "native"
+        )
         doc_routes[doc_route] = doc_routes.get(doc_route, 0) + 1
 
         # Page-level breakdown
         p_routes = {}
-        expected_pages = plan.get("expected_page_set") if plan else list(range(page_count))
+        expected_pages = (
+            plan.get("expected_page_set") if plan else list(range(page_count))
+        )
         for pno in expected_pages:
             res = page_store.get_page(doc_id, pno) if doc_id else None
             if res:
@@ -197,7 +215,7 @@ def run_evaluation():
                     page_routes["rust_native"] += 1
                     p_routes[pno] = "rust_native"
 
-                for b in (res.blocks or []):
+                for b in res.blocks or []:
                     total_chars += len(getattr(b, "text", "") or "")
                     if getattr(b, "kind", "") == "table":
                         total_tables += 1
@@ -218,9 +236,11 @@ def run_evaluation():
         if i % 10 == 0 or i == len(files):
             elapsed = time.time() - t_start
             p_rate = total_pages / max(0.001, elapsed)
-            print(f"[{i:3d}/100] Processed {total_pages:4d} pages | "
-                  f"Throughput: {p_rate:5.2f} p/s | Peak RSS: {peak_rss_gb:5.3f} GB | "
-                  f"Latest: {file_path.name[:30]:<30} ({page_count:2d}p -> {doc_route})")
+            print(
+                f"[{i:3d}/100] Processed {total_pages:4d} pages | "
+                f"Throughput: {p_rate:5.2f} p/s | Peak RSS: {peak_rss_gb:5.3f} GB | "
+                f"Latest: {file_path.name[:30]:<30} ({page_count:2d}p -> {doc_route})"
+            )
 
     try:
         scheduler.close()
@@ -254,7 +274,7 @@ def run_evaluation():
     # Generate Markdown Summary
     md = f"""# 100-Document Mixed Corpus Evaluation Report (`smart_routing`)
 
-**Date:** {report['timestamp']}
+**Date:** {report["timestamp"]}
 **Branch:** `smart_routing`
 **Total Documents:** {len(files)}
 **Total Pages:** {total_pages:,}
@@ -279,14 +299,14 @@ def run_evaluation():
 ## 2. Granular Routing Distribution
 
 ### Document-Level Routing Decisions
-- **`native` (0-30 complexity):** {doc_routes.get('native', 0)} documents ({doc_routes.get('native', 0)/len(files)*100:.1f}%)
-- **`enrichment` (31-60 scanned/OCR):** {doc_routes.get('enrichment', 0)} documents ({doc_routes.get('enrichment', 0)/len(files)*100:.1f}%)
-- **`docling` (61-100 table/complex):** {doc_routes.get('docling', 0)} documents ({doc_routes.get('docling', 0)/len(files)*100:.1f}%)
+- **`native` (0-30 complexity):** {doc_routes.get("native", 0)} documents ({doc_routes.get("native", 0) / len(files) * 100:.1f}%)
+- **`enrichment` (31-60 scanned/OCR):** {doc_routes.get("enrichment", 0)} documents ({doc_routes.get("enrichment", 0) / len(files) * 100:.1f}%)
+- **`docling` (61-100 table/complex):** {doc_routes.get("docling", 0)} documents ({doc_routes.get("docling", 0) / len(files) * 100:.1f}%)
 
 ### Per-Page Execution Tier Distribution
-- **`rust_native` (Fast Path ~35-45 p/s):** {page_routes.get('rust_native', 0)} pages ({page_routes.get('rust_native', 0)/max(1, total_pages)*100:.1f}%)
-- **`docling_heavy` (Single-Page TableFormer):** {page_routes.get('docling_heavy', 0)} pages ({page_routes.get('docling_heavy', 0)/max(1, total_pages)*100:.1f}%)
-- **`enrichment` (RapidOCR on Scanned Pages):** {page_routes.get('enrichment', 0)} pages ({page_routes.get('enrichment', 0)/max(1, total_pages)*100:.1f}%)
+- **`rust_native` (Fast Path ~35-45 p/s):** {page_routes.get("rust_native", 0)} pages ({page_routes.get("rust_native", 0) / max(1, total_pages) * 100:.1f}%)
+- **`docling_heavy` (Single-Page TableFormer):** {page_routes.get("docling_heavy", 0)} pages ({page_routes.get("docling_heavy", 0) / max(1, total_pages) * 100:.1f}%)
+- **`enrichment` (RapidOCR on Scanned Pages):** {page_routes.get("enrichment", 0)} pages ({page_routes.get("enrichment", 0) / max(1, total_pages) * 100:.1f}%)
 
 ---
 
@@ -300,7 +320,9 @@ def run_evaluation():
     report_md_path.write_text(md, encoding="utf-8")
 
     print("\n" + "=" * 80)
-    print(f"EVALUATION COMPLETE: {len(files)} docs / {total_pages} pages in {total_sec:.2f}s ({avg_throughput:.2f} p/s)")
+    print(
+        f"EVALUATION COMPLETE: {len(files)} docs / {total_pages} pages in {total_sec:.2f}s ({avg_throughput:.2f} p/s)"
+    )
     print(f"Report saved to: {report_md_path}")
     print("=" * 80)
 

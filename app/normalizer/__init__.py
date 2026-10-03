@@ -14,6 +14,7 @@ Key Guarantees:
 
 Version: 0.2.0
 """
+
 from __future__ import annotations
 
 from .config import NormalizerConfig
@@ -23,10 +24,10 @@ from .pipeline import apply, is_idempotent
 __version__ = "0.2.0"
 
 __all__ = [
+    "NormalizeResult",
     "Normalizer",
     "NormalizerConfig",
-    "NormalizeResult",
+    "__version__",
     "apply",
     "is_idempotent",
-    "__version__",
 ]

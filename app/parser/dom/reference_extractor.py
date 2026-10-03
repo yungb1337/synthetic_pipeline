@@ -29,6 +29,7 @@ bare number to that id, built strictly from matched labels (no fabrication).
 The function is PURE: it only reads `Page`/`Block` data and returns structured
 references. It never mutates the DOM.
 """
+
 from __future__ import annotations
 
 import re
@@ -97,7 +98,9 @@ def _all_blocks(pages):
             yield b
 
 
-def _recover_labels_from_source(pages, src_bytes: bytes) -> dict[int, dict[int, set[str]]]:
+def _recover_labels_from_source(
+    pages, src_bytes: bytes
+) -> dict[int, dict[int, set[str]]]:
     """Recover the set of bracketed `[n]` entry markers for bibliography blocks from
     the SOURCE PDF — the ground truth for where one entry ends and the next begins.
 
@@ -155,7 +158,9 @@ def _recover_labels_from_source(pages, src_bytes: bytes) -> dict[int, dict[int, 
     return out
 
 
-def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) -> tuple[list[Reference], dict[str, str]]:
+def extract_references(
+    pages, doc_id: str = "", src_bytes: bytes | None = None
+) -> tuple[list[Reference], dict[str, str]]:
     """Return (references, citation_index) for the document's bibliography.
 
     `references` is empty and `citation_index` empty when no bibliography signal
@@ -171,7 +176,7 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
     heading_found = start is not None
 
     # Collect candidate entry blocks + detect [n]-leading blocks anywhere.
-    n_leading_blocks: list[tuple[int, "Block", str, str]] = []
+    n_leading_blocks: list[tuple[int, Block, str, str]] = []
     for i, b in enumerate(blocks):
         entry_match = _extract_entry_match(b.text or "")
         if entry_match and (start is None or i > start):
@@ -200,7 +205,9 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
     # For merged blocks, geo supplies the ADDITIONAL entry numbers inside the block.
     geo = _recover_labels_from_source(pages, src_bytes) if src_bytes else {}
 
-    def _split_merged_block(text: str, leading_num: str, geo_nums: set[str]) -> list[tuple[str, str, str]]:
+    def _split_merged_block(
+        text: str, leading_num: str, geo_nums: set[str]
+    ) -> list[tuple[str, str, str]]:
         """Split a block that contains multiple [n] markers into individual entries.
 
         Uses `_CITATION` (no anchors) to find every `[n]` position in the text,
@@ -223,13 +230,13 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
             return []
         if len(found) == 1:
             _, num, raw = found[0]
-            body = text[len(raw):].strip()
+            body = text[len(raw) :].strip()
             return [(num, f"[{num}]", body)]
         # Multiple confirmed markers: split at each one.
         entries = []
         for k, (start_p, num, raw) in enumerate(found):
             end_pos = found[k + 1][0] if k + 1 < len(found) else len(text)
-            seg = text[start_p + len(raw):end_pos].strip()
+            seg = text[start_p + len(raw) : end_pos].strip()
             entries.append((num, f"[{num}]", seg))
         return entries
 
@@ -247,7 +254,9 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
         label = f"[{num}]"
         existing = best.get(num)
         if existing is None or len(text) > len(existing.text):
-            best[num] = Reference(kind="citation", target=rid, id=rid, label=label, text=text)
+            best[num] = Reference(
+                kind="citation", target=rid, id=rid, label=label, text=text
+            )
 
     last_num: str | None = None
 
@@ -271,7 +280,11 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
             for k, lm in enumerate(line_matches):
                 num = lm.group(1) or lm.group(2) or lm.group(3)
                 start_p = lm.end()
-                end_p = line_matches[k + 1].start() if k + 1 < len(line_matches) else len(text)
+                end_p = (
+                    line_matches[k + 1].start()
+                    if k + 1 < len(line_matches)
+                    else len(text)
+                )
                 ent_text = text[start_p:end_p].strip()
                 if num and ent_text:
                     _keep(num, ent_text)
@@ -293,7 +306,9 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
                 last_num = leading_num
         elif geo_nums:
             # Block has NO leading [n] but geo found markers (marker dropped in mapping).
-            splits = _split_merged_block(text, next(iter(sorted(geo_nums, key=int))), geo_nums)
+            splits = _split_merged_block(
+                text, next(iter(sorted(geo_nums, key=int))), geo_nums
+            )
             if splits:
                 for num, _label, ent_text in splits:
                     _keep(num, ent_text)
@@ -319,4 +334,3 @@ def extract_references(pages, doc_id: str = "", src_bytes: bytes | None = None) 
     refs = ordered
     citation_index = {r.label[1:-1]: r.id for r in ordered}
     return refs, citation_index
-

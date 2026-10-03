@@ -1,10 +1,10 @@
-"""Smart Router using pdf-inspector signals to determine optimal execution path (per-page hybrid).
-"""
+"""Smart Router using pdf-inspector signals to determine optimal execution path (per-page hybrid)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import pdf_inspector
 
@@ -80,9 +80,13 @@ class PDFInspectorSmartRouter:
             for p_idx in range(n_pages):
                 # 1-based page number from inspector vs 0-based index
                 p_num_1based = p_idx + 1
-                needs_ocr = (p_num_1based in ocr_set) or has_encoding_issues or (pdf_type in ("scanned", "image_based"))
-                has_tables = (p_num_1based in tables_set)
-                has_columns = (p_num_1based in cols_set)
+                needs_ocr = (
+                    (p_num_1based in ocr_set)
+                    or has_encoding_issues
+                    or (pdf_type in ("scanned", "image_based"))
+                )
+                has_tables = p_num_1based in tables_set
+                has_columns = p_num_1based in cols_set
 
                 # Rule A: Page needs OCR or has broken font CMap -> cuda_ocr
                 if needs_ocr:
@@ -113,7 +117,11 @@ class PDFInspectorSmartRouter:
                 primary_route = "cuda_ocr"
                 primary_reason = f"Majority of pages ({breakdown['cuda_ocr']}/{n_pages}) require OCR."
             elif breakdown["docling_heavy"] > 0:
-                primary_route = "rust_native" if breakdown["rust_native"] >= breakdown["docling_heavy"] else "docling_heavy"
+                primary_route = (
+                    "rust_native"
+                    if breakdown["rust_native"] >= breakdown["docling_heavy"]
+                    else "docling_heavy"
+                )
                 primary_reason = f"Hybrid per-page execution: {breakdown['rust_native']} native, {breakdown['docling_heavy']} docling pages."
             else:
                 primary_route = "rust_native"

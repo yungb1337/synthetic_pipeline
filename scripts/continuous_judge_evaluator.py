@@ -4,11 +4,11 @@
 Monitors manifest records, evaluates existing DOMs in parallel with rate-limit handling,
 waits for any remaining DOMs being parsed, and triggers final report compilation when complete.
 """
+
 from __future__ import annotations
 
 import concurrent.futures
 import json
-import os
 import subprocess
 import sys
 import time
@@ -154,9 +154,13 @@ def compile_final_report(telemetry: dict, judge_results: dict) -> Path:
         pass_cnt = cv.get("PASS", 0)
         pass_pct = (pass_cnt / max(1, cnt)) * 100
         cat_rows.append(
-            f"| **`{cname}`** | {cnt} | {cm.get('completeness', 0)*100:.1f}% | {cm.get('fidelity', 0)*100:.1f}% | {cm.get('structure', 0)*100:.1f}% | {cm.get('tables', 0)*100:.1f}% | {cm.get('scans_ocr', 0)*100:.1f}% | {pass_cnt} ({pass_pct:.1f}%) |"
+            f"| **`{cname}`** | {cnt} | {cm.get('completeness', 0) * 100:.1f}% | {cm.get('fidelity', 0) * 100:.1f}% | {cm.get('structure', 0) * 100:.1f}% | {cm.get('tables', 0) * 100:.1f}% | {cm.get('scans_ocr', 0) * 100:.1f}% | {pass_cnt} ({pass_pct:.1f}%) |"
         )
-    cat_table = "\n".join(cat_rows) if cat_rows else "| (No data) | 0 | 0% | 0% | 0% | 0% | 0% | 0 (0%) |"
+    cat_table = (
+        "\n".join(cat_rows)
+        if cat_rows
+        else "| (No data) | 0 | 0% | 0% | 0% | 0% | 0% | 0 (0%) |"
+    )
 
     content = f"""# 1,000-Document Comprehensive Evaluation & Throughput Report
 
@@ -168,15 +172,15 @@ def compile_final_report(telemetry: dict, judge_results: dict) -> Path:
 
 ## 1. Executive Summary
 
-- **Total Documents Evaluated:** {judge_results.get('total_judged', 0)} / {telemetry.get('docs_issued', 1000)}
-- **Parsing Success Rate:** {telemetry.get('docs_ok', 0)} / {telemetry.get('docs_issued', 1000)} ({(telemetry.get('docs_ok', 0)/max(1, telemetry.get('docs_issued', 1000)))*100:.1f}%)
-- **Zero-Silent-Loss Integrity:** `{telemetry.get('docs_failed', 0)}` failures, `0` dead letters, `0` unparsed pages.
+- **Total Documents Evaluated:** {judge_results.get("total_judged", 0)} / {telemetry.get("docs_issued", 1000)}
+- **Parsing Success Rate:** {telemetry.get("docs_ok", 0)} / {telemetry.get("docs_issued", 1000)} ({(telemetry.get("docs_ok", 0) / max(1, telemetry.get("docs_issued", 1000))) * 100:.1f}%)
+- **Zero-Silent-Loss Integrity:** `{telemetry.get("docs_failed", 0)}` failures, `0` dead letters, `0` unparsed pages.
 - **Overall Quality & Fidelity Scores:**
-  - **Completeness:** `{mm.get('completeness', 0)*100:.1f}%`
-  - **Text & Numeric Fidelity:** `{mm.get('fidelity', 0)*100:.1f}%`
-  - **Layout & Reading Order:** `{mm.get('structure', 0)*100:.1f}%`
-  - **Table Accuracy:** `{mm.get('tables', 0)*100:.1f}%`
-  - **Scan / OCR Recovery:** `{mm.get('scans_ocr', 0)*100:.1f}%`
+  - **Completeness:** `{mm.get("completeness", 0) * 100:.1f}%`
+  - **Text & Numeric Fidelity:** `{mm.get("fidelity", 0) * 100:.1f}%`
+  - **Layout & Reading Order:** `{mm.get("structure", 0) * 100:.1f}%`
+  - **Table Accuracy:** `{mm.get("tables", 0) * 100:.1f}%`
+  - **Scan / OCR Recovery:** `{mm.get("scans_ocr", 0) * 100:.1f}%`
 
 ---
 
@@ -184,18 +188,18 @@ def compile_final_report(telemetry: dict, judge_results: dict) -> Path:
 
 | Metric | Measured Value |
 |---|---|
-| **Total Wall Time** | **{telemetry.get('wall_time_sec', 0):.1f} s ({telemetry.get('wall_time_min', 0):.2f} min)** |
-| **Total Pages Processed** | **{telemetry.get('pages_parsed', 0):,} pages** |
-| **Throughput (Pages / sec)** | **{telemetry.get('pages_per_sec', 0):.3f} pages/s** |
-| **Throughput (Docs / sec)** | **{telemetry.get('docs_per_sec', 0):.4f} docs/s** |
-| **Mean Latency per Page** | **{telemetry.get('ms_per_page', 0):.1f} ms** |
-| **Total Blocks Extracted** | **{telemetry.get('blocks', 0):,}** |
-| **Total Tables Extracted** | **{telemetry.get('tables', 0):,}** |
-| **Total Images Extracted** | **{telemetry.get('images', 0):,}** |
-| **Total References Extracted** | **{telemetry.get('references', 0):,}** |
+| **Total Wall Time** | **{telemetry.get("wall_time_sec", 0):.1f} s ({telemetry.get("wall_time_min", 0):.2f} min)** |
+| **Total Pages Processed** | **{telemetry.get("pages_parsed", 0):,} pages** |
+| **Throughput (Pages / sec)** | **{telemetry.get("pages_per_sec", 0):.3f} pages/s** |
+| **Throughput (Docs / sec)** | **{telemetry.get("docs_per_sec", 0):.4f} docs/s** |
+| **Mean Latency per Page** | **{telemetry.get("ms_per_page", 0):.1f} ms** |
+| **Total Blocks Extracted** | **{telemetry.get("blocks", 0):,}** |
+| **Total Tables Extracted** | **{telemetry.get("tables", 0):,}** |
+| **Total Images Extracted** | **{telemetry.get("images", 0):,}** |
+| **Total References Extracted** | **{telemetry.get("references", 0):,}** |
 
 ### Route Distribution
-{chr(10).join(f"- **`{r}`**: {cnt} documents ({cnt*100/max(1, telemetry.get('docs_ok', 1)):.1f}%)" for r, cnt in sorted(telemetry.get('routes', {}).items()))}
+{chr(10).join(f"- **`{r}`**: {cnt} documents ({cnt * 100 / max(1, telemetry.get('docs_ok', 1)):.1f}%)" for r, cnt in sorted(telemetry.get("routes", {}).items()))}
 
 ---
 
@@ -213,21 +217,21 @@ Evaluated across canonical Document JSON vs source PDF text:
 
 | Dimension / Metric | Mean Score (0.0 - 1.0) | Percentage | Quality Assessment |
 |---|---|---|---|
-| **Completeness** | **{mm.get('completeness', 0):.3f}** | **{mm.get('completeness', 0)*100:.1f}%** | Exhaustive content capture |
-| **Fidelity** | **{mm.get('fidelity', 0):.3f}** | **{mm.get('fidelity', 0)*100:.1f}%** | Exact text & character fidelity |
-| **Structure** | **{mm.get('structure', 0):.3f}** | **{mm.get('structure', 0)*100:.1f}%** | Accurate hierarchy & reading order |
-| **Tables** | **{mm.get('tables', 0):.3f}** | **{mm.get('tables', 0)*100:.1f}%** | High-precision grid & row extraction |
-| **References** | **{mm.get('references', 0):.3f}** | **{mm.get('references', 0)*100:.1f}%** | Clean citation extraction |
-| **Scans / OCR** | **{mm.get('scans_ocr', 0):.3f}** | **{mm.get('scans_ocr', 0)*100:.1f}%** | Robust OCR & scanned form parsing |
+| **Completeness** | **{mm.get("completeness", 0):.3f}** | **{mm.get("completeness", 0) * 100:.1f}%** | Exhaustive content capture |
+| **Fidelity** | **{mm.get("fidelity", 0):.3f}** | **{mm.get("fidelity", 0) * 100:.1f}%** | Exact text & character fidelity |
+| **Structure** | **{mm.get("structure", 0):.3f}** | **{mm.get("structure", 0) * 100:.1f}%** | Accurate hierarchy & reading order |
+| **Tables** | **{mm.get("tables", 0):.3f}** | **{mm.get("tables", 0) * 100:.1f}%** | High-precision grid & row extraction |
+| **References** | **{mm.get("references", 0):.3f}** | **{mm.get("references", 0) * 100:.1f}%** | Clean citation extraction |
+| **Scans / OCR** | **{mm.get("scans_ocr", 0):.3f}** | **{mm.get("scans_ocr", 0) * 100:.1f}%** | Robust OCR & scanned form parsing |
 
 ### Verdict Distribution
-- **PASS:** `{vd.get('PASS', 0)}`
-- **PASS_WITH_ISSUES:** `{vd.get('PASS_WITH_ISSUES', 0)}`
-- **FAIL:** `{vd.get('FAIL', 0)}`
+- **PASS:** `{vd.get("PASS", 0)}`
+- **PASS_WITH_ISSUES:** `{vd.get("PASS_WITH_ISSUES", 0)}`
+- **FAIL:** `{vd.get("FAIL", 0)}`
 
 ### Issue Surface Breakdown
-- **By Severity:** {', '.join(f'`{k}={v}`' for k, v in sorted(sev.items())) or 'None'}
-- **By Surface:** {', '.join(f'`{k}={v}`' for k, v in sorted(srf.items())) or 'None'}
+- **By Severity:** {", ".join(f"`{k}={v}`" for k, v in sorted(sev.items())) or "None"}
+- **By Surface:** {", ".join(f"`{k}={v}`" for k, v in sorted(srf.items())) or "None"}
 
 ---
 
@@ -267,7 +271,11 @@ def compute_telemetry() -> dict:
                 total_tables += sum(len(p.get("tables", [])) for p in dom_pages)
                 total_images += sum(len(p.get("images", [])) for p in dom_pages)
                 total_refs += len(dom.get("references", []))
-                r = dom.get("provenance", {}).get("routing", {}).get("route", "enrichment")
+                r = (
+                    dom.get("provenance", {})
+                    .get("routing", {})
+                    .get("route", "enrichment")
+                )
                 routes[r] = routes.get(r, 0) + 1
         except Exception:
             pass
@@ -335,10 +343,14 @@ def main() -> int:
         )
 
         if pending_items:
-            log(f"Launching batch evaluation for {len(pending_items)} items with {workers} workers...")
+            log(
+                f"Launching batch evaluation for {len(pending_items)} items with {workers} workers..."
+            )
             with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {
-                    executor.submit(judge_document, doc_id, dom_path, pdf_path, cat, model): doc_id
+                    executor.submit(
+                        judge_document, doc_id, dom_path, pdf_path, cat, model
+                    ): doc_id
                     for doc_id, dom_path, pdf_path, cat in pending_items
                 }
                 done_count = 0
@@ -346,7 +358,9 @@ def main() -> int:
                     res = fut.result()
                     done_count += 1
                     if done_count % 10 == 0 or done_count == len(pending_items):
-                        log(f"  [Judge Batch Progress] Evaluated {done_count}/{len(pending_items)} pending documents")
+                        log(
+                            f"  [Judge Batch Progress] Evaluated {done_count}/{len(pending_items)} pending documents"
+                        )
 
         # Check if fully complete
         ready_doms = find_ready_doms(manifest)
@@ -365,10 +379,14 @@ def main() -> int:
             break
 
         if len(ready_doms) < total_manifest:
-            log(f"Waiting for parser to complete remaining {total_manifest - len(ready_doms)} DOMs (sleeping 15s)...")
+            log(
+                f"Waiting for parser to complete remaining {total_manifest - len(ready_doms)} DOMs (sleeping 15s)..."
+            )
             time.sleep(15)
         elif len(valid_judgments) < len(ready_doms):
-            log(f"Retrying evaluation on remaining {len(ready_doms) - len(valid_judgments)} documents...")
+            log(
+                f"Retrying evaluation on remaining {len(ready_doms) - len(valid_judgments)} documents..."
+            )
             time.sleep(5)
         else:
             break
@@ -396,7 +414,10 @@ def main() -> int:
                 metric_sums[m] += float(v)
                 metric_counts[m] += 1
 
-    metric_means = {m: (metric_sums[m] / metric_counts[m]) if metric_counts[m] > 0 else 0.0 for m in METRICS}
+    metric_means = {
+        m: (metric_sums[m] / metric_counts[m]) if metric_counts[m] > 0 else 0.0
+        for m in METRICS
+    }
 
     severity_counts = Counter()
     surface_counts = Counter()
@@ -437,7 +458,10 @@ def main() -> int:
     category_summary = {}
     for cat, cd in category_data.items():
         cat_means = {
-            m: (cd["metric_sums"][m] / cd["metric_counts"][m]) if cd["metric_counts"][m] > 0 else 0.0 for m in METRICS
+            m: (cd["metric_sums"][m] / cd["metric_counts"][m])
+            if cd["metric_counts"][m] > 0
+            else 0.0
+            for m in METRICS
         }
         category_summary[cat] = {
             "count": cd["count"],

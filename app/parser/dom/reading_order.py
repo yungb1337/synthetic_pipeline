@@ -16,9 +16,11 @@ v0.2 heuristic: per page, geometric column-aware reading order.
 - Pure and deterministic given the block list; operates on both intermediate loader
   blocks (tuple bbox) and canonical DOM Block objects (BBox model).
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
+
 from .models import BBox, ReadingOrderEntry
 
 
@@ -26,15 +28,22 @@ def _get_coords(bbox: Any) -> tuple[float, float, float, float] | None:
     """Extract (x0, y0, x1, y1) from either a BBox object or a tuple/list."""
     if bbox is None:
         return None
-    if hasattr(bbox, "x0") and getattr(bbox, "x0") is not None:
+    if hasattr(bbox, "x0") and bbox.x0 is not None:
         return (float(bbox.x0), float(bbox.y0), float(bbox.x1), float(bbox.y1))
     if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
-        if bbox[0] is not None and bbox[1] is not None and bbox[2] is not None and bbox[3] is not None:
+        if (
+            bbox[0] is not None
+            and bbox[1] is not None
+            and bbox[2] is not None
+            and bbox[3] is not None
+        ):
             return (float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3]))
     return None
 
 
-def _partition_columns(blocks_with_coords: list[tuple[Any, tuple[float, float, float, float]]]) -> list[Any]:
+def _partition_columns(
+    blocks_with_coords: list[tuple[Any, tuple[float, float, float, float]]],
+) -> list[Any]:
     """Recursively partition a list of (block, coords) into natural reading order."""
     if len(blocks_with_coords) <= 1:
         return [b for b, _ in blocks_with_coords]
@@ -44,13 +53,27 @@ def _partition_columns(blocks_with_coords: list[tuple[Any, tuple[float, float, f
     w = max_x - min_x
     if w < 100:
         # Narrow region: sort top-to-bottom, clustering nearby baselines
-        return [b for b, _ in sorted(blocks_with_coords, key=lambda it: (int(it[1][1] // 3.0), it[1][0], getattr(it[0], "seq", 0)))]
+        return [
+            b
+            for b, _ in sorted(
+                blocks_with_coords,
+                key=lambda it: (
+                    int(it[1][1] // 3.0),
+                    it[1][0],
+                    getattr(it[0], "seq", 0),
+                ),
+            )
+        ]
 
     # Check for full-width spanning blocks (e.g. titles, section headers) that divide vertical bands
-    spanning = [it for it in blocks_with_coords if (it[1][2] - it[1][0]) >= 0.70 * w and w > 200]
+    spanning = [
+        it for it in blocks_with_coords if (it[1][2] - it[1][0]) >= 0.70 * w and w > 200
+    ]
     if spanning and len(spanning) < len(blocks_with_coords):
         sorted_by_y = sorted(blocks_with_coords, key=lambda it: it[1][1])
-        bands: list[tuple[str, list[tuple[Any, tuple[float, float, float, float]]]]] = []
+        bands: list[
+            tuple[str, list[tuple[Any, tuple[float, float, float, float]]]]
+        ] = []
         cur_band: list[tuple[Any, tuple[float, float, float, float]]] = []
         for it in sorted_by_y:
             is_span = (it[1][2] - it[1][0]) >= 0.70 * w and w > 200
@@ -93,12 +116,16 @@ def _partition_columns(blocks_with_coords: list[tuple[Any, tuple[float, float, f
         min_right_y = min(it[1][1] for it in right)
         max_right_y = max(it[1][3] for it in right)
 
-        overlap_y = max(0.0, min(max_left_y, max_right_y) - max(min_left_y, min_right_y))
+        overlap_y = max(
+            0.0, min(max_left_y, max_right_y) - max(min_left_y, min_right_y)
+        )
         span_y = max(max_left_y, max_right_y) - min(min_left_y, min_right_y)
 
         # Significant vertical overlap indicates parallel columns rather than sequential vertical blocks
         if span_y > 0 and (overlap_y / span_y) >= 0.20:
-            score = (100.0 if gutter >= 0 else -abs(gutter)) + (overlap_y / span_y) * 50.0
+            score = (100.0 if gutter >= 0 else -abs(gutter)) + (
+                overlap_y / span_y
+            ) * 50.0
             if score > best_score and gutter >= -15.0:
                 best_score = score
                 best_split = (x_cut, left, right)
@@ -117,7 +144,13 @@ def _partition_columns(blocks_with_coords: list[tuple[Any, tuple[float, float, f
         return _partition_columns(left) + _partition_columns(right)
 
     # No multi-column partition found: sort top-to-bottom, clustering nearby baselines
-    return [b for b, _ in sorted(blocks_with_coords, key=lambda it: (int(it[1][1] // 3.0), it[1][0], getattr(it[0], "seq", 0)))]
+    return [
+        b
+        for b, _ in sorted(
+            blocks_with_coords,
+            key=lambda it: (int(it[1][1] // 3.0), it[1][0], getattr(it[0], "seq", 0)),
+        )
+    ]
 
 
 def recover_per_page(blocks) -> list:
@@ -182,7 +215,11 @@ def build_regions(page) -> list[tuple[str, list[str], tuple]]:
     footnotes: list = []
     main_blocks: list = []
     for b in blocks:
-        if b.bbox and b.bbox.y0 >= footnote_zone_y and (b.bbox.x1 - b.bbox.x0) < page_h * 0.6:
+        if (
+            b.bbox
+            and b.bbox.y0 >= footnote_zone_y
+            and (b.bbox.x1 - b.bbox.x0) < page_h * 0.6
+        ):
             footnotes.append(b)
         else:
             main_blocks.append(b)
@@ -192,7 +229,11 @@ def build_regions(page) -> list[tuple[str, list[str], tuple]]:
     headers: list = []
     body_blocks: list = []
     for b in main_blocks:
-        if b.bbox and b.bbox.y1 <= header_zone_y and (b.bbox.x1 - b.bbox.x0) >= page_w * 0.5:
+        if (
+            b.bbox
+            and b.bbox.y1 <= header_zone_y
+            and (b.bbox.x1 - b.bbox.x0) >= page_w * 0.5
+        ):
             headers.append(b)
         else:
             body_blocks.append(b)
@@ -201,11 +242,13 @@ def build_regions(page) -> list[tuple[str, list[str], tuple]]:
     regions: list[tuple[str, list[str], tuple]] = []
 
     if headers:
-        regions.append((
-            "header",
-            [b.id for b in headers],
-            _union_bbox([b.bbox for b in headers if b.bbox]),
-        ))
+        regions.append(
+            (
+                "header",
+                [b.id for b in headers],
+                _union_bbox([b.bbox for b in headers if b.bbox]),
+            )
+        )
 
     if body_blocks:
         geo_items = []
@@ -215,11 +258,13 @@ def build_regions(page) -> list[tuple[str, list[str], tuple]]:
                 geo_items.append((b, coords))
             else:
                 # non-geo blocks: treat as a single column
-                regions.append((
-                    "column",
-                    [b.id],
-                    b.bbox,  # already a BBox
-                ))
+                regions.append(
+                    (
+                        "column",
+                        [b.id],
+                        b.bbox,  # already a BBox
+                    )
+                )
         if geo_items:
             ordered = _partition_columns(geo_items)
             # group contiguous same-column blocks
@@ -230,11 +275,13 @@ def build_regions(page) -> list[tuple[str, list[str], tuple]]:
                 coords = _get_coords(b.bbox)
                 if coords is None:
                     if current_col:
-                        regions.append((
-                            "column",
-                            [x.id for x in current_col],
-                            _union_bbox(current_bbox),
-                        ))
+                        regions.append(
+                            (
+                                "column",
+                                [x.id for x in current_col],
+                                _union_bbox(current_bbox),
+                            )
+                        )
                         current_col = []
                         current_bbox = []
                         prev_center_x = None
@@ -242,29 +289,35 @@ def build_regions(page) -> list[tuple[str, list[str], tuple]]:
                 cx = (coords[0] + coords[2]) / 2
                 if prev_center_x is not None and abs(cx - prev_center_x) > 50:
                     # new column detected
-                    regions.append((
-                        "column",
-                        [x.id for x in current_col],
-                        _union_bbox(current_bbox),
-                    ))
+                    regions.append(
+                        (
+                            "column",
+                            [x.id for x in current_col],
+                            _union_bbox(current_bbox),
+                        )
+                    )
                     current_col = []
                     current_bbox = []
                 current_col.append(b)
                 current_bbox.append(coords)
                 prev_center_x = cx
             if current_col:
-                regions.append((
-                    "column",
-                    [x.id for x in current_col],
-                    _union_bbox(current_bbox),
-                ))
+                regions.append(
+                    (
+                        "column",
+                        [x.id for x in current_col],
+                        _union_bbox(current_bbox),
+                    )
+                )
 
     if footnotes:
-        regions.append((
-            "footnote",
-            [b.id for b in footnotes],
-            _union_bbox([b.bbox for b in footnotes if b.bbox]),
-        ))
+        regions.append(
+            (
+                "footnote",
+                [b.id for b in footnotes],
+                _union_bbox([b.bbox for b in footnotes if b.bbox]),
+            )
+        )
 
     return regions
 

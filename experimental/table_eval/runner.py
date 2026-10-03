@@ -1,31 +1,34 @@
-"""Batch benchmark runner managing staged evaluation across document corpora.
-"""
+"""Batch benchmark runner managing staged evaluation across document corpora."""
+
 from __future__ import annotations
 
 import gc
 import hashlib
-import json
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import fitz
 
 from .artifacts import BenchmarkArtifactManager
-from .config import BenchmarkConfig, PERMUTATIONS, PermutationSpec
+from .config import PERMUTATIONS, BenchmarkConfig
 from .converter import TableBenchmarkDOMConverter
 from .judge_evaluator import TableBenchmarkJudgeEvaluator
-from .profiler import HardwareProfile, HardwareProfiler
+from .profiler import HardwareProfiler
 from .strategies import ExecutionStrategy
 
 
 class BenchmarkRunner:
     """Orchestrates multi-stage benchmarking across layout/table permutations."""
 
-    def __init__(self, config: Optional[BenchmarkConfig] = None):
+    def __init__(self, config: BenchmarkConfig | None = None):
         self.config = config or BenchmarkConfig()
-        self.artifacts = BenchmarkArtifactManager(self.config.artifacts_dir, self.config.evaluation_dir)
-        self.profiler = HardwareProfiler(safety_threshold_mb=self.config.vram_safety_ceiling_mb)
+        self.artifacts = BenchmarkArtifactManager(
+            self.config.artifacts_dir, self.config.evaluation_dir
+        )
+        self.profiler = HardwareProfiler(
+            safety_threshold_mb=self.config.vram_safety_ceiling_mb
+        )
         self.converter = TableBenchmarkDOMConverter()
         self.judge = TableBenchmarkJudgeEvaluator(
             model=self.config.judge_model,
@@ -37,7 +40,7 @@ class BenchmarkRunner:
         self,
         strategy: ExecutionStrategy,
         pdf_path: Path,
-        doc_id: Optional[str] = None,
+        doc_id: str | None = None,
     ) -> dict[str, Any]:
         """Runs a strategy on a single PDF document with strict telemetry profiling."""
         pdf_path = Path(pdf_path).resolve()
@@ -81,7 +84,9 @@ class BenchmarkRunner:
             dom_ms = (time.perf_counter() - t_dom0) * 1000.0
 
             # Save canonical DOM
-            dom_path = self.artifacts.save_document_dom(strategy.spec.id, d_id, canonical_dom)
+            dom_path = self.artifacts.save_document_dom(
+                strategy.spec.id, d_id, canonical_dom
+            )
 
         except Exception as exc:
             status = "failed"
@@ -108,7 +113,9 @@ class BenchmarkRunner:
 
         self.artifacts.save_runtime_telemetry(strategy.spec.id, d_id, runtime_data)
         if status == "failed":
-            self.artifacts.record_failure(strategy.spec.id, d_id, error_msg or "unknown error")
+            self.artifacts.record_failure(
+                strategy.spec.id, d_id, error_msg or "unknown error"
+            )
 
         return runtime_data
 
@@ -128,10 +135,12 @@ class BenchmarkRunner:
                 continue
 
             spec = PERMUTATIONS[s_id]
-            print(f"\n==================================================")
-            print(f"Executing Strategy {spec.id} ({spec.name}) — Stage: {stage.upper()}")
+            print("\n==================================================")
+            print(
+                f"Executing Strategy {spec.id} ({spec.name}) — Stage: {stage.upper()}"
+            )
             print(f"Description: {spec.description}")
-            print(f"==================================================")
+            print("==================================================")
 
             s_dir = self.artifacts.get_strategy_dir(spec.id)
             doc_summaries = []
@@ -147,13 +156,22 @@ class BenchmarkRunner:
             skip_extraction = (
                 stage == "judge"
                 and not force_extract
-                and all((s_dir / "normalized_output" / f"{p.stem}.parsed.v1.docJSON").exists() for p in pdf_paths)
+                and all(
+                    (
+                        s_dir / "normalized_output" / f"{p.stem}.parsed.v1.docJSON"
+                    ).exists()
+                    for p in pdf_paths
+                )
             )
 
             if not skip_extraction:
                 strategy = ExecutionStrategy(spec)
                 for pdf_p in pdf_paths:
-                    print(f"  -> Processing document: {pdf_p.name} ...", end=" ", flush=True)
+                    print(
+                        f"  -> Processing document: {pdf_p.name} ...",
+                        end=" ",
+                        flush=True,
+                    )
                     res = self.run_permutation_on_doc(strategy, pdf_p)
                     doc_summaries.append(res)
 
@@ -173,10 +191,16 @@ class BenchmarkRunner:
                         print(f"FAILED ({res.get('error', '')})")
                     else:
                         pps = (p_cnt / (t_ms / 1000.0)) if t_ms > 0 else 0.0
-                        print(f"OK ({p_cnt} pgs, {t_ms:.1f}ms, {pps:.2f} pgs/s, {res['tables_extracted']} tbls, {vram:.1f}MB VRAM)")
+                        print(
+                            f"OK ({p_cnt} pgs, {t_ms:.1f}ms, {pps:.2f} pgs/s, {res['tables_extracted']} tbls, {vram:.1f}MB VRAM)"
+                        )
 
                 # Aggregate strategy metrics
-                pages_per_sec = (total_pages / (total_time_ms / 1000.0)) if total_time_ms > 0 else 0.0
+                pages_per_sec = (
+                    (total_pages / (total_time_ms / 1000.0))
+                    if total_time_ms > 0
+                    else 0.0
+                )
                 ms_per_page = (total_time_ms / total_pages) if total_pages > 0 else 0.0
 
                 strat_summary = {
@@ -197,13 +221,18 @@ class BenchmarkRunner:
 
                 self.artifacts.update_experiment_registry(spec.id, strat_summary)
             else:
-                print(f"  -> Found existing normalized docJSONs for all {len(pdf_paths)} documents. Skipping re-extraction.")
+                print(
+                    f"  -> Found existing normalized docJSONs for all {len(pdf_paths)} documents. Skipping re-extraction."
+                )
                 experiments = self.artifacts.load_experiment_registry()
-                strat_summary = experiments.get(spec.id, {
-                    "strategy_id": spec.id,
-                    "strategy_name": spec.name,
-                    "description": spec.description,
-                })
+                strat_summary = experiments.get(
+                    spec.id,
+                    {
+                        "strategy_id": spec.id,
+                        "strategy_name": spec.name,
+                        "description": spec.description,
+                    },
+                )
 
             stage_summary[spec.id] = strat_summary
 
@@ -222,7 +251,9 @@ class BenchmarkRunner:
 
                 s_dir = self.artifacts.get_strategy_dir(spec.id)
                 for pdf_p in pdf_paths:
-                    dom_file = s_dir / "normalized_output" / f"{pdf_p.stem}.parsed.v1.docJSON"
+                    dom_file = (
+                        s_dir / "normalized_output" / f"{pdf_p.stem}.parsed.v1.docJSON"
+                    )
                     verdict_file = s_dir / "logs" / f"{pdf_p.stem}.verdict.json"
 
                     if dom_file.exists():
@@ -233,13 +264,24 @@ class BenchmarkRunner:
                             for k in judge_metrics_accum:
                                 judge_metrics_accum[k] += m.get(k, 0.0)
                             judged_count += 1
-                            v_label = j_res.get("verdict_status") or (j_res.get("verdict") if isinstance(j_res.get("verdict"), str) else "PASS")
-                            print(f"Verdict: {v_label} (Tables: {m.get('tables', 0.0):.2f}, Fidelity: {m.get('fidelity', 0.0):.2f})")
+                            v_label = j_res.get("verdict_status") or (
+                                j_res.get("verdict")
+                                if isinstance(j_res.get("verdict"), str)
+                                else "PASS"
+                            )
+                            print(
+                                f"Verdict: {v_label} (Tables: {m.get('tables', 0.0):.2f}, Fidelity: {m.get('fidelity', 0.0):.2f})"
+                            )
                         else:
-                            print(f"Judge error: {j_res.get('error', 'unknown') if j_res else 'no result'}")
+                            print(
+                                f"Judge error: {j_res.get('error', 'unknown') if j_res else 'no result'}"
+                            )
 
                 if judged_count > 0:
-                    avg_metrics = {k: round(v / judged_count, 3) for k, v in judge_metrics_accum.items()}
+                    avg_metrics = {
+                        k: round(v / judged_count, 3)
+                        for k, v in judge_metrics_accum.items()
+                    }
                     strat_summary["judge_metrics"] = avg_metrics
                     self.artifacts.save_judge_results(spec.id, avg_metrics)
                     print(f"  -> Judge Averages: {avg_metrics}")
@@ -248,6 +290,7 @@ class BenchmarkRunner:
             gc.collect()
             if self.profiler.cuda_available:
                 import torch
+
                 torch.cuda.empty_cache()
 
         return stage_summary

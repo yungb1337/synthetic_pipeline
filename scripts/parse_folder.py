@@ -18,6 +18,7 @@ The script:
   - creates OUTPUT (recursively) before delegating
   - forwards to the real parser; exit code mirrors the parser's result
 """
+
 from __future__ import annotations
 
 import argparse
@@ -50,7 +51,8 @@ def _resolve_venv_python() -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description="Parse an input folder/file with the page-centric parser; "
-                    "auto-creates the output folder.")
+        "auto-creates the output folder."
+    )
     ap.add_argument("input_pos", nargs="?", help="input file or directory (positional)")
     ap.add_argument("output_pos", nargs="?", help="output store dir (positional)")
     ap.add_argument("--in", dest="input", help="input file or directory")
@@ -58,18 +60,39 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-ocr", action="store_true", help="disable OCR")
     ap.add_argument("--native-concurrency", type=int, default=None)
     ap.add_argument("--heavy-concurrency", type=int, default=None)
-    ap.add_argument("--in-process", action="store_true", default=None,
-                    help="run heavy engine in-process")
-    ap.add_argument("--no-in-process", action="store_false", dest="in_process", default=None,
-                    help="run heavy engine in subprocess pool")
+    ap.add_argument(
+        "--in-process",
+        action="store_true",
+        default=None,
+        help="run heavy engine in-process",
+    )
+    ap.add_argument(
+        "--no-in-process",
+        action="store_false",
+        dest="in_process",
+        default=None,
+        help="run heavy engine in subprocess pool",
+    )
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--offset", type=int, default=None)
-    ap.add_argument("--shards", type=int, default=1,
-                    help="B1: number of concurrent parser processes to run on the box")
-    ap.add_argument("--shard-index", type=int, default=None,
-                    help="B3: specific shard index for multi-box cluster workers")
-    ap.add_argument("--shard-total", type=int, default=None,
-                    help="B3: total shard count for multi-box cluster workers")
+    ap.add_argument(
+        "--shards",
+        type=int,
+        default=1,
+        help="B1: number of concurrent parser processes to run on the box",
+    )
+    ap.add_argument(
+        "--shard-index",
+        type=int,
+        default=None,
+        help="B3: specific shard index for multi-box cluster workers",
+    )
+    ap.add_argument(
+        "--shard-total",
+        type=int,
+        default=None,
+        help="B3: total shard count for multi-box cluster workers",
+    )
     args = ap.parse_args(argv)
 
     # Accept either positional or --in/--out forms.
@@ -96,9 +119,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(f"[parse_folder] input : {src}")
-    print(f"[parse_folder] output: {dst}  (created)" if not dst.exists() else
-          f"[parse_folder] output: {dst}")
-    print(f"[parse_folder] launching parser...\n")
+    print(
+        f"[parse_folder] output: {dst}  (created)"
+        if not dst.exists()
+        else f"[parse_folder] output: {dst}"
+    )
+    print("[parse_folder] launching parser...\n")
 
     py = _resolve_venv_python()
     base_cmd = [py, "-m", "app.parser.cli", "--in", str(src), "--out", str(dst)]
@@ -120,20 +146,26 @@ def main(argv: list[str] | None = None) -> int:
     # B3: Explicit single shard on a cluster worker
     if args.shard_index is not None and args.shard_total is not None:
         cmd = list(base_cmd) + [
-            "--shard-index", str(args.shard_index),
-            "--shard-total", str(args.shard_total),
+            "--shard-index",
+            str(args.shard_index),
+            "--shard-total",
+            str(args.shard_total),
         ]
         return subprocess.call(cmd)
 
     # B1: Multi-process sharding on a single box
     if args.shards and args.shards > 1:
         num_shards = int(args.shards)
-        print(f"[parse_folder] B1: spawning {num_shards} concurrent shard processes...\n")
+        print(
+            f"[parse_folder] B1: spawning {num_shards} concurrent shard processes...\n"
+        )
         procs = []
         for s_idx in range(num_shards):
             cmd = list(base_cmd) + [
-                "--shard-index", str(s_idx),
-                "--shard-total", str(num_shards),
+                "--shard-index",
+                str(s_idx),
+                "--shard-total",
+                str(num_shards),
             ]
             p = subprocess.Popen(cmd)
             procs.append(p)
@@ -141,7 +173,10 @@ def main(argv: list[str] | None = None) -> int:
         exit_codes = [p.wait() for p in procs]
         if any(c != 0 for c in exit_codes):
             failed = sum(1 for c in exit_codes if c != 0)
-            print(f"\n[parse_folder] ERROR: {failed}/{num_shards} shards exited with errors", file=sys.stderr)
+            print(
+                f"\n[parse_folder] ERROR: {failed}/{num_shards} shards exited with errors",
+                file=sys.stderr,
+            )
             return 1
         print(f"\n[parse_folder] all {num_shards} shards completed successfully.")
         return 0

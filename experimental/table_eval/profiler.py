@@ -1,10 +1,9 @@
-"""Hardware & latency profiler with strict CUDA VRAM and host RAM tracking.
-"""
+"""Hardware & latency profiler with strict CUDA VRAM and host RAM tracking."""
+
 from __future__ import annotations
 
 import gc
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 try:
@@ -21,6 +20,7 @@ except ImportError:
 @dataclass
 class HardwareProfile:
     """Telemetry captured for one document or stage."""
+
     total_wall_ms: float = 0.0
     init_ms: float = 0.0
     preprocess_ms: float = 0.0
@@ -111,12 +111,20 @@ class HardwareProfiler:
         )
         return prof
 
-    def finalize_profile(self, prof: HardwareProfile, total_wall_ms: float) -> HardwareProfile:
+    def finalize_profile(
+        self, prof: HardwareProfile, total_wall_ms: float
+    ) -> HardwareProfile:
         prof.total_wall_ms = total_wall_ms
         if self.cuda_available:
-            prof.peak_vram_allocated_mb = torch.cuda.max_memory_allocated() / (1024.0 * 1024.0)
-            prof.peak_vram_reserved_mb = torch.cuda.max_memory_reserved() / (1024.0 * 1024.0)
-            prof.delta_vram_mb = max(0.0, prof.peak_vram_allocated_mb - prof.baseline_vram_mb)
+            prof.peak_vram_allocated_mb = torch.cuda.max_memory_allocated() / (
+                1024.0 * 1024.0
+            )
+            prof.peak_vram_reserved_mb = torch.cuda.max_memory_reserved() / (
+                1024.0 * 1024.0
+            )
+            prof.delta_vram_mb = max(
+                0.0, prof.peak_vram_allocated_mb - prof.baseline_vram_mb
+            )
             prof.vram_safe = prof.peak_vram_reserved_mb <= self.safety_threshold_mb
         else:
             prof.vram_safe = True

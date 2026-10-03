@@ -1,5 +1,5 @@
-"""Configuration for the experimental Unlimited-OCR evaluation path.
-"""
+"""Configuration for the experimental Unlimited-OCR evaluation path."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -30,9 +30,15 @@ class UnlimitedOCRConfig:
     repetition_threshold: float = 0.35
 
     # Storage Paths
-    artifacts_dir: Path = field(default_factory=lambda: Path("artifacts") / "unlimited_ocr_eval")
-    evaluation_dir: Path = field(default_factory=lambda: Path("evaluation") / "unlimited_ocr")
-    report_path: Path = field(default_factory=lambda: Path("docs") / "unlimited-ocr-evaluation.md")
+    artifacts_dir: Path = field(
+        default_factory=lambda: Path("artifacts") / "unlimited_ocr_eval"
+    )
+    evaluation_dir: Path = field(
+        default_factory=lambda: Path("evaluation") / "unlimited_ocr"
+    )
+    report_path: Path = field(
+        default_factory=lambda: Path("docs") / "unlimited-ocr-evaluation.md"
+    )
 
     # LLM Judge Settings (reuses existing repo defaults)
     judge_model: str = "gemini-3.5-flash-lite"

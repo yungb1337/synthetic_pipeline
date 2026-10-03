@@ -111,10 +111,11 @@ All tests are hermetic via `DummyEmbedder` except C1 (gated on model + tokenizer
       overlap_at_heading_seams: bool = True
       max_tokens_per_call: int = 16384
       max_texts_per_call: int = 32
-      tokenizer_mode: str = "bge-m3"          # preference; actual mode recorded when resolved
+      tokenizer_mode: str = "bge-m3"  # preference; actual mode recorded when resolved
       allow_char4_fallback: bool = True
       tokenizer_path: str = "models/bge-m3/tokenizer.json"
-      def snapshot(self) -> dict: ...         # all non-underscore fields, JSON-safe
+
+      def snapshot(self) -> dict: ...  # all non-underscore fields, JSON-safe
   ```
 - **Tests (`tests/test_chunking.py`):** `test_config_defaults` (values match the architecture table), `test_config_snapshot` (round-trips to JSON, includes chunker_version).
 - **DoD:** defaults exactly as above; `snapshot()` returns the full field set.
@@ -131,7 +132,9 @@ All tests are hermetic via `DummyEmbedder` except C1 (gated on model + tokenizer
     ```python
     payload = json.dumps(
         {"doc_id": doc_id, "text": text, "source_block_ids": source_block_ids},
-        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
     ```
@@ -284,11 +287,19 @@ All tests are hermetic via `DummyEmbedder` except C1 (gated on model + tokenizer
   ```python
   def _available() -> bool:
       try:
-          import sentence_transformers, torch   # noqa
-          return Path("models/bge-m3/tokenizer.json").exists() and Path("models/bge-m3/config.json").exists()
+          import sentence_transformers, torch  # noqa
+
+          return (
+              Path("models/bge-m3/tokenizer.json").exists()
+              and Path("models/bge-m3/config.json").exists()
+          )
       except Exception:
           return False
-  pytestmark = pytest.mark.skipif(not _available(), reason="sentence-transformers/torch/bge-m3 unavailable")
+
+
+  pytestmark = pytest.mark.skipif(
+      not _available(), reason="sentence-transformers/torch/bge-m3 unavailable"
+  )
   ```
   - `test_cosine_stable_across_runs`: run `ChunkEmbedPipeline` twice on the same DOM with the real embedder (`factory.default_embedder(EmbeddingOptions(real_if_available=True))`); cosine between `chunks[0]` vectors of the two runs ≥ 0.9999 (L2-normalized already — Fact).
   - `test_dim_and_dtype`: `dim == 1024`; `.npy` loads as `float32`, shape `(N, 1024)`.

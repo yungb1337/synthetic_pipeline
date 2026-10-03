@@ -3,9 +3,10 @@
 Immutable; snapshot the whole struct into the DOM's normalization report so
 any downstream module can reproduce exactly what was applied.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -24,10 +25,16 @@ class NormalizerConfig:
 
     # Structural and domain-specific options
     preserve_paragraph_breaks: bool = True  # Preserve \n\n as paragraph separation
-    preserve_code_blocks: bool = True       # Preserve indentation and newlines in kind="code"
-    preserve_formulas: bool = True          # Preserve whitespace and notation in kind="formula"
-    preserve_multilingual_zwnj: bool = True # Preserve ZWNJ/ZWJ for Persian, Arabic, Indic
-    preserve_compound_hyphens: bool = True  # Guard legitimate compounds (e.g. cost-effective)
+    preserve_code_blocks: bool = (
+        True  # Preserve indentation and newlines in kind="code"
+    )
+    preserve_formulas: bool = True  # Preserve whitespace and notation in kind="formula"
+    preserve_multilingual_zwnj: bool = (
+        True  # Preserve ZWNJ/ZWJ for Persian, Arabic, Indic
+    )
+    preserve_compound_hyphens: bool = (
+        True  # Guard legitimate compounds (e.g. cost-effective)
+    )
 
     # DOM traversal scope toggles
     normalize_blocks: bool = True

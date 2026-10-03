@@ -2,6 +2,7 @@
 Reads the ledgers, DOM outputs, and page stores in artifacts/mixed_100_out/
 and computes the final verified metrics report.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,9 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.parser.dom.models import Document
-from app.parser.storage_pages import Ledger, PageStore
 import pdf_inspector
+
+from app.parser.dom.models import Document
+from app.parser.storage_pages import Ledger
 
 
 def summarize():
@@ -50,6 +52,7 @@ def summarize():
         total_inspect_ms += inspect_ms
 
         import hashlib
+
         sha = hashlib.sha256(data).hexdigest()
         doc_id = f"d-{sha[:16]}"
         plan = ledger.load_plan(doc_id)
@@ -146,7 +149,7 @@ def summarize():
 
     md = f"""# 100-Document Mixed Corpus Evaluation Report (`smart_routing`)
 
-**Date:** {report['timestamp']}
+**Date:** {report["timestamp"]}
 **Branch:** `smart_routing`
 **Total Documents Evaluated:** {len(files)}
 **Total Pages Parsed:** {total_pages:,}
@@ -173,19 +176,19 @@ def summarize():
 ## 2. Granular Routing Distribution
 
 ### Document-Level Routing Decisions
-- **`docling` (61–100 table/complex):** {doc_routes.get('docling', 0)} documents ({doc_routes.get('docling', 0)/len(files)*100:.1f}%)
-- **`enrichment` (31–60 scanned/OCR):** {doc_routes.get('enrichment', 0)} documents ({doc_routes.get('enrichment', 0)/len(files)*100:.1f}%)
-- **`native` (0–30 clean digital text):** {doc_routes.get('native', 0)} documents ({doc_routes.get('native', 0)/len(files)*100:.1f}%)
+- **`docling` (61–100 table/complex):** {doc_routes.get("docling", 0)} documents ({doc_routes.get("docling", 0) / len(files) * 100:.1f}%)
+- **`enrichment` (31–60 scanned/OCR):** {doc_routes.get("enrichment", 0)} documents ({doc_routes.get("enrichment", 0) / len(files) * 100:.1f}%)
+- **`native` (0–30 clean digital text):** {doc_routes.get("native", 0)} documents ({doc_routes.get("native", 0) / len(files) * 100:.1f}%)
 
 ### Per-Page Execution Tier Breakdown
-- **`docling_heavy` (Single-Page TableFormer Escalated):** {page_routes.get('docling_heavy', 0):,} pages ({page_routes.get('docling_heavy', 0)/max(1, total_pages)*100:.1f}%)
-- **`rust_native` (Fast Path ~35–45 p/s):** {page_routes.get('rust_native', 0):,} pages ({page_routes.get('rust_native', 0)/max(1, total_pages)*100:.1f}%)
-- **`enrichment_ocr` (RapidOCR on Scanned Pages):** {page_routes.get('enrichment_ocr', 0):,} pages ({page_routes.get('enrichment_ocr', 0)/max(1, total_pages)*100:.1f}%)
+- **`docling_heavy` (Single-Page TableFormer Escalated):** {page_routes.get("docling_heavy", 0):,} pages ({page_routes.get("docling_heavy", 0) / max(1, total_pages) * 100:.1f}%)
+- **`rust_native` (Fast Path ~35–45 p/s):** {page_routes.get("rust_native", 0):,} pages ({page_routes.get("rust_native", 0) / max(1, total_pages) * 100:.1f}%)
+- **`enrichment_ocr` (RapidOCR on Scanned Pages):** {page_routes.get("enrichment_ocr", 0):,} pages ({page_routes.get("enrichment_ocr", 0) / max(1, total_pages) * 100:.1f}%)
 
 ---
 
 ## 3. Key Observations & Takeaways
-1. **Single-Page TableFormer Slicing:** {page_routes.get('docling_heavy', 0):,} table-bearing pages executed single-page TableFormer extraction, recovering **{total_tables:,} high-fidelity tables** with full cell snapping and header structure.
+1. **Single-Page TableFormer Slicing:** {page_routes.get("docling_heavy", 0):,} table-bearing pages executed single-page TableFormer extraction, recovering **{total_tables:,} high-fidelity tables** with full cell snapping and header structure.
 2. **Scanned Documents & OCR Fallback:** Scanned tickets/receipts and image-heavy pages correctly engaged **RapidOCR (PP-OCRv6)**, extracting **{total_ocr_blocks:,} OCR blocks** across scanned regions.
 3. **Sub-30ms Rust Pre-Inspection:** `pdf-inspector` classified incoming PDFs with zero rendering overhead before routing.
 4. **Zero Silent Loss & 100% Assembly:** All {total_pages:,} pages across all {len(files)} documents passed through DOM validation with 0 dropped pages and 0 dead letters.

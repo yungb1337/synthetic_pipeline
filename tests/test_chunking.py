@@ -1,4 +1,5 @@
 """Tests for Module #3 — semantic chunking (config, schema, tokenize, sentences, chunker)."""
+
 from __future__ import annotations
 
 import json
@@ -17,7 +18,15 @@ from app.chunking import (
 )
 from app.chunking.schema import compute_chunk_id
 from app.chunking.sentences import split_sentences, tail_sentences
-from app.parser.dom import Block, Document, ImageObject, Metadata, Page, Provenance, Table
+from app.parser.dom import (
+    Block,
+    Document,
+    ImageObject,
+    Metadata,
+    Page,
+    Provenance,
+    Table,
+)
 
 BGE_TOKENIZER = Path("models/bge-m3/tokenizer.json")
 
@@ -50,16 +59,28 @@ def _chunker(config=None, counter=None) -> SemanticChunker:
     return SemanticChunker(cfg, counter or TokenCounter(mode="char4"))
 
 
-def _chunk_with(seq: int = 0, anchor: str = "", version: str = "chunker-v0.1.0") -> Chunk:
+def _chunk_with(
+    seq: int = 0, anchor: str = "", version: str = "chunker-v0.1.0"
+) -> Chunk:
     text = "the text"
     cid = compute_chunk_id("d1", text, ["b1"])
     prov = ChunkProvenance(
-        chunker_version=version, chunker_params={}, dom_schema_version="s",
-        normalizer_version=None, tokenizer="char4",
+        chunker_version=version,
+        chunker_params={},
+        dom_schema_version="s",
+        normalizer_version=None,
+        tokenizer="char4",
     )
     return Chunk(
-        chunk_id=cid, doc_id="d1", seq=seq, kind="paragraph", text=text,
-        source_block_ids=["b1"], heading_anchor=anchor, provenance=prov, tokenizer="char4",
+        chunk_id=cid,
+        doc_id="d1",
+        seq=seq,
+        kind="paragraph",
+        text=text,
+        source_block_ids=["b1"],
+        heading_anchor=anchor,
+        provenance=prov,
+        tokenizer="char4",
     )
 
 
@@ -86,10 +107,19 @@ def test_config_snapshot():
     json.dumps(snap)  # JSON-safe
     assert snap["chunker_version"] == "chunker-v0.1.0"
     assert set(snap) == {
-        "chunker_version", "dom_schema_version", "target_tokens", "min_band_tokens",
-        "soft_max_tokens", "hard_max_tokens", "overlap_tokens",
-        "overlap_at_heading_seams", "max_tokens_per_call", "max_texts_per_call",
-        "tokenizer_mode", "allow_char4_fallback", "tokenizer_path",
+        "chunker_version",
+        "dom_schema_version",
+        "target_tokens",
+        "min_band_tokens",
+        "soft_max_tokens",
+        "hard_max_tokens",
+        "overlap_tokens",
+        "overlap_at_heading_seams",
+        "max_tokens_per_call",
+        "max_texts_per_call",
+        "tokenizer_mode",
+        "allow_char4_fallback",
+        "tokenizer_path",
     }
 
 
@@ -113,15 +143,24 @@ def test_chunk_id_changes_with_text_or_blocks():
 
 def test_schema_roundtrip():
     prov = ChunkProvenance(
-        chunker_version="chunker-v0.1.0", chunker_params={"a": 1},
-        dom_schema_version="s", tokenizer="char4",
-    )
-    chunk = Chunk(
-        chunk_id=compute_chunk_id("d1", "hello", ["b1"]), doc_id="d1", seq=0,
-        kind="paragraph", text="hello", source_block_ids=["b1"], provenance=prov,
+        chunker_version="chunker-v0.1.0",
+        chunker_params={"a": 1},
+        dom_schema_version="s",
         tokenizer="char4",
     )
-    art = ChunksArtifact(doc_id="d1", chunker_version="chunker-v0.1.0", chunks=[chunk], report={"r": 1})
+    chunk = Chunk(
+        chunk_id=compute_chunk_id("d1", "hello", ["b1"]),
+        doc_id="d1",
+        seq=0,
+        kind="paragraph",
+        text="hello",
+        source_block_ids=["b1"],
+        provenance=prov,
+        tokenizer="char4",
+    )
+    art = ChunksArtifact(
+        doc_id="d1", chunker_version="chunker-v0.1.0", chunks=[chunk], report={"r": 1}
+    )
     art2 = ChunksArtifact.model_validate_json(art.model_dump_json())
     assert art2 == art
     assert art2.schema_version == "chunks-v1"
@@ -129,13 +168,23 @@ def test_schema_roundtrip():
 
 def test_reserved_fields_present():
     prov = ChunkProvenance(
-        chunker_version="chunker-v0.1.0", chunker_params={}, dom_schema_version="s", tokenizer="char4",
+        chunker_version="chunker-v0.1.0",
+        chunker_params={},
+        dom_schema_version="s",
+        tokenizer="char4",
     )
     chunk = Chunk(
-        chunk_id=compute_chunk_id("d1", "atomic table", ["b9"]), doc_id="d1", seq=0,
-        kind="table_atomic", text="atomic table", source_block_ids=["b9"],
-        parent_chunk_id="p-1", source_table_ids=["t1"], source_image_ids=["i1"],
-        provenance=prov, tokenizer="char4",
+        chunk_id=compute_chunk_id("d1", "atomic table", ["b9"]),
+        doc_id="d1",
+        seq=0,
+        kind="table_atomic",
+        text="atomic table",
+        source_block_ids=["b9"],
+        parent_chunk_id="p-1",
+        source_table_ids=["t1"],
+        source_image_ids=["i1"],
+        provenance=prov,
+        tokenizer="char4",
     )
     art = ChunksArtifact(doc_id="d1", chunker_version="chunker-v0.1.0", chunks=[chunk])
     art2 = ChunksArtifact.model_validate_json(art.model_dump_json())
@@ -156,7 +205,9 @@ def test_char4_deterministic():
 
 
 def test_char4_fallback_on_missing_file():
-    c = TokenCounter(mode="bge-m3", tokenizer_path="does/not/exist.json", allow_char4_fallback=True)
+    c = TokenCounter(
+        mode="bge-m3", tokenizer_path="does/not/exist.json", allow_char4_fallback=True
+    )
     assert c.tokenizer == "char4"
     assert c.count("abc") == 1  # max(1, 3 // 4)
 
@@ -232,19 +283,25 @@ def test_sentences_deterministic():
 def test_tail_sentences_budget():
     c = TokenCounter(mode="char4")
     text = "First sentence. Second sentence. Third sentence."
-    tail = tail_sentences(text, c, budget_tokens=1)   # any one sentence > 1 token
+    tail = tail_sentences(text, c, budget_tokens=1)  # any one sentence > 1 token
     assert tail == ["Third sentence."]
     assert tail_sentences(text, c, budget_tokens=100) == [
-        "First sentence.", "Second sentence.", "Third sentence.",
+        "First sentence.",
+        "Second sentence.",
+        "Third sentence.",
     ]
-    assert tail_sentences(text, c, budget_tokens=1) == tail_sentences(text, c, budget_tokens=1)
+    assert tail_sentences(text, c, budget_tokens=1) == tail_sentences(
+        text, c, budget_tokens=1
+    )
 
 
 # ------------------------------------------------------------------- chunker
 def test_heading_starts_chunk():
-    blocks = [_block(0, "Intro text here.", kind="paragraph"),
-              _block(1, "Section", kind="heading"),
-              _block(2, "x" * 4000)]  # 1000 tokens: too big to merge into the heading
+    blocks = [
+        _block(0, "Intro text here.", kind="paragraph"),
+        _block(1, "Section", kind="heading"),
+        _block(2, "x" * 4000),
+    ]  # 1000 tokens: too big to merge into the heading
     r = _chunker().chunk(_doc(blocks))
     assert len(r.chunks) == 3
     assert [c.kind for c in r.chunks] == ["paragraph", "heading", "paragraph"]
@@ -254,7 +311,9 @@ def test_heading_starts_chunk():
 
 
 def test_merge_to_target():
-    blocks = [_block(i, "x" * 150) for i in range(8)]  # 8 x 150 chars ≈ 301 tokens joined
+    blocks = [
+        _block(i, "x" * 150) for i in range(8)
+    ]  # 8 x 150 chars ≈ 301 tokens joined
     r = _chunker().chunk(_doc(blocks))
     assert len(r.chunks) == 1
     c = r.chunks[0]
@@ -267,7 +326,7 @@ def test_band_merge():
     blocks = [_block(0, "y" * 600), _block(1, "y" * 2000), _block(2, "y" * 2000)]
     r = _chunker().chunk(_doc(blocks))
     assert len(r.chunks) == 2
-    assert r.chunks[0].kind == "mixed"                 # 600+2000 chars merged via band rule
+    assert r.chunks[0].kind == "mixed"  # 600+2000 chars merged via band rule
     assert r.chunks[0].source_block_ids == [blocks[0].id, blocks[1].id]
     assert r.chunks[1].source_block_ids == [blocks[2].id]
 
@@ -295,7 +354,10 @@ def test_reading_order_empty_falls_back_page_order():
     # large blocks so each is its own chunk (page order is observable)
     b1, b2 = _block(0, "x" * 2000), _block(1, "x" * 2000)
     doc = Document(
-        version="dom-schema-v0.1.0", document_id="d-test", source_hash="00", metadata=Metadata(),
+        version="dom-schema-v0.1.0",
+        document_id="d-test",
+        source_hash="00",
+        metadata=Metadata(),
         provenance=Provenance(parser_version="p", dom_schema_version="s"),
         reading_order=[],  # empty -> page-order fallback
         pages=[Page(index=1, blocks=[b2]), Page(index=0, blocks=[b1])],
@@ -308,10 +370,10 @@ def test_reading_order_empty_falls_back_page_order():
 
 def test_oversized_block_sentence_split():
     sentence = "The patient continued treatment without complications."
-    big = _block(1, " ".join([sentence] * 170))   # > 8192 chars -> > 2048 tokens (char4)
+    big = _block(1, " ".join([sentence] * 170))  # > 8192 chars -> > 2048 tokens (char4)
     blocks = [_block(0, "Introduction", kind="heading"), big]
     r = _chunker().chunk(_doc(blocks))
-    oversized = r.chunks[1:]                       # skip the heading chunk
+    oversized = r.chunks[1:]  # skip the heading chunk
     assert len(oversized) >= 2
     for c in oversized:
         assert c.token_count <= 400
@@ -337,13 +399,17 @@ def test_oversized_repeated_sentences_distinct_chunk_ids():
     # discriminator every sentence-sub-chunk would share a single chunk_id,
     # breaking the never-embed-twice key and get_embedding.
     sentence = "The patient continued treatment without complications."
-    big = _block(0, " ".join([sentence] * 170))   # > 2048 tokens (char4)
+    big = _block(0, " ".join([sentence] * 170))  # > 2048 tokens (char4)
     r = _chunker().chunk(_doc([big]))
     ids = [c.chunk_id for c in r.chunks]
     assert len(ids) >= 2
-    assert len(ids) == len(set(ids)), "byte-identical oversized pieces must stay distinct"
+    assert len(ids) == len(set(ids)), (
+        "byte-identical oversized pieces must stay distinct"
+    )
     texts = [c.text for c in r.chunks]
-    assert len(texts) > len(set(texts)), "precondition: pieces really are byte-identical"
+    assert len(texts) > len(set(texts)), (
+        "precondition: pieces really are byte-identical"
+    )
 
 
 def test_forced_split_identical_pieces_distinct_chunk_ids():
@@ -401,8 +467,9 @@ def test_determinism_two_runs_identical():
     r1 = _chunker().chunk(doc)
     r2 = _chunker().chunk(doc)
     assert r1 == r2
-    assert json.dumps([c.model_dump() for c in r1.chunks], sort_keys=True) == \
-        json.dumps([c.model_dump() for c in r2.chunks], sort_keys=True)
+    assert json.dumps(
+        [c.model_dump() for c in r1.chunks], sort_keys=True
+    ) == json.dumps([c.model_dump() for c in r2.chunks], sort_keys=True)
 
 
 def test_provenance_fields():
@@ -410,7 +477,9 @@ def test_provenance_fields():
     doc = _doc(blocks)
     counter = TokenCounter(mode="char4")
     cfg = ChunkingConfig()
-    r = SemanticChunker(cfg, counter).chunk(doc, dom_storage_key="dom/d-test/norm-v0.1.0.docJSON")
+    r = SemanticChunker(cfg, counter).chunk(
+        doc, dom_storage_key="dom/d-test/norm-v0.1.0.docJSON"
+    )
     c = r.chunks[0]
     assert c.provenance.normalizer_version == "normalizer-v0.1.0"
     assert c.provenance.tokenizer == "char4"

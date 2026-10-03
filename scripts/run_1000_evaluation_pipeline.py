@@ -11,13 +11,11 @@ Phases:
 Usage:
   .venv/Scripts/python.exe scripts/run_1000_evaluation_pipeline.py
 """
+
 from __future__ import annotations
 
-import argparse
 import concurrent.futures
-import glob
 import json
-import os
 import subprocess
 import sys
 import time
@@ -45,7 +43,14 @@ def log(msg: str) -> None:
 
 def check_945_parser_done() -> tuple[bool, int, int]:
     """Check if the 945-doc corpus parser is done."""
-    target_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-14-full-corpus" / "parsed" / "manifest"
+    target_dir = (
+        ROOT_DIR
+        / "checkpoints"
+        / "run"
+        / "run-2026-09-14-full-corpus"
+        / "parsed"
+        / "manifest"
+    )
     if not target_dir.exists():
         return True, 945, 945
     plans = list(target_dir.glob("*/plan.json"))
@@ -66,13 +71,18 @@ def step1_ensure_all_downloads(workers: int = 16) -> int:
     cmd = [
         PYTHON_EXE,
         str(ROOT_DIR / "scripts" / "seed_and_download_1000.py"),
-        "--out", str(RUN_DIR),
-        "--limit", "1000",
-        "--workers", str(workers),
+        "--out",
+        str(RUN_DIR),
+        "--limit",
+        "1000",
+        "--workers",
+        str(workers),
     ]
     p = subprocess.run(cmd, cwd=str(ROOT_DIR))
     if p.returncode != 0:
-        log(f"WARNING: Initial download pass returned {p.returncode}. Checking local files...")
+        log(
+            f"WARNING: Initial download pass returned {p.returncode}. Checking local files..."
+        )
 
     # Count verified PDFs
     pdfs = [f for f in PDF_DIR.glob("*.pdf") if f.stat().st_size > 1000]
@@ -85,7 +95,9 @@ def step2_wait_for_945_parser() -> None:
     log("=== STEP 2: Monitoring Background 945-Doc Parser ===")
     while True:
         done, current, total = check_945_parser_done()
-        log(f"  [Wait Gate] Background 945 run: {current}/{total} documents parsed ({(current/total)*100:.1f}%)")
+        log(
+            f"  [Wait Gate] Background 945 run: {current}/{total} documents parsed ({(current / total) * 100:.1f}%)"
+        )
         if done:
             log("  [Wait Gate] Background 945 run is COMPLETE! Proceeding to Step 3.")
             time.sleep(5.0)
@@ -103,16 +115,23 @@ def step3_parse_1000_corpus() -> dict:
     cmd = [
         PYTHON_EXE,
         str(ROOT_DIR / "scripts" / "run_parser_benchmark.py"),
-        "--in", str(PDF_DIR),
-        "--out", str(PARSED_DIR),
-        "--batch", "eval1000",
-        "--reports", str(REPORTS_DIR),
-        "--limit", "1000",
+        "--in",
+        str(PDF_DIR),
+        "--out",
+        str(PARSED_DIR),
+        "--batch",
+        "eval1000",
+        "--reports",
+        str(REPORTS_DIR),
+        "--limit",
+        "1000",
     ]
     log(f"Running command: {' '.join(cmd)}")
     p = subprocess.run(cmd, cwd=str(ROOT_DIR))
     wall_sec = time.time() - start_time
-    log(f"Parsing run exited with code {p.returncode} in {wall_sec:.2f}s ({wall_sec/60:.2f} min)")
+    log(
+        f"Parsing run exited with code {p.returncode} in {wall_sec:.2f}s ({wall_sec / 60:.2f} min)"
+    )
 
     # Aggregate telemetry from parsed manifest plans
     plans = list((PARSED_DIR / "manifest").glob("*/plan.json"))
@@ -143,7 +162,11 @@ def step3_parse_1000_corpus() -> dict:
                     total_tables += sum(len(pg.get("tables", [])) for pg in dom_pages)
                     total_images += sum(len(pg.get("images", [])) for pg in dom_pages)
                     total_refs += len(dom.get("references", []))
-                    r = dom.get("provenance", {}).get("routing", {}).get("route", "unknown")
+                    r = (
+                        dom.get("provenance", {})
+                        .get("routing", {})
+                        .get("route", "unknown")
+                    )
                     routes[r] = routes.get(r, 0) + 1
             else:
                 failed += 1
@@ -178,14 +201,14 @@ def step3_parse_1000_corpus() -> dict:
 ## Summary
 - **Documents**: {len(plans)} issued · `{ok}` OK · `{failed}` failed · `0` dead · `0` unparsed
 - **Throughput & Timing**:
-  - Total wall time: `{wall_sec:.1f}s` ({wall_sec/60:.2f} mins)
+  - Total wall time: `{wall_sec:.1f}s` ({wall_sec / 60:.2f} mins)
   - Total pages parsed: `{total_pages}`
-  - Mean time per doc: `{wall_sec*1000/max(1, ok):.1f} ms` ({wall_sec/max(1, ok):.2f}s)
-  - Mean time per page: `{ms_per_page:.1f} ms` ({ms_per_page/1000:.3f}s)
+  - Mean time per doc: `{wall_sec * 1000 / max(1, ok):.1f} ms` ({wall_sec / max(1, ok):.2f}s)
+  - Mean time per page: `{ms_per_page:.1f} ms` ({ms_per_page / 1000:.3f}s)
   - Throughput (pages/s): `{pages_per_sec:.3f}`
   - Throughput (docs/s): `{docs_per_sec:.4f}`
 - **Route Distribution**:
-{chr(10).join(f"  - `{k}`: {v} docs ({v*100/max(1, ok):.1f}%)" for k, v in sorted(routes.items()))}
+{chr(10).join(f"  - `{k}`: {v} docs ({v * 100 / max(1, ok):.1f}%)" for k, v in sorted(routes.items()))}
 - **Extraction Yield**:
   - Blocks: `{total_blocks}`
   - Tables: `{total_tables}`
@@ -271,15 +294,24 @@ def step4_run_llm_judge(model: str = "gemini-3.1-flash-lite", workers: int = 5) 
                     break
 
         if not pdf_path:
-            return {"doc_id": doc_id, "category": category, "error": "source_pdf_unresolved", "status": "skipped"}
+            return {
+                "doc_id": doc_id,
+                "category": category,
+                "error": "source_pdf_unresolved",
+                "status": "skipped",
+            }
 
         cmd = [
             str(Path(PYTHON_EXE).resolve()),
             str((ROOT_DIR / "scripts" / "llm_judge.py").resolve()),
-            "--pdf", str(pdf_path.resolve()),
-            "--dom", str(dom_path.resolve()),
-            "--out", str(out_json.resolve()),
-            "--model", model,
+            "--pdf",
+            str(pdf_path.resolve()),
+            "--dom",
+            str(dom_path.resolve()),
+            "--out",
+            str(out_json.resolve()),
+            "--model",
+            model,
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT_DIR))
         if out_json.exists():
@@ -289,7 +321,12 @@ def step4_run_llm_judge(model: str = "gemini-3.1-flash-lite", workers: int = 5) 
                 return data
             except Exception:
                 pass
-        return {"doc_id": doc_id, "category": category, "error": f"judge_exit_{res.returncode}: {res.stderr[:200]}", "status": "error"}
+        return {
+            "doc_id": doc_id,
+            "category": category,
+            "error": f"judge_exit_{res.returncode}: {res.stderr[:200]}",
+            "status": "error",
+        }
 
     judgments = []
     completed = 0
@@ -306,7 +343,9 @@ def step4_run_llm_judge(model: str = "gemini-3.1-flash-lite", workers: int = 5) 
                 elapsed = time.time() - start_time
                 rate = completed / elapsed if elapsed > 0 else 0
                 valid_cnt = sum(1 for j in judgments if j.get("verdict"))
-                log(f"  [LLM Judge Progress] [{completed}/{total}] Evaluated: {valid_cnt} | Speed: {rate:.2f} docs/s")
+                log(
+                    f"  [LLM Judge Progress] [{completed}/{total}] Evaluated: {valid_cnt} | Speed: {rate:.2f} docs/s"
+                )
 
     # Aggregate Global Judge Metrics
     valid = [j for j in judgments if j.get("verdict")]
@@ -322,7 +361,10 @@ def step4_run_llm_judge(model: str = "gemini-3.1-flash-lite", workers: int = 5) 
                 metric_sums[m] += float(v)
                 metric_counts[m] += 1
 
-    metric_means = {m: (metric_sums[m] / metric_counts[m]) if metric_counts[m] > 0 else 0.0 for m in METRICS}
+    metric_means = {
+        m: (metric_sums[m] / metric_counts[m]) if metric_counts[m] > 0 else 0.0
+        for m in METRICS
+    }
 
     severity_counts = Counter()
     surface_counts = Counter()
@@ -358,7 +400,12 @@ def step4_run_llm_judge(model: str = "gemini-3.1-flash-lite", workers: int = 5) 
 
     category_summary = {}
     for cat, cd in category_data.items():
-        cat_means = {m: (cd["metric_sums"][m] / cd["metric_counts"][m]) if cd["metric_counts"][m] > 0 else 0.0 for m in METRICS}
+        cat_means = {
+            m: (cd["metric_sums"][m] / cd["metric_counts"][m])
+            if cd["metric_counts"][m] > 0
+            else 0.0
+            for m in METRICS
+        }
         category_summary[cat] = {
             "count": cd["count"],
             "verdicts": dict(cd["verdicts"]),
@@ -397,7 +444,7 @@ def step5_compile_final_report(telemetry: dict, judge_results: dict) -> Path:
         cv = cd.get("verdicts", {})
         pass_pct = (cv.get("PASS", 0) / max(1, cd.get("count", 1))) * 100
         cat_rows.append(
-            f"| **`{cname}`** | {cd.get('count', 0)} | {cm.get('completeness', 0)*100:.1f}% | {cm.get('fidelity', 0)*100:.1f}% | {cm.get('structure', 0)*100:.1f}% | {cm.get('tables', 0)*100:.1f}% | {cm.get('scans_ocr', 0)*100:.1f}% | {cv.get('PASS', 0)} ({pass_pct:.1f}%) |"
+            f"| **`{cname}`** | {cd.get('count', 0)} | {cm.get('completeness', 0) * 100:.1f}% | {cm.get('fidelity', 0) * 100:.1f}% | {cm.get('structure', 0) * 100:.1f}% | {cm.get('tables', 0) * 100:.1f}% | {cm.get('scans_ocr', 0) * 100:.1f}% | {cv.get('PASS', 0)} ({pass_pct:.1f}%) |"
         )
     cat_table = "\n".join(cat_rows)
 
@@ -411,15 +458,15 @@ def step5_compile_final_report(telemetry: dict, judge_results: dict) -> Path:
 
 ## 1. Executive Summary
 
-- **Total Documents Evaluated:** {judge_results.get('total_judged', 0)} / {telemetry.get('docs_issued', 1000)}
-- **Parsing Success Rate:** {telemetry.get('docs_ok', 0)} / {telemetry.get('docs_issued', 1000)} ({(telemetry.get('docs_ok', 0)/max(1, telemetry.get('docs_issued', 1000)))*100:.1f}%)
-- **Zero-Silent-Loss Integrity:** `{telemetry.get('docs_failed', 0)}` failures, `0` dead letters, `0` unparsed pages.
+- **Total Documents Evaluated:** {judge_results.get("total_judged", 0)} / {telemetry.get("docs_issued", 1000)}
+- **Parsing Success Rate:** {telemetry.get("docs_ok", 0)} / {telemetry.get("docs_issued", 1000)} ({(telemetry.get("docs_ok", 0) / max(1, telemetry.get("docs_issued", 1000))) * 100:.1f}%)
+- **Zero-Silent-Loss Integrity:** `{telemetry.get("docs_failed", 0)}` failures, `0` dead letters, `0` unparsed pages.
 - **Overall Accuracy & Fidelity:**
-  - **Completeness:** `{mm.get('completeness', 0)*100:.1f}%`
-  - **Text & Numeric Fidelity:** `{mm.get('fidelity', 0)*100:.1f}%`
-  - **Layout & Structure:** `{mm.get('structure', 0)*100:.1f}%`
-  - **Table Accuracy:** `{mm.get('tables', 0)*100:.1f}%`
-  - **Scan / OCR Accuracy:** `{mm.get('scans_ocr', 0)*100:.1f}%`
+  - **Completeness:** `{mm.get("completeness", 0) * 100:.1f}%`
+  - **Text & Numeric Fidelity:** `{mm.get("fidelity", 0) * 100:.1f}%`
+  - **Layout & Structure:** `{mm.get("structure", 0) * 100:.1f}%`
+  - **Table Accuracy:** `{mm.get("tables", 0) * 100:.1f}%`
+  - **Scan / OCR Accuracy:** `{mm.get("scans_ocr", 0) * 100:.1f}%`
 
 ---
 
@@ -427,18 +474,18 @@ def step5_compile_final_report(telemetry: dict, judge_results: dict) -> Path:
 
 | Metric | Measured Value |
 |---|---|
-| **Total Wall Time** | **{telemetry.get('wall_time_sec', 0):.1f} s ({telemetry.get('wall_time_min', 0):.2f} min)** |
-| **Total Pages Processed** | **{telemetry.get('pages_parsed', 0)} pages** |
-| **Throughput (Pages / sec)** | **{telemetry.get('pages_per_sec', 0):.3f} pages/s** |
-| **Throughput (Docs / sec)** | **{telemetry.get('docs_per_sec', 0):.4f} docs/s** |
-| **Mean Latency per Page** | **{telemetry.get('ms_per_page', 0):.1f} ms** |
-| **Total Blocks Extracted** | **{telemetry.get('blocks', 0):,}** |
-| **Total Tables Extracted** | **{telemetry.get('tables', 0):,}** |
-| **Total Images Extracted** | **{telemetry.get('images', 0):,}** |
-| **Total References Extracted** | **{telemetry.get('references', 0):,}** |
+| **Total Wall Time** | **{telemetry.get("wall_time_sec", 0):.1f} s ({telemetry.get("wall_time_min", 0):.2f} min)** |
+| **Total Pages Processed** | **{telemetry.get("pages_parsed", 0)} pages** |
+| **Throughput (Pages / sec)** | **{telemetry.get("pages_per_sec", 0):.3f} pages/s** |
+| **Throughput (Docs / sec)** | **{telemetry.get("docs_per_sec", 0):.4f} docs/s** |
+| **Mean Latency per Page** | **{telemetry.get("ms_per_page", 0):.1f} ms** |
+| **Total Blocks Extracted** | **{telemetry.get("blocks", 0):,}** |
+| **Total Tables Extracted** | **{telemetry.get("tables", 0):,}** |
+| **Total Images Extracted** | **{telemetry.get("images", 0):,}** |
+| **Total References Extracted** | **{telemetry.get("references", 0):,}** |
 
 ### Route Distribution
-{chr(10).join(f"- **`{r}`**: {cnt} documents ({cnt*100/max(1, telemetry.get('docs_ok', 1)):.1f}%)" for r, cnt in sorted(telemetry.get('routes', {}).items()))}
+{chr(10).join(f"- **`{r}`**: {cnt} documents ({cnt * 100 / max(1, telemetry.get('docs_ok', 1)):.1f}%)" for r, cnt in sorted(telemetry.get("routes", {}).items()))}
 
 ---
 
@@ -456,21 +503,21 @@ Evaluated across canonical Document JSON vs source PDF text:
 
 | Dimension / Metric | Mean Score (0.0 - 1.0) | Percentage | Quality Assessment |
 |---|---|---|---|
-| **Completeness** | **{mm.get('completeness', 0):.3f}** | **{mm.get('completeness', 0)*100:.1f}%** | Exhaustive content capture |
-| **Fidelity** | **{mm.get('fidelity', 0):.3f}** | **{mm.get('fidelity', 0)*100:.1f}%** | Exact text & character fidelity |
-| **Structure** | **{mm.get('structure', 0):.3f}** | **{mm.get('structure', 0)*100:.1f}%** | Accurate hierarchy & reading order |
-| **Tables** | **{mm.get('tables', 0):.3f}** | **{mm.get('tables', 0)*100:.1f}%** | High-precision grid & row extraction |
-| **References** | **{mm.get('references', 0):.3f}** | **{mm.get('references', 0)*100:.1f}%** | Clean citation extraction |
-| **Scans / OCR** | **{mm.get('scans_ocr', 0):.3f}** | **{mm.get('scans_ocr', 0)*100:.1f}%** | Robust OCR & scanned form parsing |
+| **Completeness** | **{mm.get("completeness", 0):.3f}** | **{mm.get("completeness", 0) * 100:.1f}%** | Exhaustive content capture |
+| **Fidelity** | **{mm.get("fidelity", 0):.3f}** | **{mm.get("fidelity", 0) * 100:.1f}%** | Exact text & character fidelity |
+| **Structure** | **{mm.get("structure", 0):.3f}** | **{mm.get("structure", 0) * 100:.1f}%** | Accurate hierarchy & reading order |
+| **Tables** | **{mm.get("tables", 0):.3f}** | **{mm.get("tables", 0) * 100:.1f}%** | High-precision grid & row extraction |
+| **References** | **{mm.get("references", 0):.3f}** | **{mm.get("references", 0) * 100:.1f}%** | Clean citation extraction |
+| **Scans / OCR** | **{mm.get("scans_ocr", 0):.3f}** | **{mm.get("scans_ocr", 0) * 100:.1f}%** | Robust OCR & scanned form parsing |
 
 ### Verdict Distribution
-- **PASS:** `{vd.get('PASS', 0)}`
-- **PASS_WITH_ISSUES:** `{vd.get('PASS_WITH_ISSUES', 0)}`
-- **FAIL:** `{vd.get('FAIL', 0)}`
+- **PASS:** `{vd.get("PASS", 0)}`
+- **PASS_WITH_ISSUES:** `{vd.get("PASS_WITH_ISSUES", 0)}`
+- **FAIL:** `{vd.get("FAIL", 0)}`
 
 ### Issue Surface Breakdown
-- **By Severity:** {', '.join(f'`{k}={v}`' for k, v in sorted(sev.items()))}
-- **By Surface:** {', '.join(f'`{k}={v}`' for k, v in sorted(srf.items()))}
+- **By Severity:** {", ".join(f"`{k}={v}`" for k, v in sorted(sev.items()))}
+- **By Surface:** {", ".join(f"`{k}={v}`" for k, v in sorted(srf.items()))}
 
 ---
 

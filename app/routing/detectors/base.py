@@ -7,6 +7,7 @@ so a failing detector records a `failed` result (never re-raises, never
 manufactures a negative signal) — one bad detector cannot crash a document or
 routing (spec §11).
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -20,7 +21,7 @@ from ..schema import Signal
 class DetectorResult:
     detector: str
     version: str
-    status: str                  # "ok" | "failed" | "not_enough/data"
+    status: str  # "ok" | "failed" | "not_enough/data"
     error: str | None = None
     signals: list[Signal] = field(default_factory=list)
 
@@ -48,7 +49,7 @@ class Detector(ABC):
             if not self.can_evaluate(feats):
                 return DetectorResult(self.name, self.version, "not_applicable")
             return self._evaluate(feats)
-        except Exception as e:                # spec §11: record, never re-raise
+        except Exception as e:  # spec §11: record, never re-raise
             return DetectorResult(
                 self.name,
                 self.version,
@@ -66,7 +67,9 @@ class Detector(ABC):
                 ],
             )
 
-    def _signal(self, name, value=None, confidence=None, evidence=None, status="ok") -> Signal:
+    def _signal(
+        self, name, value=None, confidence=None, evidence=None, status="ok"
+    ) -> Signal:
         return Signal(
             detector=self.name,
             version=self.version,
@@ -79,5 +82,11 @@ class Detector(ABC):
 
     def _sig_missing(self, name: str, evidence: str | None = None) -> Signal:
         """A 'missing' signal: value None, status missing — never a 0/False."""
-        return Signal(detector=self.name, version=self.version, name=name,
-                      value=None, status="missing", evidence=evidence)
+        return Signal(
+            detector=self.name,
+            version=self.version,
+            name=name,
+            value=None,
+            status="missing",
+            evidence=evidence,
+        )

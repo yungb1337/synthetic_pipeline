@@ -18,13 +18,12 @@ two stores directly comparable per document.
 Exit code: 0 if every document that appears in both stores is identical in
 (expected, actual, status, dom_checksum); otherwise 1.
 """
+
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import os
-import sys
 from pathlib import Path
 
 
@@ -83,10 +82,13 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Store {na}: {ra}")
     print(f"Store {nb}: {rb}")
-    print(f"docs in {na}={len(ids_a)}  docs in {nb}={len(ids_b)}  total distinct={len(all_ids)}\n")
+    print(
+        f"docs in {na}={len(ids_a)}  docs in {nb}={len(ids_b)}  total distinct={len(all_ids)}\n"
+    )
 
-    header = (f"{'doc_id':22} | {'in':5} | "
-              f"{na}:stat/exp/act | {nb}:stat/exp/act | DOM-match")
+    header = (
+        f"{'doc_id':22} | {'in':5} | {na}:stat/exp/act | {nb}:stat/exp/act | DOM-match"
+    )
     print(header)
     print("-" * len(header))
 
@@ -103,13 +105,16 @@ def main(argv: list[str] | None = None) -> int:
         def fmt(s):
             if s is None:
                 return "   -/-/-  "
-            return f"{str(s['status']):>4}/{s['expected']}/{s['actual']}"
+            return f"{s['status']!s:>4}/{s['expected']}/{s['actual']}"
 
         inboth = ina and inb
-        sa_sb_same = (sa and sb and
-                      sa["status"] == sb["status"] and
-                      sa["expected"] == sb["expected"] and
-                      sa["actual"] == sb["actual"])
+        sa_sb_same = (
+            sa
+            and sb
+            and sa["status"] == sb["status"]
+            and sa["expected"] == sb["expected"]
+            and sa["actual"] == sb["actual"]
+        )
         dom_match = (ca == cb) if (ca is not None and cb is not None) else None
         dom_str = {True: "yes", False: "NO ", None: "n/a"}[dom_match]
 

@@ -6,6 +6,7 @@ title/author/subject/creator/producer/dates consistently. Docling's own
 `DoclingDocument.metadata` is frequently empty for plain PDFs; the PDF info
 dict (via PyMuPDF) is the reliable source and is already a hard dependency.
 """
+
 from __future__ import annotations
 
 import re

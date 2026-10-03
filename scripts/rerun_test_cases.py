@@ -14,6 +14,7 @@ Usage:
         --out C:/Users/Asus/Downloads/test_cases_output \
         --manifest C:/Users/Asus/Downloads/test_cases_output/rerun_manifest.csv
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,8 +27,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.parser.config import default_config
-from app.parser.storage import FilesystemStore
 from app.parser.extraction import Extractor
+from app.parser.storage import FilesystemStore
 
 
 def main() -> int:
@@ -59,7 +60,9 @@ def main() -> int:
             out = ex.extract(data, f.name)
         except Exception as exc:  # never let one file abort the batch
             print(f"EXC  {f.name}: {type(exc).__name__}: {exc}", file=sys.stderr)
-            rows.append((f.name, "exception", "", 0, 0, 0, 0, 0, f"{type(exc).__name__}: {exc}"))
+            rows.append(
+                (f.name, "exception", "", 0, 0, 0, 0, 0, f"{type(exc).__name__}: {exc}")
+            )
             continue
         elapsed = round((time.time() - t0) * 1000)
         doc = out.document
@@ -71,20 +74,46 @@ def main() -> int:
         actual = out.report.get("actual_pages", 0) if out.report else 0
         if out.ok:
             ok += 1
-            print(f"OK   {f.name}: doc_id={out.document_id} pages={actual}/{expect} "
-                  f"blocks={blocks} tables={tables} images={images} refs={refs} ({elapsed}ms)")
+            print(
+                f"OK   {f.name}: doc_id={out.document_id} pages={actual}/{expect} "
+                f"blocks={blocks} tables={tables} images={images} refs={refs} ({elapsed}ms)"
+            )
         else:
-            print(f"FAIL {f.name}: status={out.status} pages={actual}/{expect} "
-                  f"({elapsed}ms) {out.report.get('error','') if out.report else ''}")
-        rows.append((f.name, out.status, out.document_id or "", expect, actual,
-                     blocks, tables, images, refs))
+            print(
+                f"FAIL {f.name}: status={out.status} pages={actual}/{expect} "
+                f"({elapsed}ms) {out.report.get('error', '') if out.report else ''}"
+            )
+        rows.append(
+            (
+                f.name,
+                out.status,
+                out.document_id or "",
+                expect,
+                actual,
+                blocks,
+                tables,
+                images,
+                refs,
+            )
+        )
 
     # Manifest
     manifest = args.manifest or str(outdir / "rerun_manifest.csv")
     with open(manifest, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["file", "status", "document_id", "expected_pages", "actual_pages",
-                    "blocks", "tables", "images", "references"])
+        w.writerow(
+            [
+                "file",
+                "status",
+                "document_id",
+                "expected_pages",
+                "actual_pages",
+                "blocks",
+                "tables",
+                "images",
+                "references",
+            ]
+        )
         w.writerows(rows)
 
     print(f"\n=== {ok}/{len(files)} parsed; manifest -> {manifest} ===")

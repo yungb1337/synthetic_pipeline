@@ -1,4 +1,5 @@
 """Tests for the batching-capable embedding seam (Module #4 seam)."""
+
 from __future__ import annotations
 
 from app.embedding.dummy import DummyEmbedder
@@ -13,9 +14,13 @@ def _block(seq: int, text: str) -> Block:
 def _doc(n: int) -> Document:
     blocks = [_block(i, f"block {i} of the document") for i in range(n)]
     return Document(
-        version="v1", document_id="x", source_hash="0", metadata=Metadata(),
+        version="v1",
+        document_id="x",
+        source_hash="0",
+        metadata=Metadata(),
         provenance=Provenance(parser_version="p", dom_schema_version="v1"),
-        reading_order=[b.id for b in blocks], pages=[Page(index=0, blocks=blocks)],
+        reading_order=[b.id for b in blocks],
+        pages=[Page(index=0, blocks=blocks)],
     )
 
 

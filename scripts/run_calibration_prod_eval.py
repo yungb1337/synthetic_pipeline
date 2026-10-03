@@ -5,10 +5,10 @@ Corpus B and Corpus 945) through the production extraction pipeline on branch
 `smart_routing`, scores them with the Gemini LLM Judge, and compares the results
 side-by-side with the experimental prototype run.
 """
+
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sys
 import time
@@ -20,7 +20,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import pdf_inspector
 import psutil
+
 from app.parser.config import default_config
 from app.parser.dom.models import Document
 from app.parser.events import EventPublisher
@@ -28,28 +30,52 @@ from app.parser.extraction import Extractor, set_shared_scheduler
 from app.parser.scheduler import Scheduler
 from app.parser.storage import FilesystemStore
 from app.parser.storage_pages import Ledger, PageStore
-import pdf_inspector
 from experimental.table_eval.judge_evaluator import TableBenchmarkJudgeEvaluator
 
-
 HARD_DOC_IDS = [
-    'PLOS-pbio.0060073', 'PLOS-pbio.1000033', 'PLOS-pcbi.1012408',
-    'PLOS-pcbi.1012663', 'PLOS-pcbi.1014129', 'PLOS-pctr.0020014',
-    'PLOS-pctr.0020019', 'PLOS-pctr.0020027', 'PLOS-pdig.0000408',
-    'PLOS-pgph.0000375', 'PLOS-pgph.0000501', 'PLOS-pgph.0001859',
-    'PLOS-pgph.0002220', 'PLOS-pgph.0003762', 'PLOS-pgph.0004462',
-    'PLOS-pgph.0004468', 'PLOS-pgph.0005818', 'PLOS-pgph.0006948',
-    'PLOS-pmed.0010039', 'PLOS-pmed.0010064'
+    "PLOS-pbio.0060073",
+    "PLOS-pbio.1000033",
+    "PLOS-pcbi.1012408",
+    "PLOS-pcbi.1012663",
+    "PLOS-pcbi.1014129",
+    "PLOS-pctr.0020014",
+    "PLOS-pctr.0020019",
+    "PLOS-pctr.0020027",
+    "PLOS-pdig.0000408",
+    "PLOS-pgph.0000375",
+    "PLOS-pgph.0000501",
+    "PLOS-pgph.0001859",
+    "PLOS-pgph.0002220",
+    "PLOS-pgph.0003762",
+    "PLOS-pgph.0004462",
+    "PLOS-pgph.0004468",
+    "PLOS-pgph.0005818",
+    "PLOS-pgph.0006948",
+    "PLOS-pmed.0010039",
+    "PLOS-pmed.0010064",
 ]
 
 EASY_DOC_IDS = [
-    'PLOS-pbio.1002203', 'PLOS-pbio.1002246', 'PLOS-pcbi.1007418',
-    'PLOS-pgph.0002990', 'PLOS-pgph.0006547', 'PLOS-pmed.0040104',
-    'PLOS-pmed.0040137', 'PLOS-pmed.1001850', 'PLOS-pmed.1002030',
-    'PLOS-pmed.1002129', 'PLOS-pmed.1004234', 'PLOS-pmed.1005087',
-    'PLOS-pntd.0006249', 'PLOS-pntd.0006457', 'PLOS-pntd.0008316',
-    'PLOS-pntd.0014047', 'PLOS-pone.0021711', 'PLOS-pone.0042934',
-    'PLOS-pone.0075284', 'PLOS-pone.0118423'
+    "PLOS-pbio.1002203",
+    "PLOS-pbio.1002246",
+    "PLOS-pcbi.1007418",
+    "PLOS-pgph.0002990",
+    "PLOS-pgph.0006547",
+    "PLOS-pmed.0040104",
+    "PLOS-pmed.0040137",
+    "PLOS-pmed.1001850",
+    "PLOS-pmed.1002030",
+    "PLOS-pmed.1002129",
+    "PLOS-pmed.1004234",
+    "PLOS-pmed.1005087",
+    "PLOS-pntd.0006249",
+    "PLOS-pntd.0006457",
+    "PLOS-pntd.0008316",
+    "PLOS-pntd.0014047",
+    "PLOS-pone.0021711",
+    "PLOS-pone.0042934",
+    "PLOS-pone.0075284",
+    "PLOS-pone.0118423",
 ]
 
 
@@ -57,8 +83,18 @@ def find_pdf_path(doc_id: str) -> Path | None:
     search_dirs = [
         REPO_ROOT / "artifacts" / "curated_hard",
         REPO_ROOT / "artifacts" / "curated_easy",
-        REPO_ROOT / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf",
-        REPO_ROOT / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "sources" / "pdf",
+        REPO_ROOT
+        / "checkpoints"
+        / "run"
+        / "run-2026-09-14-eval-1000"
+        / "sources"
+        / "pdf",
+        REPO_ROOT
+        / "checkpoints"
+        / "run"
+        / "run-2026-09-04-parser-reliability"
+        / "sources"
+        / "pdf",
     ]
     for d in search_dirs:
         if d.exists():
@@ -78,7 +114,10 @@ def run_production_calibration():
 
     # Resolve PDF paths
     targets = []
-    for group_name, doc_ids in [("curated_hard", HARD_DOC_IDS), ("curated_easy", EASY_DOC_IDS)]:
+    for group_name, doc_ids in [
+        ("curated_hard", HARD_DOC_IDS),
+        ("curated_easy", EASY_DOC_IDS),
+    ]:
         for did in doc_ids:
             p = find_pdf_path(did)
             if p and p.exists():
@@ -89,7 +128,7 @@ def run_production_calibration():
     print(f"Found {len(targets)} total target PDFs for production calibration.")
 
     process = psutil.Process()
-    initial_rss_gb = process.memory_info().rss / (1024 ** 3)
+    initial_rss_gb = process.memory_info().rss / (1024**3)
     peak_rss_gb = initial_rss_gb
 
     # Setup parser
@@ -107,8 +146,12 @@ def run_production_calibration():
     )
     set_shared_scheduler(scheduler)
     extractor = Extractor(
-        cfg, store, events=EventPublisher(),
-        scheduler=scheduler, page_store=page_store, ledger=ledger
+        cfg,
+        store,
+        events=EventPublisher(),
+        scheduler=scheduler,
+        page_store=page_store,
+        ledger=ledger,
     )
 
     print("\n" + "=" * 80)
@@ -134,9 +177,8 @@ def run_production_calibration():
         event = extractor.extract(data, filename=pdf_p.name)
         doc_elapsed = (time.time() - t_doc_start) * 1000.0
 
-        curr_rss = process.memory_info().rss / (1024 ** 3)
-        if curr_rss > peak_rss_gb:
-            peak_rss_gb = curr_rss
+        curr_rss = process.memory_info().rss / (1024**3)
+        peak_rss_gb = max(peak_rss_gb, curr_rss)
 
         plan = ledger.load_plan(event.document_id)
         dfile = out_dir / "dom" / event.document_id / "dom-v0.1.0.docJSON"
@@ -188,10 +230,12 @@ def run_production_calibration():
             "ocr_blocks": doc_ocr,
         }
 
-        print(f"[{i}/{len(targets)}] {did} ({grp}) -> {extracted_docs[did]['pages']} pages | "
-              f"Route: {extracted_docs[did]['doc_route']} | "
-              f"Tiers: {list(page_routes.values()).count('rust_native')} Native, {list(page_routes.values()).count('docling_heavy')} Docling | "
-              f"Tables: {doc_tables} | Inspect: {inspect_ms:.1f}ms | Parse: {doc_elapsed:.1f}ms")
+        print(
+            f"[{i}/{len(targets)}] {did} ({grp}) -> {extracted_docs[did]['pages']} pages | "
+            f"Route: {extracted_docs[did]['doc_route']} | "
+            f"Tiers: {list(page_routes.values()).count('rust_native')} Native, {list(page_routes.values()).count('docling_heavy')} Docling | "
+            f"Tables: {doc_tables} | Inspect: {inspect_ms:.1f}ms | Parse: {doc_elapsed:.1f}ms"
+        )
 
     prod_parse_wall_sec = time.time() - t_start
     total_parsed_pages = sum(d["pages"] for d in extracted_docs.values())
@@ -202,7 +246,9 @@ def run_production_calibration():
     print(f"Targeting {len(extracted_docs)} documents with light pacing")
     print("=" * 80 + "\n")
 
-    judge = TableBenchmarkJudgeEvaluator(model="gemini-3.5-flash-lite", pacing_seconds=0.5)
+    judge = TableBenchmarkJudgeEvaluator(
+        model="gemini-3.5-flash-lite", pacing_seconds=0.5
+    )
     judgments = {}
 
     def judge_task(item: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
@@ -214,7 +260,10 @@ def run_production_calibration():
         return did, res
 
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(judge_task, item): item["doc_id"] for item in extracted_docs.values()}
+        futures = {
+            executor.submit(judge_task, item): item["doc_id"]
+            for item in extracted_docs.values()
+        }
         for fut in as_completed(futures):
             did = futures[fut]
             try:
@@ -224,7 +273,9 @@ def run_production_calibration():
                 metrics = v_res.get("metrics", {})
                 tab_score = metrics.get("tables", 0.0)
                 comp_score = metrics.get("completeness", 0.0)
-                print(f"  [Judge] {did} -> {status} | Completeness: {comp_score:.2f} | Tables: {tab_score:.2f}")
+                print(
+                    f"  [Judge] {did} -> {status} | Completeness: {comp_score:.2f} | Tables: {tab_score:.2f}"
+                )
             except Exception as exc:
                 print(f"  [Judge ERROR] {did}: {exc}")
                 judgments[did] = {"verdict": "FAIL", "error": str(exc), "metrics": {}}
@@ -235,8 +286,12 @@ def run_production_calibration():
 
     # Load experimental judgments
     exp_judgments = {}
-    exp_hard_dir = REPO_ROOT / "artifacts" / "pdf_inspector_eval" / "curated_hard" / "judgment"
-    exp_easy_dir = REPO_ROOT / "artifacts" / "pdf_inspector_eval" / "curated_easy" / "judgment"
+    exp_hard_dir = (
+        REPO_ROOT / "artifacts" / "pdf_inspector_eval" / "curated_hard" / "judgment"
+    )
+    exp_easy_dir = (
+        REPO_ROOT / "artifacts" / "pdf_inspector_eval" / "curated_easy" / "judgment"
+    )
 
     for did in HARD_DOC_IDS:
         p = exp_hard_dir / f"{did}.verdict.json"
@@ -256,7 +311,14 @@ def run_production_calibration():
 
     def compute_stats(doc_list: list[str], j_map: dict[str, Any]) -> dict[str, Any]:
         verdicts = {"PASS": 0, "PASS_WITH_ISSUES": 0, "FAIL": 0}
-        metric_sums = {"completeness": 0.0, "fidelity": 0.0, "structure": 0.0, "tables": 0.0, "references": 0.0, "scans_ocr": 0.0}
+        metric_sums = {
+            "completeness": 0.0,
+            "fidelity": 0.0,
+            "structure": 0.0,
+            "tables": 0.0,
+            "references": 0.0,
+            "scans_ocr": 0.0,
+        }
         table_evaluable_sums = 0.0
         table_evaluable_count = 0
         valid_count = 0
@@ -285,14 +347,18 @@ def run_production_calibration():
 
         n = max(1, valid_count)
         means = {k: round(v / n, 3) for k, v in metric_sums.items()}
-        pcts = {k: f"{means[k]*100:.1f}%" for k in means}
-        t_eval = f"{(table_evaluable_sums / max(1, table_evaluable_count))*100:.1f}%" if table_evaluable_count > 0 else "N/A"
+        pcts = {k: f"{means[k] * 100:.1f}%" for k in means}
+        t_eval = (
+            f"{(table_evaluable_sums / max(1, table_evaluable_count)) * 100:.1f}%"
+            if table_evaluable_count > 0
+            else "N/A"
+        )
 
         return {
             "total_docs": len(doc_list),
             "evaluated": valid_count,
             "verdicts": verdicts,
-            "pass_rate": f"{((verdicts['PASS'] + verdicts['PASS_WITH_ISSUES']) / max(1, len(doc_list)))*100:.1f}%",
+            "pass_rate": f"{((verdicts['PASS'] + verdicts['PASS_WITH_ISSUES']) / max(1, len(doc_list))) * 100:.1f}%",
             "metrics_mean": means,
             "metrics_percentage": pcts,
             "table_accuracy_evaluable": t_eval,
@@ -344,13 +410,16 @@ def run_production_calibration():
                 "production_tables": extracted_docs[did]["tables"],
                 "production_ocr_blocks": extracted_docs[did]["ocr_blocks"],
                 "production_page_routes": extracted_docs[did]["page_routes"],
-                "experimental_verdict": exp_judgments.get(did, {}).get("verdict_status") or exp_judgments.get(did, {}).get("verdict"),
-                "production_verdict": judgments.get(did, {}).get("verdict_status") or judgments.get(did, {}).get("verdict"),
+                "experimental_verdict": exp_judgments.get(did, {}).get("verdict_status")
+                or exp_judgments.get(did, {}).get("verdict"),
+                "production_verdict": judgments.get(did, {}).get("verdict_status")
+                or judgments.get(did, {}).get("verdict"),
                 "experimental_metrics": exp_judgments.get(did, {}).get("metrics"),
                 "production_metrics": judgments.get(did, {}).get("metrics"),
             }
-            for did in all_docs if did in extracted_docs
-        }
+            for did in all_docs
+            if did in extracted_docs
+        },
     }
 
     report_json_path = REPO_ROOT / "artifacts" / "calibration_comparison_report.json"
@@ -364,7 +433,7 @@ def run_production_calibration():
     # Generate Markdown Report
     md = f"""# Side-by-Side Evaluation Report: Experimental Prototype vs Production Pipeline
 
-**Date:** {comparison_data['timestamp']}
+**Date:** {comparison_data["timestamp"]}
 **Branch:** `smart_routing`
 **Calibration Set:** 40 Documents (20 `curated_hard` + 20 `curated_easy` from Corpus B & Corpus 945)
 **Total Pages Parsed:** {total_pages_count(extracted_docs):,}
@@ -377,24 +446,24 @@ def run_production_calibration():
 
 | Dimension / Metric | Experimental Prototype | Production Pipeline (`smart_routing`) | Delta / Verification |
 |---|---|---|---|
-| **Hard Docs: Table Quality** | **{exp_hard_stats['metrics_percentage']['tables']}** | **{prod_hard_stats['metrics_percentage']['tables']}** | **MATCH / HIGH ACCURACY** |
-| **Hard Docs: Structure** | **{exp_hard_stats['metrics_percentage']['structure']}** | **{prod_hard_stats['metrics_percentage']['structure']}** | **+1.4pp GAIN (EXCEEDS)** |
-| **Hard Docs: Completeness** | **{exp_hard_stats['metrics_percentage']['completeness']}** | **{prod_hard_stats['metrics_percentage']['completeness']}** | **+1.0pp GAIN (EXCEEDS)** |
-| **Hard Docs: Fidelity** | **{exp_hard_stats['metrics_percentage']['fidelity']}** | **{prod_hard_stats['metrics_percentage']['fidelity']}** | **+1.4pp GAIN (EXCEEDS)** |
-| **Hard Docs: References** | **{exp_hard_stats['metrics_percentage']['references']}** | **{prod_hard_stats['metrics_percentage']['references']}** | **+5.1pp GAIN (EXCEEDS)** |
-| **Easy Docs: Completeness** | **{exp_easy_stats['metrics_percentage']['completeness']}** | **{prod_easy_stats['metrics_percentage']['completeness']}** | **+0.6pp GAIN (EXCEEDS)** |
-| **Easy Docs: Fidelity** | **{exp_easy_stats['metrics_percentage']['fidelity']}** | **{prod_easy_stats['metrics_percentage']['fidelity']}** | **100% PARITY (98.9%)** |
-| **Hard Docs: Pass Rate** | **{exp_hard_stats['pass_rate']}** ({exp_hard_stats['verdicts']['PASS']}P / {exp_hard_stats['verdicts']['PASS_WITH_ISSUES']}PWI / {exp_hard_stats['verdicts']['FAIL']}F) | **{prod_hard_stats['pass_rate']}** ({prod_hard_stats['verdicts']['PASS']}P / {prod_hard_stats['verdicts']['PASS_WITH_ISSUES']}PWI / {prod_hard_stats['verdicts']['FAIL']}F) | **100% PASS (0 FAILURES)** |
-| **Easy Docs: Pass Rate** | **{exp_easy_stats['pass_rate']}** ({exp_easy_stats['verdicts']['PASS']}P / {exp_easy_stats['verdicts']['PASS_WITH_ISSUES']}PWI / {exp_easy_stats['verdicts']['FAIL']}F) | **{prod_easy_stats['pass_rate']}** ({prod_easy_stats['verdicts']['PASS']}P / {prod_easy_stats['verdicts']['PASS_WITH_ISSUES']}PWI / {prod_easy_stats['verdicts']['FAIL']}F) | **100% CLEAN** |
+| **Hard Docs: Table Quality** | **{exp_hard_stats["metrics_percentage"]["tables"]}** | **{prod_hard_stats["metrics_percentage"]["tables"]}** | **MATCH / HIGH ACCURACY** |
+| **Hard Docs: Structure** | **{exp_hard_stats["metrics_percentage"]["structure"]}** | **{prod_hard_stats["metrics_percentage"]["structure"]}** | **+1.4pp GAIN (EXCEEDS)** |
+| **Hard Docs: Completeness** | **{exp_hard_stats["metrics_percentage"]["completeness"]}** | **{prod_hard_stats["metrics_percentage"]["completeness"]}** | **+1.0pp GAIN (EXCEEDS)** |
+| **Hard Docs: Fidelity** | **{exp_hard_stats["metrics_percentage"]["fidelity"]}** | **{prod_hard_stats["metrics_percentage"]["fidelity"]}** | **+1.4pp GAIN (EXCEEDS)** |
+| **Hard Docs: References** | **{exp_hard_stats["metrics_percentage"]["references"]}** | **{prod_hard_stats["metrics_percentage"]["references"]}** | **+5.1pp GAIN (EXCEEDS)** |
+| **Easy Docs: Completeness** | **{exp_easy_stats["metrics_percentage"]["completeness"]}** | **{prod_easy_stats["metrics_percentage"]["completeness"]}** | **+0.6pp GAIN (EXCEEDS)** |
+| **Easy Docs: Fidelity** | **{exp_easy_stats["metrics_percentage"]["fidelity"]}** | **{prod_easy_stats["metrics_percentage"]["fidelity"]}** | **100% PARITY (98.9%)** |
+| **Hard Docs: Pass Rate** | **{exp_hard_stats["pass_rate"]}** ({exp_hard_stats["verdicts"]["PASS"]}P / {exp_hard_stats["verdicts"]["PASS_WITH_ISSUES"]}PWI / {exp_hard_stats["verdicts"]["FAIL"]}F) | **{prod_hard_stats["pass_rate"]}** ({prod_hard_stats["verdicts"]["PASS"]}P / {prod_hard_stats["verdicts"]["PASS_WITH_ISSUES"]}PWI / {prod_hard_stats["verdicts"]["FAIL"]}F) | **100% PASS (0 FAILURES)** |
+| **Easy Docs: Pass Rate** | **{exp_easy_stats["pass_rate"]}** ({exp_easy_stats["verdicts"]["PASS"]}P / {exp_easy_stats["verdicts"]["PASS_WITH_ISSUES"]}PWI / {exp_easy_stats["verdicts"]["FAIL"]}F) | **{prod_easy_stats["pass_rate"]}** ({prod_easy_stats["verdicts"]["PASS"]}P / {prod_easy_stats["verdicts"]["PASS_WITH_ISSUES"]}PWI / {prod_easy_stats["verdicts"]["FAIL"]}F) | **100% CLEAN** |
 
 ---
 
 ## 2. Execution Tiers & Routing Distribution (Production)
 
 Across all {total_pages_count(extracted_docs):,} pages in the calibration corpus:
-- **`rust_native` (Fast Path ~35–45 p/s):** {prod_tiers['rust_native']} pages ({prod_tiers['rust_native']/max(1, total_pages_count(extracted_docs))*100:.1f}%)
-- **`docling_heavy` (Single-Page TableFormer Escalated):** {prod_tiers['docling_heavy']} pages ({prod_tiers['docling_heavy']/max(1, total_pages_count(extracted_docs))*100:.1f}%)
-- **`enrichment_ocr` (RapidOCR Fallback):** {prod_tiers['enrichment_ocr']} pages ({prod_tiers['enrichment_ocr']/max(1, total_pages_count(extracted_docs))*100:.1f}%)
+- **`rust_native` (Fast Path ~35–45 p/s):** {prod_tiers["rust_native"]} pages ({prod_tiers["rust_native"] / max(1, total_pages_count(extracted_docs)) * 100:.1f}%)
+- **`docling_heavy` (Single-Page TableFormer Escalated):** {prod_tiers["docling_heavy"]} pages ({prod_tiers["docling_heavy"] / max(1, total_pages_count(extracted_docs)) * 100:.1f}%)
+- **`enrichment_ocr` (RapidOCR Fallback):** {prod_tiers["enrichment_ocr"]} pages ({prod_tiers["enrichment_ocr"] / max(1, total_pages_count(extracted_docs)) * 100:.1f}%)
 
 **Invariants Enforced:**
 1. **Whole-Document Docling Calls:** **0 (0.00%)**
@@ -412,8 +481,14 @@ Across all {total_pages_count(extracted_docs):,} pages in the calibration corpus
     for did in HARD_DOC_IDS:
         if did in extracted_docs:
             d = extracted_docs[did]
-            e_v = clean_v(exp_judgments.get(did, {}).get("verdict_status") or exp_judgments.get(did, {}).get("verdict", "N/A"))
-            p_v = clean_v(judgments.get(did, {}).get("verdict_status") or judgments.get(did, {}).get("verdict", "N/A"))
+            e_v = clean_v(
+                exp_judgments.get(did, {}).get("verdict_status")
+                or exp_judgments.get(did, {}).get("verdict", "N/A")
+            )
+            p_v = clean_v(
+                judgments.get(did, {}).get("verdict_status")
+                or judgments.get(did, {}).get("verdict", "N/A")
+            )
             p_m = judgments.get(did, {}).get("metrics", {})
             if not p_m and isinstance(judgments.get(did, {}).get("verdict"), dict):
                 p_m = judgments[did]["verdict"].get("metrics", {})
@@ -430,8 +505,14 @@ Across all {total_pages_count(extracted_docs):,} pages in the calibration corpus
     for did in EASY_DOC_IDS:
         if did in extracted_docs:
             d = extracted_docs[did]
-            e_v = clean_v(exp_judgments.get(did, {}).get("verdict_status") or exp_judgments.get(did, {}).get("verdict", "N/A"))
-            p_v = clean_v(judgments.get(did, {}).get("verdict_status") or judgments.get(did, {}).get("verdict", "N/A"))
+            e_v = clean_v(
+                exp_judgments.get(did, {}).get("verdict_status")
+                or exp_judgments.get(did, {}).get("verdict", "N/A")
+            )
+            p_v = clean_v(
+                judgments.get(did, {}).get("verdict_status")
+                or judgments.get(did, {}).get("verdict", "N/A")
+            )
             p_m = judgments.get(did, {}).get("metrics", {})
             if not p_m and isinstance(judgments.get(did, {}).get("verdict"), dict):
                 p_m = judgments[did]["verdict"].get("metrics", {})

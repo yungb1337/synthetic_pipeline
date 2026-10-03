@@ -21,6 +21,7 @@ Usage:
 Key resolution: --api-key > $GEMINI_API_KEY env > key.py at repo root (gitignored).
 Missing key => exit 3 with a clear message (judge is additive, never fatal).
 Dependencies: google.generativeai 0.8.6, PyMuPDF, requests (all installed)."""
+
 from __future__ import annotations
 
 import argparse
@@ -52,8 +53,13 @@ FALLBACK_MODELS = (
 # ("transient rate limit") so the batch driver can skip this doc and continue
 # instead of aborting the whole run (exit 3 stays reserved for fatal: key/auth).
 _MAX_ATTEMPTS = 2
-_RATE_LIMIT_MARKERS = ("429", "RESOURCE_EXHAUSTED", "rate limit", "quota",
-                       "TooManyRequests")
+_RATE_LIMIT_MARKERS = (
+    "429",
+    "RESOURCE_EXHAUSTED",
+    "rate limit",
+    "quota",
+    "TooManyRequests",
+)
 
 _RETRY_SLEEP_SECONDS = 20.0  # fallback if the API does not report a delay
 
@@ -62,8 +68,8 @@ _RETRY_SLEEP_SECONDS = 20.0  # fallback if the API does not report a delay
 # scored "not evaluable" -> 0 on any doc that HAS tables (see run-2026-09-06
 # triage). These caps keep the preview bounded AND tell the model that anything
 # beyond the shown text is a preview limit, not a parser defect.
-_CELL_CHARS = 24        # truncate each cell / header string to this many chars
-_TABLE_BUDGET = 1200    # total characters across the whole tables_preview
+_CELL_CHARS = 24  # truncate each cell / header string to this many chars
+_TABLE_BUDGET = 1200  # total characters across the whole tables_preview
 _TABLE_PREVIEW_ROWS = 2  # first data rows per table
 
 
@@ -74,8 +80,10 @@ def _rate_limited(exc: BaseException) -> bool:
     name, network) so the retry loop never burns time on unrecoverable inputs."""
     name = type(exc).__name__
     msg = str(exc)
-    return any(m.lower() in name.lower() or m.lower() in msg.lower()
-               for m in _RATE_LIMIT_MARKERS)
+    return any(
+        m.lower() in name.lower() or m.lower() in msg.lower()
+        for m in _RATE_LIMIT_MARKERS
+    )
 
 
 def _retry_delay(exc: BaseException) -> float:
@@ -167,11 +175,19 @@ def extract_source_text(pdf_path: Path, max_chars: int) -> dict:
                 pages.append(t)
                 total += len(t)
     except Exception as exc:  # noqa: BLE001
-        return {"error": f"fitz open failed: {exc}", "pages": pages,
-                "page_count": real_count, "preview_page_count": len(pages),
-                "total_chars": total}
-    return {"pages": pages, "page_count": real_count,
-            "preview_page_count": len(pages), "total_chars": total}
+        return {
+            "error": f"fitz open failed: {exc}",
+            "pages": pages,
+            "page_count": real_count,
+            "preview_page_count": len(pages),
+            "total_chars": total,
+        }
+    return {
+        "pages": pages,
+        "page_count": real_count,
+        "preview_page_count": len(pages),
+        "total_chars": total,
+    }
 
 
 def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
@@ -186,7 +202,9 @@ def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
     ro_full = dom.get("reading_order_full", [])
 
     # Sample of text blocks across pages for fidelity spot check
-    total_text_chars = sum(len(b.get("text", "")) for p in pages for b in p.get("blocks", []))
+    total_text_chars = sum(
+        len(b.get("text", "")) for p in pages for b in p.get("blocks", [])
+    )
     sample_blocks: list[str] = []
     used_chars = 0
     for p in sorted(pages, key=lambda x: x.get("index", 0)):
@@ -214,8 +232,11 @@ def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
         "`text_chars_total`, and `page_count_dom` vs the source."
     )
     # First reference entries (D3) — labels + short text
-    sample_refs = [{"label": r.get("label", ""), "text": (r.get("text") or "")[:120]}
-                   for r in refs[:6]]
+    sample_refs = [
+        {"label": r.get("label", ""), "text": (r.get("text") or "")[:120]}
+        for r in refs[:6]
+    ]
+
     # Table preview: bounded real-content sample so the "tables" metric is
     # actually evaluable. Dims alone score 0 "not evaluable" on any doc that
     # HAS tables (the judge has nothing to verify). Global sequential index
@@ -236,11 +257,12 @@ def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
             rows = t.get("rows") or []
             hdr_txt = " | ".join(_cell_text(h) for h in header)
             row_txts = []
-            for r in rows[: _TABLE_PREVIEW_ROWS]:
+            for r in rows[:_TABLE_PREVIEW_ROWS]:
                 cells = r.get("cells") if isinstance(r, dict) else r
                 row_txts.append(" | ".join(_cell_text(c) for c in cells))
-            seg = (f"T{gi}:{len(rows)}r x {len(header)}c | {hdr_txt} | "
-                   + " ; ".join(row_txts))
+            seg = f"T{gi}:{len(rows)}r x {len(header)}c | {hdr_txt} | " + " ; ".join(
+                row_txts
+            )
             if used + len(seg) > _TABLE_BUDGET:
                 break
             table_preview.append(seg)
@@ -251,7 +273,8 @@ def summarize_dom(dom: dict, max_chars: int = 4000) -> dict:
         f"{_TABLE_BUDGET} total chars. Only the tables/cells shown exist in the "
         "preview; truncation or absence beyond the shown text is a PREVIEW LIMIT, "
         "never a parser defect. Score 'tables' by judging ONLY the content shown "
-        "against the SOURCE pages that contain them; do not penalize truncation.")
+        "against the SOURCE pages that contain them; do not penalize truncation."
+    )
     return {
         "document_id": dom.get("document_id"),
         "source_hash": (dom.get("source_hash") or "")[:12],
@@ -307,25 +330,37 @@ discrepancy. Output ONLY the JSON object (no markdown fences, no commentary)."""
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pdf", required=True, help="source PDF path")
-    ap.add_argument("--dom", required=True, help="parsed DOM file (document.parsed.v1.docJSON) or any Document JSON")
+    ap.add_argument(
+        "--dom",
+        required=True,
+        help="parsed DOM file (document.parsed.v1.docJSON) or any Document JSON",
+    )
     ap.add_argument("--out", required=True, help="output verdict JSON path")
     ap.add_argument("--model", default=DEFAULT_MODEL, help="Gemini model name (light)")
-    ap.add_argument("--max-chars", type=int, default=12000, help="source text char budget")
-    ap.add_argument("--api-key", default=None, help="Gemini API key (overrides env/key.py)")
+    ap.add_argument(
+        "--max-chars", type=int, default=12000, help="source text char budget"
+    )
+    ap.add_argument(
+        "--api-key", default=None, help="Gemini API key (overrides env/key.py)"
+    )
     args = ap.parse_args()
 
     key = resolve_key(args.api_key)
     if not key:
-        print("ERROR: no Gemini API key found. Set GEMINI_API_KEY env or create "
-              "gitignored key.py with GEMINI_API_KEY='...'. Judge skipped (exit 3).",
-              file=sys.stderr)
+        print(
+            "ERROR: no Gemini API key found. Set GEMINI_API_KEY env or create "
+            "gitignored key.py with GEMINI_API_KEY='...'. Judge skipped (exit 3).",
+            file=sys.stderr,
+        )
         return 3
 
     pdf = Path(args.pdf)
     dom_file = Path(args.dom)
     if not pdf.is_file() or not dom_file.is_file():
-        print(f"ERROR: need both --pdf and --dom files (pdf={pdf.is_file()} dom={dom_file.is_file()})",
-              file=sys.stderr)
+        print(
+            f"ERROR: need both --pdf and --dom files (pdf={pdf.is_file()} dom={dom_file.is_file()})",
+            file=sys.stderr,
+        )
         return 2
 
     dom = json.loads(dom_file.read_text(encoding="utf-8"))
@@ -338,18 +373,22 @@ def main() -> int:
     for idx in range(len(src["pages"])):
         chunk = src["pages"][idx][: src_budget // max(1, len(src["pages"]))]
         src_parts.append(f"[page {idx + 1} of {src['page_count']}] {chunk}")
-    source_json = json.dumps({
-        "source_page_count": src.get("page_count") or len(src_parts),
-        "preview_pages": [i + 1 for i in range(len(src_parts))],
-        "pages": src_parts,
-        "preview_note": "PARTIAL PREVIEW: only pages listed in preview_pages are shown, sampled across the document. Do NOT flag page-count differences as defects; judge fidelity/structure/tables/references ONLY on shown pages.",  # noqa: E501
-    }, ensure_ascii=False)
+    source_json = json.dumps(
+        {
+            "source_page_count": src.get("page_count") or len(src_parts),
+            "preview_pages": [i + 1 for i in range(len(src_parts))],
+            "pages": src_parts,
+            "preview_note": "PARTIAL PREVIEW: only pages listed in preview_pages are shown, sampled across the document. Do NOT flag page-count differences as defects; judge fidelity/structure/tables/references ONLY on shown pages.",
+        },
+        ensure_ascii=False,
+    )
     dom_json = json.dumps(dom_sum, ensure_ascii=False)
 
     prompt = PROMPT_TEMPLATE.format(source_json=source_json, dom_json=dom_json)
 
     try:
         import google.generativeai as genai
+
         genai.configure(api_key=key)
 
         # Build candidate model list starting with requested model then fallbacks
@@ -374,15 +413,24 @@ def main() -> int:
                     err_msg = str(exc)
                     # If daily quota is exhausted (PerDay), switch to next model immediately
                     if "PerDay" in err_msg or "per day" in err_msg.lower():
-                        print(f"  [judge] model {current_model_name} daily quota exhausted -> trying next model...", file=sys.stderr)
+                        print(
+                            f"  [judge] model {current_model_name} daily quota exhausted -> trying next model...",
+                            file=sys.stderr,
+                        )
                         break
                     if not _rate_limited(exc):
-                        print(f"  [judge] model {current_model_name} call failed: {exc}", file=sys.stderr)
+                        print(
+                            f"  [judge] model {current_model_name} call failed: {exc}",
+                            file=sys.stderr,
+                        )
                         break  # try next fallback model
                     delay = min(25.0, max(3.0, _retry_delay(exc)))
                     if attempt < _MAX_ATTEMPTS:
-                        print(f"  [judge] {current_model_name} rate-limited (retry {attempt}/{_MAX_ATTEMPTS}); "
-                              f"waiting {delay:.1f}s", file=sys.stderr)
+                        print(
+                            f"  [judge] {current_model_name} rate-limited (retry {attempt}/{_MAX_ATTEMPTS}); "
+                            f"waiting {delay:.1f}s",
+                            file=sys.stderr,
+                        )
                         time.sleep(delay)
             if resp is not None:
                 break
@@ -393,8 +441,10 @@ def main() -> int:
     if resp is None:
         # All retries exhausted on the same transient rate limit → tell the batch
         # driver this is a per-doc skip (exit 4), not a fatal key error (exit 3).
-        print(f"ERROR: Gemini rate-limited after {_MAX_ATTEMPTS} attempts: {last_exc}",
-              file=sys.stderr)
+        print(
+            f"ERROR: Gemini rate-limited after {_MAX_ATTEMPTS} attempts: {last_exc}",
+            file=sys.stderr,
+        )
         return 4
 
     text = resp.text.strip()
@@ -412,7 +462,7 @@ def main() -> int:
             text = match.group(0)
     try:
         verdict = json.loads(text)
-    except json.JSONDecodeError as exc:
+    except json.JSONDecodeError:
         print(f"ERROR: judge returned non-JSON:\n{text[:500]}", file=sys.stderr)
         return 1
 

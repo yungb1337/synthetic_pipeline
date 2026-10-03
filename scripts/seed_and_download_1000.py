@@ -17,13 +17,13 @@ Ensures:
 Usage:
   .venv/Scripts/python.exe scripts/seed_and_download_1000.py --out checkpoints/run/run-2026-09-14-eval-1000 --limit 1000
 """
+
 from __future__ import annotations
 
 import argparse
 import concurrent.futures
 import hashlib
 import json
-import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -63,11 +63,26 @@ PLOS_QUERIES = {
 }
 
 FORM_TYPES = {
-    "bills_claims_economics": ("billing_statement_and_claims", "forms_ocr_tables_dense"),
-    "lab_pathology_reports": ("laboratory_and_pathology_panel", "multitable_intervals_biomarkers"),
-    "doctor_guidelines_clinical_notes": ("clinical_practice_guideline", "multicolumn_nested_flowcharts"),
-    "clinical_trials_statistical_tables": ("clinical_trial_report", "dense_statistical_tables"),
-    "radiology_imaging_complex_scans": ("radiology_imaging_report", "scans_figures_mixed_layouts"),
+    "bills_claims_economics": (
+        "billing_statement_and_claims",
+        "forms_ocr_tables_dense",
+    ),
+    "lab_pathology_reports": (
+        "laboratory_and_pathology_panel",
+        "multitable_intervals_biomarkers",
+    ),
+    "doctor_guidelines_clinical_notes": (
+        "clinical_practice_guideline",
+        "multicolumn_nested_flowcharts",
+    ),
+    "clinical_trials_statistical_tables": (
+        "clinical_trial_report",
+        "dense_statistical_tables",
+    ),
+    "radiology_imaging_complex_scans": (
+        "radiology_imaging_report",
+        "scans_figures_mixed_layouts",
+    ),
 }
 
 
@@ -79,7 +94,16 @@ def get_plos_pdf_url(doi: str) -> str:
 def query_plos(query: str, rows: int = 100) -> list[dict]:
     url = "http://api.plos.org/search"
     try:
-        r = requests.get(url, params={"q": query, "fl": "id,title,journal,publication_date", "rows": rows, "wt": "json"}, timeout=20)
+        r = requests.get(
+            url,
+            params={
+                "q": query,
+                "fl": "id,title,journal,publication_date",
+                "rows": rows,
+                "wt": "json",
+            },
+            timeout=20,
+        )
         r.raise_for_status()
         return r.json().get("response", {}).get("docs", [])
     except Exception as exc:
@@ -87,7 +111,9 @@ def query_plos(query: str, rows: int = 100) -> list[dict]:
         return []
 
 
-def download_pdf(record: dict, out_dir: Path, timeout: int = 45, retries: int = 3) -> dict:
+def download_pdf(
+    record: dict, out_dir: Path, timeout: int = 45, retries: int = 3
+) -> dict:
     dest = out_dir / f"{record['id']}.pdf"
     if dest.exists() and dest.stat().st_size > 1000:
         try:
@@ -113,7 +139,13 @@ def download_pdf(record: dict, out_dir: Path, timeout: int = 45, retries: int = 
     last_err = None
     for attempt in range(retries):
         try:
-            with requests.get(url, stream=True, timeout=timeout, headers={"User-Agent": UA}, allow_redirects=True) as r:
+            with requests.get(
+                url,
+                stream=True,
+                timeout=timeout,
+                headers={"User-Agent": UA},
+                allow_redirects=True,
+            ) as r:
                 if r.status_code == 404:
                     return {**record, "status": "error", "error": "404 Not Found"}
                 r.raise_for_status()
@@ -159,7 +191,9 @@ def download_pdf(record: dict, out_dir: Path, timeout: int = 45, retries: int = 
     }
 
 
-def build_and_download(out_dir: Path, target_total: int = 1000, workers: int = 12) -> list[dict]:
+def build_and_download(
+    out_dir: Path, target_total: int = 1000, workers: int = 12
+) -> list[dict]:
     pdf_dir = out_dir / "pdf"
     manifest_path = out_dir / "manifest.json"
     pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -241,7 +275,9 @@ def build_and_download(out_dir: Path, target_total: int = 1000, workers: int = 1
     print(f"Starting download pool with {workers} workers...")
     final_records = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(download_pdf, rec, pdf_dir): rec for rec in all_records}
+        future_map = {
+            executor.submit(download_pdf, rec, pdf_dir): rec for rec in all_records
+        }
         completed = 0
         total = len(all_records)
         for fut in concurrent.futures.as_completed(future_map):
@@ -252,14 +288,18 @@ def build_and_download(out_dir: Path, target_total: int = 1000, workers: int = 1
                 ok_count = sum(1 for r in final_records if r.get("status") == "ok")
                 mb = sum(r.get("size_bytes", 0) for r in final_records) / (1024 * 1024)
                 print(f"  [{completed}/{total}] OK: {ok_count} | Size: {mb:.1f} MB")
-                manifest_path.write_text(json.dumps(final_records, indent=2), encoding="utf-8")
+                manifest_path.write_text(
+                    json.dumps(final_records, indent=2), encoding="utf-8"
+                )
 
     # Retry any errors once
     errors = [r for r in final_records if r.get("status") != "ok"]
     if errors:
         print(f"\nRetrying {len(errors)} errors...")
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            future_map = {executor.submit(download_pdf, rec, pdf_dir): rec for rec in errors}
+            future_map = {
+                executor.submit(download_pdf, rec, pdf_dir): rec for rec in errors
+            }
             for fut in concurrent.futures.as_completed(future_map):
                 res = fut.result()
                 if res.get("status") == "ok":
@@ -269,20 +309,30 @@ def build_and_download(out_dir: Path, target_total: int = 1000, workers: int = 1
 
     manifest_path.write_text(json.dumps(final_records, indent=2), encoding="utf-8")
     ok_count = sum(1 for r in final_records if r.get("status") == "ok")
-    print(f"\nDownload finished! Successfully verified: {ok_count} / {len(final_records)} PDFs")
+    print(
+        f"\nDownload finished! Successfully verified: {ok_count} / {len(final_records)} PDFs"
+    )
     return final_records
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", default="checkpoints/run/run-2026-09-14-eval-1000", help="Run directory")
-    parser.add_argument("--limit", type=int, default=1000, help="Total documents to download")
+    parser.add_argument(
+        "--out",
+        default="checkpoints/run/run-2026-09-14-eval-1000",
+        help="Run directory",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=1000, help="Total documents to download"
+    )
     parser.add_argument("--workers", type=int, default=16, help="Worker threads")
     args = parser.parse_args()
 
     run_dir = Path(args.out)
     sources_dir = run_dir / "sources"
-    records = build_and_download(sources_dir, target_total=args.limit, workers=args.workers)
+    records = build_and_download(
+        sources_dir, target_total=args.limit, workers=args.workers
+    )
     ok_records = [r for r in records if r.get("status") == "ok"]
     return 0 if len(ok_records) >= 950 else 1
 

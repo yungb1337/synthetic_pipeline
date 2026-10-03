@@ -7,6 +7,7 @@ Design guarantees:
   * Structure-aware: respects block kind ('code', 'formula', 'paragraph', 'heading').
   * Rich provenance: attaches comprehensive execution statistics and audit report.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -103,14 +104,18 @@ class Normalizer:
                         new_headers = []
                         for h in t.header:
                             report["table_cells_seen"] += 1
-                            new_headers.append(_normalize_str(h, "table_cell", "table_cells"))
+                            new_headers.append(
+                                _normalize_str(h, "table_cell", "table_cells")
+                            )
                         t.header = new_headers
 
                     # Table body cells
                     for row in t.rows:
                         for cell in row.cells:
                             report["table_cells_seen"] += 1
-                            cell.text = _normalize_str(cell.text, "table_cell", "table_cells")
+                            cell.text = _normalize_str(
+                                cell.text, "table_cell", "table_cells"
+                            )
 
         # 3. Image captions
         if self.config.normalize_captions:

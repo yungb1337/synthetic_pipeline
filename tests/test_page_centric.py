@@ -5,34 +5,47 @@ Covers the durable unit (`PageResult`), the `ResourceGovernor` math, the
 + `DocumentValidator`), and an end-to-end `Scheduler -> Assembler` over a small
 native (PyMuPDF) 2-page fixture (no Docling required — runs everywhere).
 """
+
 from __future__ import annotations
 
 import json
 
 import pytest
 
+from app.parser.assembler import Assembler, DocumentValidator
 from app.parser.config import ParserConfig
+from app.parser.engines.base import PageWorkItem
+from app.parser.events import EventPublisher
 from app.parser.page_result import PAGE_SCHEMA_VERSION, PageResult, PageStatus
 from app.parser.parts import RecoveredBlock, RecoveredTable
-from app.parser.scheduler import ResourceGovernor, Scheduler
 from app.parser.planner import ExecutionPlan, Planner
-from app.parser.engines.base import PageWorkItem
+from app.parser.scheduler import ResourceGovernor, Scheduler
 from app.parser.source import SourceScan
 from app.parser.storage import FilesystemStore
 from app.parser.storage_pages import Ledger, PageStore
-from app.parser.assembler import Assembler, DocumentValidator
-from app.parser.events import EventPublisher
 
 
 # ---------------------------------------------------------------------------
 # PageResult — the durable + processing unit
 # ---------------------------------------------------------------------------
 def test_page_result_roundtrip_and_checksum():
-    blk = RecoveredBlock(page=0, kind="paragraph", text="hello", bbox=(0, 0, 10, 10), seq=0, source="text")
+    blk = RecoveredBlock(
+        page=0,
+        kind="paragraph",
+        text="hello",
+        bbox=(0, 0, 10, 10),
+        seq=0,
+        source="text",
+    )
     tbl = RecoveredTable(page=0, header=["a"], rows=[["1"]], source="native")
     r = PageResult(
-        doc_id="d-abc", page_index=0, route="native", status=PageStatus.OK,
-        blocks=[blk], tables=[tbl], source_hash="sha",
+        doc_id="d-abc",
+        page_index=0,
+        route="native",
+        status=PageStatus.OK,
+        blocks=[blk],
+        tables=[tbl],
+        source_hash="sha",
     )
     assert r.content_present is True
     cs = r.compute_checksum()
@@ -50,7 +63,9 @@ def test_page_result_roundtrip_and_checksum():
 
 
 def test_page_result_empty_is_not_content_present():
-    r = PageResult(doc_id="d-x", page_index=1, route="native", status=PageStatus.OK, blocks=[])
+    r = PageResult(
+        doc_id="d-x", page_index=1, route="native", status=PageStatus.OK, blocks=[]
+    )
     assert r.content_present is False
 
 
@@ -83,7 +98,9 @@ def test_resource_governor_cgroup_bounds_ram(monkeypatch):
     g = ResourceGovernor()
     # cgroup caps the box to 4GiB; usable = 4GiB*0.8 = 3.2GiB
     monkeypatch.setattr(g, "_cgroup_max", lambda: 4 * 1024**3)
-    n = g.derive_heavy_concurrency(ram_cap=1024 * 1024**3, base_overhead=2 * 1024**3, F=1024**3)
+    n = g.derive_heavy_concurrency(
+        ram_cap=1024 * 1024**3, base_overhead=2 * 1024**3, F=1024**3
+    )
     # floor((3.2GiB - 2GiB)/1GiB) == floor(1.2) == 1
     assert n == 1
 
@@ -91,8 +108,6 @@ def test_resource_governor_cgroup_bounds_ram(monkeypatch):
 def test_resource_governor_periodic_recheck_only_downward(monkeypatch):
     import sys
     import types
-
-    import app.parser.scheduler as sched_mod
 
     g = ResourceGovernor()
     g.measured_f = 1024**3
@@ -117,7 +132,7 @@ def test_resource_governor_periodic_recheck_only_downward(monkeypatch):
 # ---------------------------------------------------------------------------
 # Planner — expected page set + resume
 # ---------------------------------------------------------------------------
-def _scan_pdf(tmp_path, pages: int = 3) -> tuple[FilesystemStore, "object"]:
+def _scan_pdf(tmp_path, pages: int = 3) -> tuple[FilesystemStore, object]:
     import fitz
 
     doc = fitz.open()
@@ -152,10 +167,17 @@ def test_planner_resume_skips_done_pages(tmp_path):
     # First plan pass writes the ledger (pending pages).
     planner.plan(manifest, "native", None, ParserConfig())
     # Mark page 0 OK and present in the page store (simulating a prior run).
-    ok_res = PageResult(doc_id=manifest.doc_id, page_index=0, route="native",
-                        status=PageStatus.OK, blocks=[RecoveredBlock(page=0, text="x", source="text")])
+    ok_res = PageResult(
+        doc_id=manifest.doc_id,
+        page_index=0,
+        route="native",
+        status=PageStatus.OK,
+        blocks=[RecoveredBlock(page=0, text="x", source="text")],
+    )
     page_store.put_page(manifest.doc_id, 0, ok_res)
-    ledger.update_page(manifest.doc_id, 0, PageStatus.OK, ok_res.checksum, "native", 0, [])
+    ledger.update_page(
+        manifest.doc_id, 0, PageStatus.OK, ok_res.checksum, "native", 0, []
+    )
 
     plan = planner.plan(manifest, "native", None, ParserConfig(), resume=True)
     # page 0 already done -> excluded
@@ -166,7 +188,9 @@ def test_planner_docling_band_degrades_without_engine(monkeypatch, tmp_path):
     store, manifest = _scan_pdf(tmp_path, pages=2)
     page_store = PageStore(str(store.root))
     ledger = Ledger(str(store.root))
-    monkeypatch.setattr("app.parser.planner.docling_loader.engine_available", lambda: False)
+    monkeypatch.setattr(
+        "app.parser.planner.docling_loader.engine_available", lambda: False
+    )
     planner = Planner(page_store, ledger)
     plan = planner.plan(manifest, "docling", None, ParserConfig(ocr_enabled=True))
     assert plan.route == "enrichment"  # graceful degrade, never crash
@@ -199,7 +223,9 @@ def test_docling_guard_status_detects_empty_stub(monkeypatch):
         document = FakeDoc()
         input = FakeInput()
 
-    status_name, errors, expected, produced = docling_loader.docling_guard_status(FakeResult())
+    status_name, errors, expected, produced = docling_loader.docling_guard_status(
+        FakeResult()
+    )
     assert status_name == "PARTIAL_SUCCESS"
     assert expected == 1
     assert produced == 0  # empty stub => 0 produced content pages
@@ -215,12 +241,27 @@ def test_validator_rejects_incomplete_assembly(tmp_path):
 
     # Only 2 of 3 pages OK -> not complete
     results = [
-        PageResult(doc_id=manifest.doc_id, page_index=0, route="native", status=PageStatus.OK,
-                   blocks=[RecoveredBlock(page=0, text="a", source="text")]),
-        PageResult(doc_id=manifest.doc_id, page_index=1, route="native", status=PageStatus.OK,
-                   blocks=[RecoveredBlock(page=1, text="b", source="text")]),
-        PageResult(doc_id=manifest.doc_id, page_index=2, route="native", status=PageStatus.FAILED,
-                   errors=[{"page_no": 3, "category": "x", "message": "fail"}]),
+        PageResult(
+            doc_id=manifest.doc_id,
+            page_index=0,
+            route="native",
+            status=PageStatus.OK,
+            blocks=[RecoveredBlock(page=0, text="a", source="text")],
+        ),
+        PageResult(
+            doc_id=manifest.doc_id,
+            page_index=1,
+            route="native",
+            status=PageStatus.OK,
+            blocks=[RecoveredBlock(page=1, text="b", source="text")],
+        ),
+        PageResult(
+            doc_id=manifest.doc_id,
+            page_index=2,
+            route="native",
+            status=PageStatus.FAILED,
+            errors=[{"page_no": 3, "category": "x", "message": "fail"}],
+        ),
     ]
     assert DocumentValidator.is_complete(results, plan) is False
     rep = DocumentValidator.classify(results, plan)
@@ -235,14 +276,24 @@ def test_validator_accepts_complete_assembly(tmp_path):
     planner = Planner(page_store, ledger)
     plan = planner.plan(manifest, "native", None, ParserConfig())
     results = [
-        PageResult(doc_id=manifest.doc_id, page_index=0, route="native", status=PageStatus.OK,
-                   blocks=[RecoveredBlock(page=0, text="a", source="text")]),
+        PageResult(
+            doc_id=manifest.doc_id,
+            page_index=0,
+            route="native",
+            status=PageStatus.OK,
+            blocks=[RecoveredBlock(page=0, text="a", source="text")],
+        ),
         # A1: a PARTIAL page only counts as assembled when it carries recovered
         # content (content_present is True). Without content it would fall into
         # missing/failed and be dead-lettered — never reported as a silent
         # success.
-        PageResult(doc_id=manifest.doc_id, page_index=1, route="native", status=PageStatus.PARTIAL,
-                   blocks=[RecoveredBlock(page=1, text="b", source="text")]),
+        PageResult(
+            doc_id=manifest.doc_id,
+            page_index=1,
+            route="native",
+            status=PageStatus.PARTIAL,
+            blocks=[RecoveredBlock(page=1, text="b", source="text")],
+        ),
     ]
     assert DocumentValidator.is_complete(results, plan) is True
 
@@ -259,7 +310,9 @@ def test_scheduler_run_plan_native_then_assemble(tmp_path):
     plan = planner.plan(manifest, "native", None, config)
 
     # Run native pages in-process (no ProcessPool) for the test.
-    sched = Scheduler(config, page_store=page_store, ledger=ledger, prefer_in_process_heavy=True)
+    sched = Scheduler(
+        config, page_store=page_store, ledger=ledger, prefer_in_process_heavy=True
+    )
     results = sched.run_plan(plan, prefer_in_process_heavy=True)
     sched.close()
 
@@ -295,11 +348,18 @@ def test_assembler_dead_letters_exhausted_page(tmp_path):
     # A FAILED page that cannot be retried (no engine produces it in-process here
     # is fine; we just feed a failed result and disable retries).
     results = [
-        PageResult(doc_id=manifest.doc_id, page_index=0, route="native", status=PageStatus.FAILED,
-                   errors=[{"page_no": 1, "category": "x", "message": "perm fail"}]),
+        PageResult(
+            doc_id=manifest.doc_id,
+            page_index=0,
+            route="native",
+            status=PageStatus.FAILED,
+            errors=[{"page_no": 1, "category": "x", "message": "perm fail"}],
+        ),
     ]
     assembler = Assembler(ParserConfig(), store, ledger)
-    report = assembler.assemble(plan, results, manifest.src_path, manifest.source_hash, max_retries=0)
+    report = assembler.assemble(
+        plan, results, manifest.src_path, manifest.source_hash, max_retries=0
+    )
     # Exhausted => dead, actual_pages == 0, never reported as complete
     assert report.status == "dead"
     assert report.actual_pages == 0
@@ -326,8 +386,14 @@ def test_heavy_docling_failure_returns_failed(monkeypatch):
     _monkeypatch_convert_path(monkeypatch, lambda *a, **k: FakeResult())
     from app.parser.engines.heavy_docling import HeavyDoclingEngine
 
-    item = PageWorkItem(doc_id="d-x", source_hash="s", src_path="x.pdf",
-                        page_index=0, route="docling", models_dir="")
+    item = PageWorkItem(
+        doc_id="d-x",
+        source_hash="s",
+        src_path="x.pdf",
+        page_index=0,
+        route="docling",
+        models_dir="",
+    )
     r = HeavyDoclingEngine(ParserConfig()).process(item)
     assert r.status == PageStatus.FAILED
     assert r.errors
@@ -345,15 +411,23 @@ def test_heavy_docling_empty_stub_returns_partial_failed_no_content(monkeypatch)
 
     class FakeResult:
         status = "PARTIAL_SUCCESS"
-        errors = [type("E", (), {"page_no": 1, "category": "x", "error_message": "stub"})()]
+        errors = [
+            type("E", (), {"page_no": 1, "category": "x", "error_message": "stub"})()
+        ]
         document = FakeDoc()
         input = type("I", (), {"page_count": 1})()
 
     _monkeypatch_convert_path(monkeypatch, lambda *a, **k: FakeResult())
     from app.parser.engines.heavy_docling import HeavyDoclingEngine
 
-    item = PageWorkItem(doc_id="d-x", source_hash="s", src_path="x.pdf",
-                        page_index=0, route="docling", models_dir="")
+    item = PageWorkItem(
+        doc_id="d-x",
+        source_hash="s",
+        src_path="x.pdf",
+        page_index=0,
+        route="docling",
+        models_dir="",
+    )
     r = HeavyDoclingEngine(ParserConfig()).process(item)
     # A1: empty stub must NOT report content_present; it must be PARTIAL/FAILED
     # and never count as an assembled (silent-loss) page.
@@ -366,8 +440,14 @@ def test_heavy_run_worker_convert_none_returns_failed(monkeypatch):
     from app.parser.scheduler import _run_heavy
 
     _monkeypatch_convert_path(monkeypatch, lambda *a, **k: None)
-    item = PageWorkItem(doc_id="d-x", source_hash="s", src_path="x.pdf",
-                        page_index=0, route="docling", models_dir="")
+    item = PageWorkItem(
+        doc_id="d-x",
+        source_hash="s",
+        src_path="x.pdf",
+        page_index=0,
+        route="docling",
+        models_dir="",
+    )
     r = _run_heavy(item, ParserConfig())
     assert r.status == PageStatus.FAILED
     assert r.errors
@@ -385,31 +465,54 @@ def test_heavy_docling_convert_error_is_retryable_category(monkeypatch):
     _monkeypatch_convert_path(monkeypatch, _boom)
     from app.parser.engines.heavy_docling import HeavyDoclingEngine
 
-    item = PageWorkItem(doc_id="d-x", source_hash="s", src_path="x.pdf",
-                        page_index=0, route="docling", models_dir="")
+    item = PageWorkItem(
+        doc_id="d-x",
+        source_hash="s",
+        src_path="x.pdf",
+        page_index=0,
+        route="docling",
+        models_dir="",
+    )
     r = HeavyDoclingEngine(ParserConfig()).process(item)
     assert r.status == PageStatus.FAILED
     assert r.errors and r.errors[0]["category"] == "docling_convert"
     assert "boom on page" in r.errors[0]["message"]
 
 
-def _plan_with_docling_page(src_path: str = "x.pdf") -> "tuple":
+def _plan_with_docling_page(src_path: str = "x.pdf") -> tuple:
     """Minimal ExecutionPlan carrying one page-0 docling work item."""
-    from app.parser.planner import ExecutionPlan
 
-    item = PageWorkItem(doc_id="d-x", source_hash="s", src_path=src_path,
-                        page_index=0, route="docling", models_dir="")
+    item = PageWorkItem(
+        doc_id="d-x",
+        source_hash="s",
+        src_path=src_path,
+        page_index=0,
+        route="docling",
+        models_dir="",
+    )
     plan = ExecutionPlan(
-        doc_id="d-x", source_hash="s", sha="s", route="docling", decision=None,
-        detected_type="pdf", mime="application/pdf", declared_extension=".pdf",
-        probe="fitz", expected_page_set=[0], page_count=1,
-        page_sizes={0: (595.0, 842.0)}, metadata={}, config_snapshot={},
+        doc_id="d-x",
+        source_hash="s",
+        sha="s",
+        route="docling",
+        decision=None,
+        detected_type="pdf",
+        mime="application/pdf",
+        declared_extension=".pdf",
+        probe="fitz",
+        expected_page_set=[0],
+        page_count=1,
+        page_sizes={0: (595.0, 842.0)},
+        metadata={},
+        config_snapshot={},
         work_items=[item],
     )
     return plan, item
 
 
-def test_retry_pages_retries_docling_convert_but_skips_engine_unavailable(monkeypatch, tmp_path):
+def test_retry_pages_retries_docling_convert_but_skips_engine_unavailable(
+    monkeypatch, tmp_path
+):
     """B4∩B2: `docling_convert` pages are retried on the next pass; only the
     genuine `engine_unavailable` (dead engine) is skipped."""
     docling = pytest.importorskip("docling")
@@ -427,18 +530,31 @@ def test_retry_pages_retries_docling_convert_but_skips_engine_unavailable(monkey
 
     def stubbed_process(self, it):
         called["n"] += 1
-        return PageResult(doc_id=it.doc_id, page_index=it.page_index, route="docling",
-                          status=PageStatus.OK, source_hash=it.source_hash)
+        return PageResult(
+            doc_id=it.doc_id,
+            page_index=it.page_index,
+            route="docling",
+            status=PageStatus.OK,
+            source_hash=it.source_hash,
+        )
 
     monkeypatch.setattr(hd.HeavyDoclingEngine, "process", stubbed_process)
 
     store = FilesystemStore(str(tmp_path / "store"))
     assembler = Assembler(ParserConfig(), store)
 
-    src = {"fail": PageResult(
-        doc_id=plan.doc_id, page_index=0, route="docling", status=PageStatus.FAILED,
-        errors=[{"page_no": 1, "category": "docling_convert", "message": "transient"}],
-        source_hash=plan.source_hash)}
+    src = {
+        "fail": PageResult(
+            doc_id=plan.doc_id,
+            page_index=0,
+            route="docling",
+            status=PageStatus.FAILED,
+            errors=[
+                {"page_no": 1, "category": "docling_convert", "message": "transient"}
+            ],
+            source_hash=plan.source_hash,
+        )
+    }
 
     try:
         # (a) docling_convert page: retried, engine actually re-invoked.
@@ -452,10 +568,19 @@ def test_retry_pages_retries_docling_convert_but_skips_engine_unavailable(monkey
     # (b) engine_unavailable page: skipped (B2) — no engine call, result kept.
     called["n"] = 0
     unavail = PageResult(
-        doc_id=plan.doc_id, page_index=0, route="docling", status=PageStatus.FAILED,
-        errors=[{"page_no": 1, "category": "engine_unavailable",
-                 "message": "docling engine unavailable"}],
-        source_hash=plan.source_hash)
+        doc_id=plan.doc_id,
+        page_index=0,
+        route="docling",
+        status=PageStatus.FAILED,
+        errors=[
+            {
+                "page_no": 1,
+                "category": "engine_unavailable",
+                "message": "docling engine unavailable",
+            }
+        ],
+        source_hash=plan.source_hash,
+    )
     report2 = AssemblyReport(doc_id=plan.doc_id, status="partial", failed_pages=[0])
     out2 = assembler._retry_pages(plan, [unavail], report2)
     assert called["n"] == 0, "engine_unavailable page must be skipped (B2)"
@@ -477,13 +602,14 @@ def test_corrupt_pdf_not_reported_parsed(tmp_path):
     """A2 end-to-end: a corrupt/unreadable PDF must surface as failed (never a
     silent 0-page `parsed` outcome)."""
     store = FilesystemStore(str(tmp_path / "store"))
-    from app.parser.events import EventPublisher
-    from app.parser.extraction import Extractor
     from app.parser.config import default_config
+    from app.parser.extraction import Extractor
 
     # A header that looks like a PDF but has no valid body -> fitz.open fails.
     bad = b"%PDF-1.4\nnot a real pdf body"
-    ex = Extractor(default_config(), store, events=EventPublisher(sink=lambda n, p: None))
+    ex = Extractor(
+        default_config(), store, events=EventPublisher(sink=lambda n, p: None)
+    )
     po = ex.extract(bad, "broken.pdf")
     # Invariant: must NOT be reported as `parsed`.
     assert po.status != "parsed"
@@ -497,10 +623,8 @@ def test_extract_exception_never_leaves_document_pending(tmp_path):
     `failed` in the ledger, every page FAILED (unless already persisted), and a
     `document.parse_failed` event emitted — never a silent `parsed` outcome."""
     store, _ = _scan_pdf(tmp_path, pages=2)
-    from app.parser.events import EventPublisher
-    from app.parser.extraction import Extractor
     from app.parser.config import default_config
-    from app.parser.page_result import PageStatus
+    from app.parser.extraction import Extractor
 
     captured = []
     events = EventPublisher(sink=lambda n, p: captured.append((n, p)))
@@ -518,6 +642,7 @@ def test_extract_exception_never_leaves_document_pending(tmp_path):
 
     # A fresh 2-page PDF so SourceScan re-derives the page set independently.
     import fitz
+
     d = fitz.open()
     for _ in range(2):
         d.new_page(width=595, height=842).insert_text((72, 100), "x", fontsize=11)
@@ -557,7 +682,9 @@ def test_assembler_retry_docling_stays_docling(monkeypatch, tmp_path):
     ledger = Ledger(str(store.root))
     # Force a genuine docling band (engine may be unavailable in CI; we only care
     # that the retry routing preserves the "docling" band, never downgrades it).
-    monkeypatch.setattr("app.parser.planner.docling_loader.engine_available", lambda: True)
+    monkeypatch.setattr(
+        "app.parser.planner.docling_loader.engine_available", lambda: True
+    )
     planner = Planner(page_store, ledger)
     plan = planner.plan(manifest, "docling", None, ParserConfig())
     # A FAILED docling page; we intercept HeavyDoclingEngine to avoid building the
@@ -566,20 +693,31 @@ def test_assembler_retry_docling_stays_docling(monkeypatch, tmp_path):
 
     def fake_heavy_process(self, item):
         captured["route"] = item.route
-        return PageResult(doc_id=item.doc_id, page_index=item.page_index, route="docling",
-                          status=PageStatus.OK,
-                          blocks=[RecoveredBlock(page=0, text="recovered", source="docling")])
+        return PageResult(
+            doc_id=item.doc_id,
+            page_index=item.page_index,
+            route="docling",
+            status=PageStatus.OK,
+            blocks=[RecoveredBlock(page=0, text="recovered", source="docling")],
+        )
 
-    monkeypatch.setattr("app.parser.engines.heavy_docling.HeavyDoclingEngine.process",
-                        fake_heavy_process)
+    monkeypatch.setattr(
+        "app.parser.engines.heavy_docling.HeavyDoclingEngine.process",
+        fake_heavy_process,
+    )
     results = [
-        PageResult(doc_id=manifest.doc_id, page_index=0, route="docling",
-                   status=PageStatus.FAILED,
-                   errors=[{"page_no": 1, "category": "x", "message": "first fail"}]),
+        PageResult(
+            doc_id=manifest.doc_id,
+            page_index=0,
+            route="docling",
+            status=PageStatus.FAILED,
+            errors=[{"page_no": 1, "category": "x", "message": "first fail"}],
+        ),
     ]
     assembler = Assembler(ParserConfig(), store, ledger)
-    report = assembler.assemble(plan, results, manifest.src_path, manifest.source_hash,
-                               max_retries=1)
+    report = assembler.assemble(
+        plan, results, manifest.src_path, manifest.source_hash, max_retries=1
+    )
     assert captured.get("route") == "docling"
     assert report.status == "ok"
     assert report.actual_pages == 1
@@ -595,15 +733,19 @@ def test_planner_resume_reschedules_failed_and_dead(tmp_path):
     planner = Planner(page_store, ledger)
     planner.plan(manifest, "native", None, ParserConfig())
     # page 0 FAILED, page 1 DEAD in the prior ledger.
-    ledger.update_page(manifest.doc_id, 0, PageStatus.FAILED, "", "native", 1, [{"m": "f"}])
-    ledger.update_page(manifest.doc_id, 1, PageStatus.DEAD, "", "native", 2, [{"m": "d"}])
+    ledger.update_page(
+        manifest.doc_id, 0, PageStatus.FAILED, "", "native", 1, [{"m": "f"}]
+    )
+    ledger.update_page(
+        manifest.doc_id, 1, PageStatus.DEAD, "", "native", 2, [{"m": "d"}]
+    )
 
     plan = planner.plan(manifest, "native", None, ParserConfig(), resume=True)
     # Both failed/dead are rescheduled (with incremented attempt); nothing dropped.
     assert sorted(w.page_index for w in plan.work_items) == [0, 1]
     by_idx = {w.page_index: w for w in plan.work_items}
-    assert by_idx[0].attempt == 2   # prior 1 + 1
-    assert by_idx[1].attempt == 3   # prior 2 + 1
+    assert by_idx[0].attempt == 2  # prior 1 + 1
+    assert by_idx[1].attempt == 3  # prior 2 + 1
 
 
 def test_planner_resume_preserves_ok_and_attempts(tmp_path):
@@ -612,8 +754,13 @@ def test_planner_resume_preserves_ok_and_attempts(tmp_path):
     ledger = Ledger(str(store.root))
     planner = Planner(page_store, ledger)
     planner.plan(manifest, "native", None, ParserConfig())
-    ok0 = PageResult(doc_id=manifest.doc_id, page_index=0, route="native", status=PageStatus.OK,
-                     blocks=[RecoveredBlock(page=0, text="x", source="text")])
+    ok0 = PageResult(
+        doc_id=manifest.doc_id,
+        page_index=0,
+        route="native",
+        status=PageStatus.OK,
+        blocks=[RecoveredBlock(page=0, text="x", source="text")],
+    )
     page_store.put_page(manifest.doc_id, 0, ok0)
     ledger.update_page(manifest.doc_id, 0, PageStatus.OK, ok0.checksum, "native", 1, [])
 
@@ -660,9 +807,9 @@ def test_heading_parity_legacy_loader_matches_engine(tmp_path):
     doc.save(path)
     doc.close()
 
-    from app.parser.loaders.loaders import Loaders
-    from app.parser.engines.native_pdf import _native_page_from_doc
     from app.parser.detection import detect
+    from app.parser.engines.native_pdf import _native_page_from_doc
+    from app.parser.loaders.loaders import Loaders
 
     data = open(path, "rb").read()
     rec = Loaders(ParserConfig())._pdf(data, detect(data, "hp.pdf"))

@@ -11,6 +11,7 @@ RoutingConfig)`. No RNG, no environment-dependent thresholds. The measured
 decision), so the reproducible decision fields (route/complexity/confidence/
 versions/signals) stay deterministic.
 """
+
 from __future__ import annotations
 
 import threading
@@ -21,8 +22,8 @@ from .config import RoutingConfig
 from .detectors import Detector, get_detectors
 from .inspectors import FastInspector
 from .policy import RoutingPolicy
-from .scoring import Scorer, WeightedHeuristicScorer
 from .schema import RoutingDecision, Signal
+from .scoring import Scorer, WeightedHeuristicScorer
 
 
 class RoutingStats:
@@ -35,10 +36,10 @@ class RoutingStats:
         self.detector_failures: dict[str, int] = defaultdict(int)
         self.total_inspection_ms = 0.0
         self.max_inspection_ms = 0.0
-        self.score_buckets: dict[int, int] = defaultdict(int)     # 0-100/10
-        self.conf_buckets: dict[int, int] = defaultdict(int)      # 0-100/10
+        self.score_buckets: dict[int, int] = defaultdict(int)  # 0-100/10
+        self.conf_buckets: dict[int, int] = defaultdict(int)  # 0-100/10
         self.missing_count = 0
-        self.unknown_signal_count = 0            # Gap B: unweighted names
+        self.unknown_signal_count = 0  # Gap B: unweighted names
         self._decisions: list[RoutingDecision] = []
         self._ring = ring
 
@@ -111,16 +112,19 @@ class Router:
         if detected is None or getattr(detected, "unresolved", False):
             return None
         if getattr(detected, "slug", None) != "pdf":
-            return None               # v1 routes PDFs only (Gap A: images stay native)
+            return None  # v1 routes PDFs only (Gap A: images stay native)
 
         t0 = time.time()
         features = self.inspector.inspect(data)
         if features is None:
             # cannot inspect this PDF -> no evidence -> no-route native at low conf
             decision = RoutingDecision(
-                route="native", complexity_score=0, confidence=0.05,
+                route="native",
+                complexity_score=0,
+                confidence=0.05,
                 reasons=["cannot inspect this PDF (no routing evidence)"],
-                signals=[], router_version=self.config.router_version,
+                signals=[],
+                router_version=self.config.router_version,
                 policy_version=self.config.policy_version,
                 scoring_version=self.config.scoring_version,
                 inspection_time_ms=round((time.time() - t0) * 1000, 3),
@@ -138,9 +142,14 @@ class Router:
                 all_signals.append(s)
             if result.status == "failed" and not result.signals:
                 all_signals.append(
-                    Signal(detector=det.name, version=det.version,
-                           name="metric_detector_failed", value=None,
-                           status="failed", evidence=result.error)
+                    Signal(
+                        detector=det.name,
+                        version=det.version,
+                        name="metric_detector_failed",
+                        value=None,
+                        status="failed",
+                        evidence=result.error,
+                    )
                 )
         all_signals = self._filter_known(all_signals)
 

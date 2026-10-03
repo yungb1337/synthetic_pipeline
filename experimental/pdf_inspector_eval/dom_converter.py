@@ -1,5 +1,5 @@
-"""DOM Converter mapping pdf-inspector output into canonical dom-v0.1.0.docJSON.
-"""
+"""DOM Converter mapping pdf-inspector output into canonical dom-v0.1.0.docJSON."""
+
 from __future__ import annotations
 
 import hashlib
@@ -21,8 +21,8 @@ from app.parser.dom.models import (
     Row,
     Table,
 )
-from .inspector_adapter import InspectorExtractionResult
 
+from .inspector_adapter import InspectorExtractionResult
 
 # Regex patterns for running headers, footers, and metadata lines
 _JOURNAL_HEADER_PAT = re.compile(
@@ -41,9 +41,7 @@ _NUMBERED_REF_PAT = re.compile(
     r"^(?:\*\*)?(?:\[?(\d+)\]?|(\d+)\.)(?:\*\*)?\s+(.*)",
     re.DOTALL,
 )
-_ORPHAN_REF_NUM_PAT = re.compile(
-    r"^(?:\*\*)?(?:\[?(\d+)\]?|(\d+)\.)(?:\*\*)?\s*$"
-)
+_ORPHAN_REF_NUM_PAT = re.compile(r"^(?:\*\*)?(?:\[?(\d+)\]?|(\d+)\.)(?:\*\*)?\s*$")
 
 
 class PDFInspectorDOMConverter:
@@ -62,7 +60,11 @@ class PDFInspectorDOMConverter:
         # Check journal titles
         if _JOURNAL_HEADER_PAT.match(clean_text):
             return "header"
-        if clean_text.upper() in ("RESEARCH ARTICLE", "EDITORIAL COMMENTARY", "REVIEW ARTICLE"):
+        if clean_text.upper() in (
+            "RESEARCH ARTICLE",
+            "EDITORIAL COMMENTARY",
+            "REVIEW ARTICLE",
+        ):
             return "header"
 
         # Check footer patterns
@@ -70,12 +72,18 @@ class PDFInspectorDOMConverter:
             return "footer"
 
         # Running title match
-        if doc_title and len(clean_text) > 10 and clean_text.lower() == doc_title.lower():
+        if (
+            doc_title
+            and len(clean_text) > 10
+            and clean_text.lower() == doc_title.lower()
+        ):
             return "header"
 
         return None
 
-    def _parse_markdown_tables(self, md_lines: list[str]) -> tuple[list[dict[str, Any]], list[tuple[int, int]]]:
+    def _parse_markdown_tables(
+        self, md_lines: list[str]
+    ) -> tuple[list[dict[str, Any]], list[tuple[int, int]]]:
         """Detects and parses Markdown table blocks. Returns table dicts and line index ranges to exclude."""
         tables = []
         ranges = []
@@ -85,7 +93,9 @@ class PDFInspectorDOMConverter:
         while i < n:
             line = md_lines[i].strip()
             # Look for delimiter row: |---|---|
-            if i + 1 < n and ("|" in line or line.startswith("Table ") or line.startswith("Tab.")):
+            if i + 1 < n and (
+                "|" in line or line.startswith("Table ") or line.startswith("Tab.")
+            ):
                 next_line = md_lines[i + 1].strip()
                 if "|" in next_line and re.search(r"\|[\s\-:|]+\|", next_line):
                     caption = ""
@@ -98,18 +108,24 @@ class PDFInspectorDOMConverter:
                         # See if next_line is header and next_next is delimiter
                         if i + 2 < n:
                             candidate_delim = md_lines[i + 2].strip()
-                            if "|" in candidate_delim and re.search(r"\|[\s\-:|]+\|", candidate_delim):
+                            if "|" in candidate_delim and re.search(
+                                r"\|[\s\-:|]+\|", candidate_delim
+                            ):
                                 header_line = next_line
                                 next_line = candidate_delim
                                 i += 1
 
-                    header_cells = [c.strip() for c in header_line.strip("|").split("|")]
+                    header_cells = [
+                        c.strip() for c in header_line.strip("|").split("|")
+                    ]
                     row_lines = []
                     i += 2  # skip header and delimiter
 
                     while i < n:
                         cur = md_lines[i].strip()
-                        if cur.startswith("|") or ("|" in cur and not cur.startswith("#")):
+                        if cur.startswith("|") or (
+                            "|" in cur and not cur.startswith("#")
+                        ):
                             row_cells = [c.strip() for c in cur.strip("|").split("|")]
                             # Filter out single-cell DOI image links as rows
                             if any(row_cells):
@@ -121,12 +137,17 @@ class PDFInspectorDOMConverter:
                     # Validate that this is a real table (at least 2 columns or multi-row)
                     has_data = len(row_lines) > 0 and any(len(r) > 1 for r in row_lines)
                     # Filter out pseudo-tables (e.g. 1-row p-value annotations or figure DOIs)
-                    if has_data and not (len(row_lines) == 1 and any("doi.org" in "".join(r) for r in row_lines)):
-                        tables.append({
-                            "caption": caption,
-                            "header": header_cells,
-                            "rows": row_lines,
-                        })
+                    if has_data and not (
+                        len(row_lines) == 1
+                        and any("doi.org" in "".join(r) for r in row_lines)
+                    ):
+                        tables.append(
+                            {
+                                "caption": caption,
+                                "header": header_cells,
+                                "rows": row_lines,
+                            }
+                        )
                         ranges.append((start_idx, i - 1))
                         continue
             i += 1
@@ -145,10 +166,13 @@ class PDFInspectorDOMConverter:
 
         # Pre-pass: Discover recurring running headers and footers across pages
         from collections import Counter
+
         top_line_counts = Counter()
         bottom_line_counts = Counter()
         for p_data in extraction.pages:
-            p_lines = [l.strip() for l in (p_data.markdown or "").splitlines() if l.strip()]
+            p_lines = [
+                l.strip() for l in (p_data.markdown or "").splitlines() if l.strip()
+            ]
             for l in p_lines[:3]:
                 clean = l.lstrip("#").strip()
                 if len(clean) > 4:
@@ -158,8 +182,12 @@ class PDFInspectorDOMConverter:
                 if len(clean) > 4:
                     bottom_line_counts[clean] += 1
 
-        recurring_headers = {line for line, count in top_line_counts.items() if count >= 2}
-        recurring_footers = {line for line, count in bottom_line_counts.items() if count >= 2}
+        recurring_headers = {
+            line for line, count in top_line_counts.items() if count >= 2
+        }
+        recurring_footers = {
+            line for line, count in bottom_line_counts.items() if count >= 2
+        }
 
         pages: list[Page] = []
         reading_order: list[str] = []
@@ -181,51 +209,69 @@ class PDFInspectorDOMConverter:
             if getattr(p_data, "route", "rust_native") == "docling_heavy":
                 try:
                     from app.parser.loaders import docling_loader
+
                     if docling_loader.engine_available():
                         import fitz
+
                         with fitz.open(extraction.pdf_path) as mdoc:
                             if p_idx < len(mdoc):
                                 single_doc = fitz.open()
-                                single_doc.insert_pdf(mdoc, from_page=p_idx, to_page=p_idx)
+                                single_doc.insert_pdf(
+                                    mdoc, from_page=p_idx, to_page=p_idx
+                                )
                                 page_bytes = single_doc.tobytes()
                                 single_doc.close()
-                                rec_doc = docling_loader.parse(page_bytes, filename=f"page_{p_idx}.pdf")
+                                rec_doc = docling_loader.parse(
+                                    page_bytes, filename=f"page_{p_idx}.pdf"
+                                )
                             else:
                                 rec_doc = None
                         if rec_doc and (rec_doc.blocks or rec_doc.tables):
                             for b in rec_doc.blocks:
                                 b_id = f"b-p{p_idx}-{block_counter:04d}"
                                 block_counter += 1
-                                page_blocks.append(Block(
-                                    id=b_id,
-                                    page=p_idx,
-                                    kind=b.kind,
-                                    text=b.text,
-                                    bbox=list(b.bbox) if b.bbox else None,
-                                    source="docling",
-                                    confidence=b.confidence,
-                                ))
+                                page_blocks.append(
+                                    Block(
+                                        id=b_id,
+                                        page=p_idx,
+                                        kind=b.kind,
+                                        text=b.text,
+                                        bbox=list(b.bbox) if b.bbox else None,
+                                        source="docling",
+                                        confidence=b.confidence,
+                                    )
+                                )
                                 reading_order.append(b_id)
-                                reading_order_full.append(ReadingOrderEntry(id=b_id, type="block"))
+                                reading_order_full.append(
+                                    ReadingOrderEntry(id=b_id, type="block")
+                                )
 
                             for t_idx, t in enumerate(rec_doc.tables):
                                 t_id = f"t-p{p_idx}-{t_idx:02d}"
                                 dom_rows = []
                                 if t.header:
-                                    dom_rows.append(Row(cells=[Cell(text=c) for c in t.header]))
+                                    dom_rows.append(
+                                        Row(cells=[Cell(text=c) for c in t.header])
+                                    )
                                 for r in t.rows:
-                                    dom_rows.append(Row(cells=[Cell(text=c) for c in r]))
-                                page_tables.append(Table(
-                                    id=t_id,
-                                    page=p_idx,
-                                    bbox=list(t.bbox) if t.bbox else None,
-                                    header=t.header,
-                                    rows=dom_rows,
-                                    caption=t.caption or "",
-                                    source="docling",
-                                ))
+                                    dom_rows.append(
+                                        Row(cells=[Cell(text=c) for c in r])
+                                    )
+                                page_tables.append(
+                                    Table(
+                                        id=t_id,
+                                        page=p_idx,
+                                        bbox=list(t.bbox) if t.bbox else None,
+                                        header=t.header,
+                                        rows=dom_rows,
+                                        caption=t.caption or "",
+                                        source="docling",
+                                    )
+                                )
                                 reading_order.append(t_id)
-                                reading_order_full.append(ReadingOrderEntry(id=t_id, type="table"))
+                                reading_order_full.append(
+                                    ReadingOrderEntry(id=t_id, type="table")
+                                )
 
                             pages.append(
                                 Page(
@@ -288,7 +334,11 @@ class PDFInspectorDOMConverter:
             current_paragraph: list[str] = []
 
             def flush_paragraph():
-                nonlocal block_counter, ref_counter, in_ref_section, pending_orphan_ref_nums
+                nonlocal \
+                    block_counter, \
+                    ref_counter, \
+                    in_ref_section, \
+                    pending_orphan_ref_nums
                 if not current_paragraph:
                     return
                 raw_text = " ".join(current_paragraph).strip()
@@ -353,7 +403,12 @@ class PDFInspectorDOMConverter:
                         ref_id = f"ref-{ref_counter:04d}"
                         ref_counter += 1
                         references.append(
-                            Reference(id=ref_id, text=ref_body, kind="citation", label=str(ref_num))
+                            Reference(
+                                id=ref_id,
+                                text=ref_body,
+                                kind="citation",
+                                label=str(ref_num),
+                            )
                         )
                         citation_index[ref_id] = ref_body[:80]
 
@@ -369,17 +424,26 @@ class PDFInspectorDOMConverter:
                         )
                         page_blocks.append(block)
                         reading_order.append(b_id)
-                        reading_order_full.append(ReadingOrderEntry(id=b_id, type="block"))
+                        reading_order_full.append(
+                            ReadingOrderEntry(id=b_id, type="block")
+                        )
                         return
 
                     elif len(raw_text) > 30:
                         # Check if multiple citations are glued in this text block
                         splits = [0]
-                        for m_split in re.finditer(r'(?:PMID:\s*\d+|\b\d{4}\s*[A-Z][a-z]+;\s*[\d\(]+[–\-0-9\)]+)\.?\s+(?=[A-Z][a-z]+ [A-Z]{1,2}(?:,\s+[A-Z][a-z]+ [A-Z]{1,2})*)', raw_text):
+                        for m_split in re.finditer(
+                            r"(?:PMID:\s*\d+|\b\d{4}\s*[A-Z][a-z]+;\s*[\d\(]+[–\-0-9\)]+)\.?\s+(?=[A-Z][a-z]+ [A-Z]{1,2}(?:,\s+[A-Z][a-z]+ [A-Z]{1,2})*)",
+                            raw_text,
+                        ):
                             splits.append(m_split.end())
                         splits.append(len(raw_text))
 
-                        sub_citations = [raw_text[splits[i]:splits[i+1]].strip() for i in range(len(splits)-1) if raw_text[splits[i]:splits[i+1]].strip()]
+                        sub_citations = [
+                            raw_text[splits[i] : splits[i + 1]].strip()
+                            for i in range(len(splits) - 1)
+                            if raw_text[splits[i] : splits[i + 1]].strip()
+                        ]
 
                         for sub_c in sub_citations:
                             m_sub_ref = _NUMBERED_REF_PAT.match(sub_c)
@@ -387,13 +451,22 @@ class PDFInspectorDOMConverter:
                                 lbl = m_sub_ref.group(1) or m_sub_ref.group(2)
                                 body = m_sub_ref.group(3).strip()
                             else:
-                                lbl = pending_orphan_ref_nums.pop(0) if pending_orphan_ref_nums else str(ref_counter + 1)
+                                lbl = (
+                                    pending_orphan_ref_nums.pop(0)
+                                    if pending_orphan_ref_nums
+                                    else str(ref_counter + 1)
+                                )
                                 body = sub_c
 
                             ref_id = f"ref-{ref_counter:04d}"
                             ref_counter += 1
                             references.append(
-                                Reference(id=ref_id, text=body, kind="citation", label=str(lbl))
+                                Reference(
+                                    id=ref_id,
+                                    text=body,
+                                    kind="citation",
+                                    label=str(lbl),
+                                )
                             )
                             citation_index[ref_id] = body[:80]
 
@@ -409,7 +482,9 @@ class PDFInspectorDOMConverter:
                             )
                             page_blocks.append(block)
                             reading_order.append(b_id)
-                            reading_order_full.append(ReadingOrderEntry(id=b_id, type="block"))
+                            reading_order_full.append(
+                                ReadingOrderEntry(id=b_id, type="block")
+                            )
                         return
 
                 # Normal block classification

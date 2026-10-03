@@ -43,7 +43,9 @@ def ngrams(tokens: list[str], n: int = 3) -> set[tuple[str, ...]]:
     return {tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)}
 
 
-def collect_units(path: Path, text: str, min_lines: int) -> list[tuple[Path, int, str, int, set]]:
+def collect_units(
+    path: Path, text: str, min_lines: int
+) -> list[tuple[Path, int, str, int, set]]:
     """Return (path, lineno, name, line_count, trigrams) for each function."""
     try:
         tree = ast.parse(text)
@@ -65,7 +67,9 @@ def collect_units(path: Path, text: str, min_lines: int) -> list[tuple[Path, int
                 ids.append(sub.id)
             elif isinstance(sub, ast.Attribute):
                 ids.append(sub.attr)
-        tokens = [t.lower() for t in ids if len(t) >= 3 and t.lower() not in STOP_TOKENS]
+        tokens = [
+            t.lower() for t in ids if len(t) >= 3 and t.lower() not in STOP_TOKENS
+        ]
         grams = ngrams(tokens)
         if grams:
             units.append((path, node.lineno, node.name, nlines, grams))
@@ -81,9 +85,18 @@ def jaccard(a: set, b: set) -> float:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--paths", nargs="*", default=["app"], help="files/dirs to scan (default: app)")
-    ap.add_argument("--min-lines", type=int, default=5, help="ignore functions shorter than this")
-    ap.add_argument("--threshold", type=float, default=0.40, help="report pairs with similarity >= this")
+    ap.add_argument(
+        "--paths", nargs="*", default=["app"], help="files/dirs to scan (default: app)"
+    )
+    ap.add_argument(
+        "--min-lines", type=int, default=5, help="ignore functions shorter than this"
+    )
+    ap.add_argument(
+        "--threshold",
+        type=float,
+        default=0.40,
+        help="report pairs with similarity >= this",
+    )
     ap.add_argument("--top", type=int, default=40, help="max pairs to print")
     args = ap.parse_args()
 
@@ -98,7 +111,9 @@ def main() -> int:
         units.extend(collect_units(path, text, args.min_lines))
 
     print("code-similarity report (heuristic - read flagged pairs before acting)")
-    print(f"paths: {', '.join(args.paths)}  |  min_lines: {args.min_lines}  |  threshold: {args.threshold}")
+    print(
+        f"paths: {', '.join(args.paths)}  |  min_lines: {args.min_lines}  |  threshold: {args.threshold}"
+    )
     print(f"scanned {len(files)} files, {len(units)} function units")
 
     pairs = []
@@ -113,12 +128,16 @@ def main() -> int:
         print(f"\nno pairs at or above threshold={args.threshold}")
         return 0
 
-    print(f"\n{len(pairs)} pair(s) at or above threshold={args.threshold} (showing top {args.top}):\n")
+    print(
+        f"\n{len(pairs)} pair(s) at or above threshold={args.threshold} (showing top {args.top}):\n"
+    )
     for sim, a, b in pairs[: args.top]:
         a_path, a_ln, a_name, a_lines, a_grams = a
         b_path, b_ln, b_name, b_lines, b_grams = b
         overlap = len(a_grams & b_grams)
-        print(f"  {sim:0.2f}  {a_path}:{a_ln} {a_name}() [{a_lines}ln]  ~  {b_path}:{b_ln} {b_name}() [{b_lines}ln]")
+        print(
+            f"  {sim:0.2f}  {a_path}:{a_ln} {a_name}() [{a_lines}ln]  ~  {b_path}:{b_ln} {b_name}() [{b_lines}ln]"
+        )
         print(f"        shared trigrams: {overlap}/{len(a_grams | b_grams)}")
     return 0
 

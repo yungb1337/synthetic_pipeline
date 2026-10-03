@@ -5,6 +5,7 @@ its thread-safety is undocumented. The fix serializes engine CALLS with a
 dedicated `_call_lock` (distinct from the init `_lock`). Tests use a fake
 engine that detects concurrent entry — no real model needed.
 """
+
 from __future__ import annotations
 
 import threading

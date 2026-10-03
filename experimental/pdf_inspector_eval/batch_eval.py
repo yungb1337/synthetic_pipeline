@@ -1,17 +1,15 @@
-"""Batch Evaluation Orchestrator for pdf-inspector hybrid extraction.
-"""
+"""Batch Evaluation Orchestrator for pdf-inspector hybrid extraction."""
+
 from __future__ import annotations
 
 import argparse
 import glob
 import json
-import os
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-import fitz
 import psutil
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -42,12 +40,28 @@ class PDFInspectorBatchEvaluator:
         self.router = PDFInspectorSmartRouter()
         self.process = psutil.Process()
 
-    def discover_corpus_targets(self, corpus_type: str = "corpus_b") -> list[dict[str, Any]]:
+    def discover_corpus_targets(
+        self, corpus_type: str = "corpus_b"
+    ) -> list[dict[str, Any]]:
         """Discovers PDF target files from Corpus B (1000-doc), Corpus 945, or Curated folders."""
         if corpus_type == "corpus_b":
-            pdf_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-14-eval-1000" / "sources" / "pdf"
+            pdf_dir = (
+                ROOT_DIR
+                / "checkpoints"
+                / "run"
+                / "run-2026-09-14-eval-1000"
+                / "sources"
+                / "pdf"
+            )
         elif corpus_type == "corpus_945":
-            pdf_dir = ROOT_DIR / "checkpoints" / "run" / "run-2026-09-04-parser-reliability" / "sources" / "pdf"
+            pdf_dir = (
+                ROOT_DIR
+                / "checkpoints"
+                / "run"
+                / "run-2026-09-04-parser-reliability"
+                / "sources"
+                / "pdf"
+            )
         elif corpus_type in ("curated_hard", "curated_easy"):
             pdf_dir = ROOT_DIR / "artifacts" / corpus_type
         else:
@@ -57,10 +71,12 @@ class PDFInspectorBatchEvaluator:
         targets = []
         for p in all_pdfs:
             p_obj = Path(p)
-            targets.append({
-                "doc_id": p_obj.stem,
-                "pdf_path": str(p_obj),
-            })
+            targets.append(
+                {
+                    "doc_id": p_obj.stem,
+                    "pdf_path": str(p_obj),
+                }
+            )
         return targets
 
     def run_batch(
@@ -101,7 +117,9 @@ class PDFInspectorBatchEvaluator:
                     route_counts[r_band] = route_counts.get(r_band, 0) + 1
                     for r_k, r_v in data.get("route_breakdown", {}).items():
                         page_route_counts[r_k] = page_route_counts.get(r_k, 0) + r_v
-                    print(f"[{idx:4d}/{total_docs:4d}] {doc_id} ... CACHED ({data.get('page_count', 0)} pgs, {data.get('elapsed_ms', 0.0):.1f} ms)")
+                    print(
+                        f"[{idx:4d}/{total_docs:4d}] {doc_id} ... CACHED ({data.get('page_count', 0)} pgs, {data.get('elapsed_ms', 0.0):.1f} ms)"
+                    )
                     continue
                 except Exception:
                     pass
@@ -126,11 +144,13 @@ class PDFInspectorBatchEvaluator:
 
                 # 4. Save normalized DOM
                 dom_dict = dom.model_dump()
-                out_dom_path.write_text(json.dumps(dom_dict, indent=2), encoding="utf-8")
+                out_dom_path.write_text(
+                    json.dumps(dom_dict, indent=2), encoding="utf-8"
+                )
 
                 # 5. Save telemetry
                 mem_info = self.process.memory_info()
-                rss_gb = mem_info.rss / (1024 ** 3)
+                rss_gb = mem_info.rss / (1024**3)
                 telemetry = {
                     "doc_id": doc_id,
                     "pdf_path": str(pdf_path),
@@ -146,17 +166,23 @@ class PDFInspectorBatchEvaluator:
                     "num_tables": dom.num_tables(),
                     "num_references": len(dom.references),
                     "elapsed_ms": doc_elapsed,
-                    "pages_per_sec": (page_count / (doc_elapsed / 1000.0)) if doc_elapsed > 0 else 0.0,
+                    "pages_per_sec": (page_count / (doc_elapsed / 1000.0))
+                    if doc_elapsed > 0
+                    else 0.0,
                     "hardware": {
                         "ram_rss_gb": round(rss_gb, 3),
                         "ram_percent": round(psutil.virtual_memory().percent, 1),
                         "cpu_percent": round(psutil.cpu_percent(interval=None), 1),
                     },
                 }
-                out_telemetry_path.write_text(json.dumps(telemetry, indent=2), encoding="utf-8")
+                out_telemetry_path.write_text(
+                    json.dumps(telemetry, indent=2), encoding="utf-8"
+                )
                 results.append(telemetry)
 
-                print(f"[{idx:4d}/{total_docs:4d}] {doc_id} ... OK ({page_count} pgs, {doc_elapsed:.1f} ms, {telemetry['pages_per_sec']:.1f} p/s, Route: {decision.route})")
+                print(
+                    f"[{idx:4d}/{total_docs:4d}] {doc_id} ... OK ({page_count} pgs, {doc_elapsed:.1f} ms, {telemetry['pages_per_sec']:.1f} p/s, Route: {decision.route})"
+                )
 
             except Exception as exc:
                 doc_elapsed = (time.perf_counter() - doc_t0) * 1000.0
@@ -167,7 +193,9 @@ class PDFInspectorBatchEvaluator:
                     "error": str(exc),
                     "elapsed_ms": doc_elapsed,
                 }
-                out_telemetry_path.write_text(json.dumps(telemetry, indent=2), encoding="utf-8")
+                out_telemetry_path.write_text(
+                    json.dumps(telemetry, indent=2), encoding="utf-8"
+                )
                 results.append(telemetry)
                 print(f"[{idx:4d}/{total_docs:4d}] {doc_id} ... FAILED ({exc})")
 
@@ -175,11 +203,15 @@ class PDFInspectorBatchEvaluator:
         success_count = sum(1 for r in results if r.get("status") == "ok")
         print("\n" + "=" * 60)
         print("pdf-inspector Batch Evaluation Summary")
-        print(f"Total Documents: {total_docs} | Success: {success_count} | Failed: {total_docs - success_count}")
+        print(
+            f"Total Documents: {total_docs} | Success: {success_count} | Failed: {total_docs - success_count}"
+        )
         print(f"Total Pages Parsed: {total_pages_parsed}")
         print(f"Total Wall Time: {total_wall_s:.2f} s ({total_wall_s / 60.0:.2f} min)")
         if total_wall_s > 0:
-            print(f"Effective Throughput: {total_pages_parsed / total_wall_s:.2f} pages/sec ({total_docs / total_wall_s:.3f} docs/sec)")
+            print(
+                f"Effective Throughput: {total_pages_parsed / total_wall_s:.2f} pages/sec ({total_docs / total_wall_s:.3f} docs/sec)"
+            )
         print(f"Document Route Breakdown: {route_counts}")
         print(f"Page Route Breakdown: {page_route_counts}")
         print("=" * 60)
@@ -190,21 +222,39 @@ class PDFInspectorBatchEvaluator:
             "failed_count": total_docs - success_count,
             "total_pages_parsed": total_pages_parsed,
             "total_wall_seconds": round(total_wall_s, 2),
-            "effective_throughput_pages_per_sec": round(total_pages_parsed / total_wall_s, 2) if total_wall_s > 0 else 0.0,
+            "effective_throughput_pages_per_sec": round(
+                total_pages_parsed / total_wall_s, 2
+            )
+            if total_wall_s > 0
+            else 0.0,
             "document_routes": route_counts,
             "page_routes": page_route_counts,
         }
-        (self.output_dir / "batch_summary.json").write_text(json.dumps(summary_data, indent=2), encoding="utf-8")
+        (self.output_dir / "batch_summary.json").write_text(
+            json.dumps(summary_data, indent=2), encoding="utf-8"
+        )
 
         return results
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run pdf-inspector batch evaluation")
-    parser.add_argument("--corpus", default="corpus_b", help="Corpus to evaluate ('corpus_b', 'corpus_945', or directory)")
-    parser.add_argument("--limit", type=int, default=None, help="Limit number of documents")
-    parser.add_argument("--out-dir", default="artifacts/pdf_inspector_eval/corpus_b", help="Output artifact directory")
-    parser.add_argument("--no-resume", action="store_true", help="Do not resume cached runs")
+    parser.add_argument(
+        "--corpus",
+        default="corpus_b",
+        help="Corpus to evaluate ('corpus_b', 'corpus_945', or directory)",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Limit number of documents"
+    )
+    parser.add_argument(
+        "--out-dir",
+        default="artifacts/pdf_inspector_eval/corpus_b",
+        help="Output artifact directory",
+    )
+    parser.add_argument(
+        "--no-resume", action="store_true", help="Do not resume cached runs"
+    )
     args = parser.parse_args()
 
     evaluator = PDFInspectorBatchEvaluator(output_dir=args.out_dir)

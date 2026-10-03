@@ -11,12 +11,11 @@ the shared multiprocessing.Value). These tests pin the NEW contract:
 5. `periodic_recheck` keeps its downward-only semantic when `measured_f` is
    explicitly set.
 """
+
 from __future__ import annotations
 
 import sys
 import types
-
-import pytest
 
 from app.parser.config import ParserConfig
 from app.parser.scheduler import (
@@ -31,7 +30,9 @@ def test_i02_derive_default_scales_with_ram():
     g = ResourceGovernor()
     ram = 32 * 1024**3
     n = g.derive_default_heavy_concurrency(ram_cap=ram)
-    expected = max(1, int((ram * 0.80 - BASE_OVERHEAD_BYTES) // HEAVY_WORKER_BUDGET_BYTES))
+    expected = max(
+        1, int((ram * 0.80 - BASE_OVERHEAD_BYTES) // HEAVY_WORKER_BUDGET_BYTES)
+    )
     assert n == expected
     # The regression this test guards: a big box must not be pinned at 1.
     assert n > 1
@@ -74,7 +75,9 @@ def test_i02_explicit_override_wins(monkeypatch):
 def test_i02_dead_probe_scaffolding_removed():
     import app.parser.scheduler as m
 
-    assert not hasattr(m, "_heavy_f_value"), "dead module-level probe Value still present"
+    assert not hasattr(m, "_heavy_f_value"), (
+        "dead module-level probe Value still present"
+    )
     gov = ResourceGovernor()
     assert not hasattr(gov, "measure_footprint"), "dead F-probe method still present"
     s = Scheduler(ParserConfig())
@@ -85,7 +88,6 @@ def test_i02_dead_probe_scaffolding_removed():
 
 
 def test_i02_periodic_recheck_still_downward_only(monkeypatch):
-    import app.parser.scheduler as sched_mod
 
     g = ResourceGovernor()
     g.measured_f = 1024**3  # set EXPLICITLY (the only supported path now)

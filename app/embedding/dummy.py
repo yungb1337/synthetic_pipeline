@@ -5,6 +5,7 @@ exactly like the future GPU embedder (batched, deterministic). Real model (
 e.g. BGE/e5) replaces this via the `Embedder` protocol with zero call-site
 changes. Read the constructor docstring: this is NOT a real embedding.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -27,7 +28,7 @@ class DummyEmbedder:
     def _tokens(self, text: str) -> list[str]:
         text = (text or "").lower()
         toks = list(text)
-        toks += [text[i:i + 2] for i in range(len(text) - 1)]
+        toks += [text[i : i + 2] for i in range(len(text) - 1)]
         return toks
 
     def _hash_token(self, tok: str) -> int:
@@ -42,5 +43,7 @@ class DummyEmbedder:
         n = len(text)
         return [x / (n or 1) for x in v]
 
-    def embed(self, texts: list[str], batch_size: int | None = None) -> list[list[float]]:
+    def embed(
+        self, texts: list[str], batch_size: int | None = None
+    ) -> list[list[float]]:
         return [self.embed_text(t) for t in texts]

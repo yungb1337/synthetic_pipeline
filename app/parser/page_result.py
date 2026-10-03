@@ -8,14 +8,14 @@ persists. It is pure-data (dataclass) so it pickles cleanly across the
 `Recovered*` parts are reused unchanged (no schema change) — only (de)
 serialized here for the page-store artifact.
 """
+
 from __future__ import annotations
 
 import base64
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
 
 from .parts import (
     RecoveredAnnotation,
@@ -103,8 +103,9 @@ def _table_from_dict(d: dict) -> RecoveredTable:
         column_starts=d.get("column_starts", []),
         header_bottom=d.get("header_bottom", 0.0),
         body_bottom=d.get("body_bottom", 0.0),
-        cell_bboxes=[[_bbox_from_list(c) for c in row]
-                     for row in d.get("cell_bboxes", [])],
+        cell_bboxes=[
+            [_bbox_from_list(c) for c in row] for row in d.get("cell_bboxes", [])
+        ],
         row_bboxes=[_bbox_from_list(r) for r in d.get("row_bboxes", [])],
     )
 
@@ -229,7 +230,7 @@ class PageResult:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "PageResult":
+    def from_dict(cls, d: dict) -> PageResult:
         return cls(
             doc_id=d.get("doc_id", ""),
             page_index=d.get("page_index", 0),
@@ -253,5 +254,5 @@ class PageResult:
         return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True)
 
     @classmethod
-    def from_json(cls, s: str) -> "PageResult":
+    def from_json(cls, s: str) -> PageResult:
         return cls.from_dict(json.loads(s))

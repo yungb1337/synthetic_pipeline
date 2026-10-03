@@ -1,2 +1,1 @@
-"""pdf-inspector experimentation & evaluation suite.
-"""
+"""pdf-inspector experimentation & evaluation suite."""

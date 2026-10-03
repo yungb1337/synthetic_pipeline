@@ -9,6 +9,7 @@ Calibrated 2026-09-14 (rebalanced layout/font weights; high throughput):
   clean academic papers / digital text -> ENRICHMENT / NATIVE (fast PyMuPDF)
   table-dense / complex documents      -> DOCLING   (deep table model)
 """
+
 from __future__ import annotations
 
 import pathlib
@@ -22,8 +23,10 @@ _CORPUS = pathlib.Path(r"C:/Users/Asus/Downloads/test_cases")
 ROUTER = Router()
 
 if not _CORPUS.is_dir():
-    pytest.skip(f"routing corpus {_CORPUS} not present — skipping live calibration pins",
-                allow_module_level=True)
+    pytest.skip(
+        f"routing corpus {_CORPUS} not present — skipping live calibration pins",
+        allow_module_level=True,
+    )
 
 
 def _route(filename: str) -> tuple[str, int]:
@@ -34,9 +37,14 @@ def _route(filename: str) -> tuple[str, int]:
     return dec.route, dec.complexity_score
 
 
-@pytest.mark.parametrize("name", [
-    "2503.14023v2.pdf", "2504.12322v2.pdf", "PDF v3.pdf",
-])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "2503.14023v2.pdf",
+        "2504.12322v2.pdf",
+        "PDF v3.pdf",
+    ],
+)
 def test_dense_academic_papers_route_docling(name):
     route, cpx = _route(name)
     assert route == "docling", f"{name}: {route} (cpx={cpx}) expected docling"
@@ -45,22 +53,29 @@ def test_dense_academic_papers_route_docling(name):
 def test_table_dense_acm_paper_routes_docling():
     """ACM paper with 22 tables across pages 4-8 routes to docling under distributed inspection."""
     route, cpx = _route("3548785.3548793.pdf")
-    assert route == "docling", f"3548785.3548793.pdf: {route} (cpx={cpx}) expected docling"
+    assert route == "docling", (
+        f"3548785.3548793.pdf: {route} (cpx={cpx}) expected docling"
+    )
 
 
 def test_electronics_paper_routes_enrichment():
     route, cpx = _route("electronics-13-03509.pdf")
-    assert route == "enrichment", f"electronics: {route} (cpx={cpx}) expected enrichment"
+    assert route == "enrichment", (
+        f"electronics: {route} (cpx={cpx}) expected enrichment"
+    )
 
 
-@pytest.mark.parametrize("name", [
-    "Nizammudin to Mathura.pdf",
-    "Ticket Agra to Nizam.pdf",
-    "Ticket Tundla To PRYJ.pdf",
-    "receipt1.pdf",
-    "receipt2.pdf",
-    "Report.pdf",
-])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Nizammudin to Mathura.pdf",
+        "Ticket Agra to Nizam.pdf",
+        "Ticket Tundla To PRYJ.pdf",
+        "receipt1.pdf",
+        "receipt2.pdf",
+        "Report.pdf",
+    ],
+)
 def test_scanned_docs_route_enrichment_ocr(name):
     """Scanned tickets/receipts need OCR — Enrichment, NOT the full Docling
     pipeline (spec §5: a scanned doc may not need Docling)."""
@@ -81,20 +96,26 @@ def test_simple_text_pdf_routes_native(tmp_path):
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     for i in range(30):
-        page.insert_text((72, 100 + i * 22),
-                         f"Plain paragraph {i} with ordinary body text about nothing in particular.")
+        page.insert_text(
+            (72, 100 + i * 22),
+            f"Plain paragraph {i} with ordinary body text about nothing in particular.",
+        )
     data = doc.tobytes()
 
     det = detect(data, filename="simple.pdf")
     dec = ROUTER.route(data, det)
     assert dec is not None
-    assert dec.route == "native", f"simple text: {dec.route} (cpx={dec.complexity_score}) expected native"
+    assert dec.route == "native", (
+        f"simple text: {dec.route} (cpx={dec.complexity_score}) expected native"
+    )
     assert dec.complexity_score <= 30
 
 
 def test_docling_band_is_reachable():
     """The 61-100 Docling band must be reachable for table-dense/complex docs."""
-    pmc_dir = pathlib.Path("checkpoints/run/run-2026-09-04-parser-reliability/sources/pdf")
+    pmc_dir = pathlib.Path(
+        "checkpoints/run/run-2026-09-04-parser-reliability/sources/pdf"
+    )
     if pmc_dir.is_dir():
         dense_doc = pmc_dir / "PMC11660019.pdf"
         if dense_doc.is_file():
@@ -103,4 +124,3 @@ def test_docling_band_is_reachable():
             dec = ROUTER.route(data, det)
             assert dec is not None
             assert dec.route == "docling"
-

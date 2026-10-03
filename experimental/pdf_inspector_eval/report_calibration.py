@@ -1,6 +1,7 @@
 """Generates Before vs After Comparative Scorecards for Routing Calibration.
 Compares Pass 1 (0% Docling) vs Calibrated Hybrid (Single-Page TableFormer Docling).
 """
+
 from __future__ import annotations
 
 import json
@@ -25,7 +26,9 @@ def generate_comparison_report() -> dict[str, Any]:
     # 2. Curated Hard Evaluation
     hard_summary_p = base_art / "curated_hard" / "judgment" / "judgment_summary.json"
     if not hard_summary_p.exists():
-        hard_summary_p = base_art / "curated_hard" / "judgment" / "pipeline_summary.json"
+        hard_summary_p = (
+            base_art / "curated_hard" / "judgment" / "pipeline_summary.json"
+        )
     hard_data = {}
     if hard_summary_p.exists():
         try:
@@ -36,7 +39,9 @@ def generate_comparison_report() -> dict[str, Any]:
     # 3. Curated Easy Evaluation
     easy_summary_p = base_art / "curated_easy" / "judgment" / "judgment_summary.json"
     if not easy_summary_p.exists():
-        easy_summary_p = base_art / "curated_easy" / "judgment" / "pipeline_summary.json"
+        easy_summary_p = (
+            base_art / "curated_easy" / "judgment" / "pipeline_summary.json"
+        )
     easy_data = {}
     if easy_summary_p.exists():
         try:
@@ -49,14 +54,21 @@ def generate_comparison_report() -> dict[str, Any]:
     print("=" * 80)
 
     # Format table
-    headers = ["Metric / Dimension", "Pass 1 (0% Docling Baseline)", "Calibrated Hard (Table Docling)", "Delta / Impact"]
+    headers = [
+        "Metric / Dimension",
+        "Pass 1 (0% Docling Baseline)",
+        "Calibrated Hard (Table Docling)",
+        "Delta / Impact",
+    ]
     print(f"{headers[0]:<28} | {headers[1]:<28} | {headers[2]:<30} | {headers[3]}")
     print("-" * 115)
 
     base_pct = baseline_data.get("metrics_percentage", {})
     # If partial evaluation occurred, compute true mean on valid evaluated subset
     v_cnt = baseline_data.get("verdicts", {})
-    n_evaluated = v_cnt.get("PASS", 0) + v_cnt.get("PASS_WITH_ISSUES", 0) + 9  # 9 actual doc errors
+    n_evaluated = (
+        v_cnt.get("PASS", 0) + v_cnt.get("PASS_WITH_ISSUES", 0) + 9
+    )  # 9 actual doc errors
     total_docs = baseline_data.get("total_documents", 1000)
     scale = (total_docs / n_evaluated) if n_evaluated > 0 else 1.0
 
@@ -78,13 +90,17 @@ def generate_comparison_report() -> dict[str, Any]:
         else:
             b_val = default_base
         cur_val = hard_pct.get(key, "Pending Eval")
-        print(f"{label:<28} | {b_val:<28} | {cur_val:<30} | {'+12.0% to +17.0%' if key == 'tables' else '+2.0% to +4.0%'}")
+        print(
+            f"{label:<28} | {b_val:<28} | {cur_val:<30} | {'+12.0% to +17.0%' if key == 'tables' else '+2.0% to +4.0%'}"
+        )
 
     print("-" * 115)
     print("Key Architectural Invariant:")
     print("  * Whole-Document Docling Calls: 0 (0.00%)")
     print("  * Single-Page Byte Slicing: Enforced via PyMuPDF (Peak RAM < 2.5 GB RSS)")
-    print("  * Fast Path Preservation: Easy/Text pages remain 100% on Native Rust (~35-45 p/s)")
+    print(
+        "  * Fast Path Preservation: Easy/Text pages remain 100% on Native Rust (~35-45 p/s)"
+    )
     print("=" * 80)
 
     report = {

@@ -1,5 +1,5 @@
-"""Configuration & permutation registry for the Table + Layout Model Benchmark.
-"""
+"""Configuration & permutation registry for the Table + Layout Model Benchmark."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -10,6 +10,7 @@ from typing import Any
 @dataclass
 class PermutationSpec:
     """Specification for one candidate permutation."""
+
     id: str
     name: str
     layout_detector: str
@@ -24,6 +25,7 @@ class PermutationSpec:
 @dataclass
 class BenchmarkConfig:
     """Master benchmark configuration."""
+
     # Hardware & Performance Constraints
     vram_safety_ceiling_mb: float = 3200.0  # 3.2 GB max on RTX 3050 4GB
     timeout_seconds_per_page: float = 60.0
@@ -31,11 +33,19 @@ class BenchmarkConfig:
     concurrency: int = 1  # strict sequential safety
 
     # Storage & Paths
-    artifacts_dir: Path = field(default_factory=lambda: Path("artifacts") / "table_eval")
-    evaluation_dir: Path = field(default_factory=lambda: Path("evaluation") / "table_benchmark")
-    report_path: Path = field(default_factory=lambda: Path("docs") / "table-layout-benchmark.md")
+    artifacts_dir: Path = field(
+        default_factory=lambda: Path("artifacts") / "table_eval"
+    )
+    evaluation_dir: Path = field(
+        default_factory=lambda: Path("evaluation") / "table_benchmark"
+    )
+    report_path: Path = field(
+        default_factory=lambda: Path("docs") / "table-layout-benchmark.md"
+    )
     reference_corpus_dir: Path = field(
-        default_factory=lambda: Path("checkpoints") / "run" / "run-2026-09-03-llm-judge-test" / "sources"
+        default_factory=lambda: (
+            Path("checkpoints") / "run" / "run-2026-09-03-llm-judge-test" / "sources"
+        )
     )
 
     # LLM Judge Settings

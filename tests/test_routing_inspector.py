@@ -1,4 +1,5 @@
 """Wave B1: decision-free inspector tests (spec §3, §4)."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -22,8 +23,8 @@ def test_full_bleed_image_page_flagged_with_zero_chars():
     b = image_only_pdf(pages=1)
     f = FastInspector().inspect(b)
     assert f is not None
-    assert f.pages_char_count.get(0, 0) == 0        # no embedded text on that page
-    assert 0 in f.full_image_pages                  # flagged as scanned
+    assert f.pages_char_count.get(0, 0) == 0  # no embedded text on that page
+    assert 0 in f.full_image_pages  # flagged as scanned
 
 
 def test_non_pdf_returns_none():
@@ -50,7 +51,7 @@ def test_pages_image_ratio_is_auditable_evidence():
     assert f.pages_image_ratio
     r = f.pages_image_ratio[0]
     assert 0.0 <= r <= 1.0
-    assert r > 0.9                         # a full-bleed raster ~ 0.94
+    assert r > 0.9  # a full-bleed raster ~ 0.94
     # a plain text page has effectively no image ownership
     f2 = FastInspector().inspect(text_pdf())
     assert f2.pages_image_ratio.get(0, 0.0) == 0.0
@@ -61,5 +62,5 @@ def test_certificate_like_page_is_an_image_page_not_scan_evidence():
     CONTINUOUS ratio is recorded, so the detector can gate on text (see the
     detector tests)."""
     f = FastInspector().inspect(certificate_pdf())
-    assert f.pages_image_ratio[0] > 0.7      # decorative raster covers most of page
+    assert f.pages_image_ratio[0] > 0.7  # decorative raster covers most of page
     assert f.pages_char_count.get(0, 0) > 0  # ... yet there IS embedded text

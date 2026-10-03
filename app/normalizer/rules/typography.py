@@ -7,10 +7,10 @@ Standardizes typographic punctuation:
   * Non-breaking and thin spaces (\\u00A0, \\u202F, etc.) -> standard space
   * Soft hyphens (\\u00AD) -> removed
 """
+
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from .base import RuleContext
 
@@ -42,11 +42,11 @@ _TYPOGRAPHY_MAP = {
     " ": " ",  #   Thin space
     " ": " ",  #   Hair space
     # Soft hyphen
-    "­": "",   # ­
+    "­": "",  # ­
 }
 
 
-def typography(text: str, context: Optional[RuleContext] = None) -> tuple[str, bool]:
+def typography(text: str, context: RuleContext | None = None) -> tuple[str, bool]:
     """Standardize punctuation and quotes to ASCII equivalents."""
     if not text:
         return text, False

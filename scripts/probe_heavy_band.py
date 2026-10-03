@@ -8,6 +8,7 @@ Probes the heavy-band cost model that explains Run A (F=1) ~ Run B (F=4):
            F=1 vs F=4, measuring per-task convert ms + first-task build ms
            per worker process.
 """
+
 from __future__ import annotations
 
 import os
@@ -68,7 +69,8 @@ def probe_pool(workers: int, tasks: int, mtasks: int = 20) -> None:
     build_per_pid = {}
     results = []
     ex = ProcessPoolExecutor(
-        max_workers=workers, initializer=_worker_init,
+        max_workers=workers,
+        initializer=_worker_init,
         max_tasks_per_child=mtasks if mtasks > 0 else None,
     )
     futs = {ex.submit(_convert_task, p): p for p in pages}
@@ -80,14 +82,18 @@ def probe_pool(workers: int, tasks: int, mtasks: int = 20) -> None:
             if build_s >= 0 and pid not in build_per_pid:
                 build_per_pid[pid] = build_s
             import psutil
+
             m = psutil.virtual_memory()
             print(
-            f"[pool] task {len(results)}/{tasks} page={page} pid={pid} "
-            f"ms={ms:.0f} build_s={build_s:.1f} ram_avail={m.available/2**30:.1f}GB",
-            flush=True,
-        )
+                f"[pool] task {len(results)}/{tasks} page={page} pid={pid} "
+                f"ms={ms:.0f} build_s={build_s:.1f} ram_avail={m.available / 2**30:.1f}GB",
+                flush=True,
+            )
         if len(results) % 10 == 0:
-            print(f"[pool] ... {len(results)}/{tasks} elapsed={time.perf_counter()-t0:.0f}s", flush=True)
+            print(
+                f"[pool] ... {len(results)}/{tasks} elapsed={time.perf_counter() - t0:.0f}s",
+                flush=True,
+            )
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
     wall = time.perf_counter() - t0
@@ -99,7 +105,7 @@ def probe_pool(workers: int, tasks: int, mtasks: int = 20) -> None:
             f"[pool] F={workers} mtasks={mtasks} tasks={len(results)}/{tasks} "
             f"wall={wall:.1f}s procs={len(pids)} respawns~{n_respawns} "
             f"build_s_per_proc={list(build_per_pid.values())} "
-            f"convert_ms mean={sum(converts)/len(converts):.0f} "
+            f"convert_ms mean={sum(converts) / len(converts):.0f} "
             f"min={min(converts):.0f} max={max(converts):.0f}",
             flush=True,
         )
@@ -110,5 +116,8 @@ if __name__ == "__main__":
     if mode == "engine":
         probe_engine()
     elif mode == "pool":
-        probe_pool(int(sys.argv[2]), int(sys.argv[3]),
-                   int(sys.argv[4]) if len(sys.argv) > 4 else 20)
+        probe_pool(
+            int(sys.argv[2]),
+            int(sys.argv[3]),
+            int(sys.argv[4]) if len(sys.argv) > 4 else 20,
+        )

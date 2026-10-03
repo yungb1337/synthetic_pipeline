@@ -3,6 +3,7 @@
 This preserves the provenance the legacy native loader carried into the DOM,
 so the page-centric path behaves like the original `Extractor` for PDFs.
 """
+
 from __future__ import annotations
 
 import html
@@ -27,7 +28,7 @@ def clean_meta_string(val: Any) -> str:
     return s.strip()
 
 
-def fitz_metadata(doc: "Any") -> dict:
+def fitz_metadata(doc: Any) -> dict:
     """Return a flat dict of the PDF metadata / info dictionary.
 
     Returns an empty dict when the document has no metadata or when the access
@@ -38,8 +39,16 @@ def fitz_metadata(doc: "Any") -> dict:
         meta = doc.metadata or {}
     except Exception:
         return out
-    for key in ("title", "author", "subject", "creator", "producer",
-                "creationDate", "modDate", "keywords"):
+    for key in (
+        "title",
+        "author",
+        "subject",
+        "creator",
+        "producer",
+        "creationDate",
+        "modDate",
+        "keywords",
+    ):
         val = meta.get(key)
         if val is None:
             continue

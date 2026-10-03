@@ -4,6 +4,7 @@ Uses existing parsed DOMs from artifacts/targeted_eval_post_fix/parsed/,
 skips already-judged files, rotates through all keys in key.py sequentially,
 and handles rate limits cleanly.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -80,7 +81,15 @@ def resolve_all_keys() -> list[str]:
         try:
             ns: dict = {}
             exec(k.read_text(encoding="utf-8"), ns)
-            for name in ("key", "key1", "key2", "key3", "GEMINI_API_KEY", "API_KEY", "KEY"):
+            for name in (
+                "key",
+                "key1",
+                "key2",
+                "key3",
+                "GEMINI_API_KEY",
+                "API_KEY",
+                "KEY",
+            ):
                 val = ns.get(name)
                 if isinstance(val, str) and val and val not in keys:
                     keys.append(val)
@@ -101,7 +110,10 @@ def extract_source_text(pdf_path: Path, max_chars: int = 4000) -> dict:
                 indices = list(range(real_count))
             else:
                 idx = {0, real_count - 1}
-                idx.update(round(i * (real_count - 1) / (budget - 1)) for i in range(1, budget - 1))
+                idx.update(
+                    round(i * (real_count - 1) / (budget - 1))
+                    for i in range(1, budget - 1)
+                )
                 indices = sorted(idx)
             for i in indices:
                 t = doc[i].get_text("text").strip()
@@ -111,8 +123,19 @@ def extract_source_text(pdf_path: Path, max_chars: int = 4000) -> dict:
                 pages.append(t)
                 total += len(t)
     except Exception as exc:
-        return {"error": str(exc), "pages": pages, "page_count": real_count, "preview_page_count": len(pages), "total_chars": total}
-    return {"pages": pages, "page_count": real_count, "preview_page_count": len(pages), "total_chars": total}
+        return {
+            "error": str(exc),
+            "pages": pages,
+            "page_count": real_count,
+            "preview_page_count": len(pages),
+            "total_chars": total,
+        }
+    return {
+        "pages": pages,
+        "page_count": real_count,
+        "preview_page_count": len(pages),
+        "total_chars": total,
+    }
 
 
 def summarize_dom(dom: dict) -> dict:
@@ -125,7 +148,9 @@ def summarize_dom(dom: dict) -> dict:
     citation_index = dom.get("citation_index", {})
     ro_full = dom.get("reading_order_full", [])
 
-    total_text_chars = sum(len(b.get("text", "")) for p in pages for b in p.get("blocks", []))
+    total_text_chars = sum(
+        len(b.get("text", "")) for p in pages for b in p.get("blocks", [])
+    )
     sample_blocks: list[str] = []
     used_chars = 0
     for p in sorted(pages, key=lambda x: x.get("index", 0)):
@@ -144,7 +169,10 @@ def summarize_dom(dom: dict) -> dict:
         if used_chars > 2000:
             break
 
-    sample_refs = [{"label": r.get("label", ""), "text": (r.get("text") or "")[:120]} for r in refs[:6]]
+    sample_refs = [
+        {"label": r.get("label", ""), "text": (r.get("text") or "")[:120]}
+        for r in refs[:6]
+    ]
 
     def _cell_text(cell) -> str:
         if isinstance(cell, dict):
@@ -161,10 +189,12 @@ def summarize_dom(dom: dict) -> dict:
             rows = t.get("rows") or []
             hdr_txt = " | ".join(_cell_text(h) for h in header)
             row_txts = []
-            for r in rows[: _TABLE_PREVIEW_ROWS]:
+            for r in rows[:_TABLE_PREVIEW_ROWS]:
                 cells = r.get("cells") if isinstance(r, dict) else r
                 row_txts.append(" | ".join(_cell_text(c) for c in cells))
-            seg = f"T{gi}:{len(rows)}r x {len(header)}c | {hdr_txt} | " + " ; ".join(row_txts)
+            seg = f"T{gi}:{len(rows)}r x {len(header)}c | {hdr_txt} | " + " ; ".join(
+                row_txts
+            )
             if used + len(seg) > _TABLE_BUDGET:
                 break
             table_preview.append(seg)
@@ -189,7 +219,9 @@ def summarize_dom(dom: dict) -> dict:
     }
 
 
-def judge_document(pdf_path: Path, dom_dict: dict, keys: list[str], key_idx_holder: list[int]) -> dict:
+def judge_document(
+    pdf_path: Path, dom_dict: dict, keys: list[str], key_idx_holder: list[int]
+) -> dict:
     import google.generativeai as genai
 
     dom_sum = summarize_dom(dom_dict)
@@ -198,13 +230,17 @@ def judge_document(pdf_path: Path, dom_dict: dict, keys: list[str], key_idx_hold
     src_parts = []
     for idx in range(len(src.get("pages", []))):
         chunk = src["pages"][idx][: 4000 // max(1, len(src["pages"]))]
-        src_parts.append(f"[page {idx + 1} of {src.get('page_count', len(src_parts))}] {chunk}")
+        src_parts.append(
+            f"[page {idx + 1} of {src.get('page_count', len(src_parts))}] {chunk}"
+        )
 
-    source_json = json.dumps({
-        "source_page_count": src.get("page_count") or len(src_parts),
-        "preview_pages": [i + 1 for i in range(len(src_parts))],
-        "pages": src_parts,
-    })
+    source_json = json.dumps(
+        {
+            "source_page_count": src.get("page_count") or len(src_parts),
+            "preview_pages": [i + 1 for i in range(len(src_parts))],
+            "pages": src_parts,
+        }
+    )
     dom_json = json.dumps(dom_sum, ensure_ascii=False)
     prompt = PROMPT_TEMPLATE.format(source_json=source_json, dom_json=dom_json)
 
@@ -243,7 +279,13 @@ def judge_document(pdf_path: Path, dom_dict: dict, keys: list[str], key_idx_hold
             "verdict": "FAIL",
             "verdict_status": "FAIL",
             "metrics": {m: 0.0 for m in METRICS},
-            "issues": [{"severity": "major", "surface": "judge", "detail": f"Judge rate-limited: {last_exc}"}],
+            "issues": [
+                {
+                    "severity": "major",
+                    "surface": "judge",
+                    "detail": f"Judge rate-limited: {last_exc}",
+                }
+            ],
             "notes": "Judge rate limited / unavailable",
             "model": "error",
         }
@@ -279,7 +321,13 @@ def judge_document(pdf_path: Path, dom_dict: dict, keys: list[str], key_idx_hold
             "verdict": "UNKNOWN",
             "verdict_status": "UNKNOWN",
             "metrics": {m: 0.0 for m in METRICS},
-            "issues": [{"severity": "minor", "surface": "judge_parse", "detail": f"Parse error: {exc}"}],
+            "issues": [
+                {
+                    "severity": "minor",
+                    "surface": "judge_parse",
+                    "detail": f"Parse error: {exc}",
+                }
+            ],
             "notes": f"Raw: {text[:200]}",
             "model": used_model,
         }
@@ -319,7 +367,11 @@ def main() -> None:
 
         # Check if already judged successfully
         v = data.get("verdict", {})
-        if isinstance(v, dict) and v.get("model") != "error" and v.get("verdict_status") in ("PASS", "PASS_WITH_ISSUES", "FAIL"):
+        if (
+            isinstance(v, dict)
+            and v.get("model") != "error"
+            and v.get("verdict_status") in ("PASS", "PASS_WITH_ISSUES", "FAIL")
+        ):
             if any(v.get("metrics", {}).values()):
                 judged_success += 1
                 continue
@@ -328,7 +380,9 @@ def main() -> None:
         dom_dict = None
         if pdf_path.exists():
             h = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
-            target_dom_file = out_dir / "parsed" / "dom" / f"d-{h[:16]}" / "dom-v0.1.0.docJSON"
+            target_dom_file = (
+                out_dir / "parsed" / "dom" / f"d-{h[:16]}" / "dom-v0.1.0.docJSON"
+            )
             if target_dom_file.exists():
                 try:
                     dom_dict = json.loads(target_dom_file.read_text(encoding="utf-8"))
@@ -368,7 +422,9 @@ def main() -> None:
             "orig_verdict": orig_verdict,
             "orig_metrics": orig_metrics,
         }
-        jf.write_text(json.dumps(new_record, indent=2, ensure_ascii=False), encoding="utf-8")
+        jf.write_text(
+            json.dumps(new_record, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
         rejudged_count += 1
         v_status = res_verdict.get("verdict_status") or res_verdict.get("verdict")
         model_used = res_verdict.get("model")
@@ -377,12 +433,16 @@ def main() -> None:
             judged_success += 1
 
         if idx % 10 == 0 or idx == total_docs:
-            log(f"  Progress: {idx}/{total_docs} | Valid: {judged_success} | Re-judged: {rejudged_count} | Last: {doc_id} -> {v_status} ({model_used})")
+            log(
+                f"  Progress: {idx}/{total_docs} | Valid: {judged_success} | Re-judged: {rejudged_count} | Last: {doc_id} -> {v_status} ({model_used})"
+            )
 
         # Pacing to avoid hitting 15 RPM free tier spikes
         time.sleep(0.4)
 
-    log(f"=== Re-judging complete: {judged_success}/{total_docs} successfully judged ===")
+    log(
+        f"=== Re-judging complete: {judged_success}/{total_docs} successfully judged ==="
+    )
 
     # Generate Final Aggregated Summary and Report
     orig_verdict_counts = Counter()
@@ -401,7 +461,9 @@ def main() -> None:
             pv = v_dict.get("verdict_status") or v_dict.get("verdict") or "UNKNOWN"
             post_verdict_counts[pv] += 1
 
-            if v_dict.get("model") != "error" and any(v_dict.get("metrics", {}).values()):
+            if v_dict.get("model") != "error" and any(
+                v_dict.get("metrics", {}).values()
+            ):
                 valid_count += 1
                 pm = v_dict.get("metrics", {})
                 om = d.get("orig_metrics", {})
@@ -432,25 +494,47 @@ def main() -> None:
         "total_pages": existing_sum.get("total_pages", 3680),
         "parse_throughput_pps": existing_sum.get("parse_throughput_pps", 1.96),
         "parse_time_sec": existing_sum.get("parse_time_sec", 1881.58),
-        "routing": existing_sum.get("routing", {
-            "native_pages": 3394,
-            "native_pct": 92.23,
-            "docling_pages": 278,
-            "docling_pct": 7.55,
-        }),
+        "routing": existing_sum.get(
+            "routing",
+            {
+                "native_pages": 3394,
+                "native_pct": 92.23,
+                "docling_pages": 278,
+                "docling_pct": 7.55,
+            },
+        ),
         "verdicts_before": dict(orig_verdict_counts),
         "verdicts_after": dict(post_verdict_counts),
-        "pass_rate_before": round((orig_verdict_counts.get("PASS", 0) + orig_verdict_counts.get("PASS_WITH_ISSUES", 0)) / max(1, len(all_j)) * 100, 1),
-        "pass_rate_after": round((post_verdict_counts.get("PASS", 0) + post_verdict_counts.get("PASS_WITH_ISSUES", 0)) / max(1, len(all_j)) * 100, 1),
+        "pass_rate_before": round(
+            (
+                orig_verdict_counts.get("PASS", 0)
+                + orig_verdict_counts.get("PASS_WITH_ISSUES", 0)
+            )
+            / max(1, len(all_j))
+            * 100,
+            1,
+        ),
+        "pass_rate_after": round(
+            (
+                post_verdict_counts.get("PASS", 0)
+                + post_verdict_counts.get("PASS_WITH_ISSUES", 0)
+            )
+            / max(1, len(all_j))
+            * 100,
+            1,
+        ),
         "metrics_before": orig_metric_avgs,
         "metrics_after": post_metric_avgs,
         "metric_deltas": deltas,
-        "elements": existing_sum.get("elements", {
-            "blocks": 47563,
-            "tables": 1012,
-            "images": 2559,
-            "references": 8853,
-        }),
+        "elements": existing_sum.get(
+            "elements",
+            {
+                "blocks": 47563,
+                "tables": 1012,
+                "images": 2559,
+                "references": 8853,
+            },
+        ),
     }
 
     sum_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -459,7 +543,7 @@ def main() -> None:
     # Generate Markdown Report
     report = f"""# Targeted Re-Evaluation Report: 250 Issue Document Cohort
 
-**Date:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+**Date:** {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}
 **Target Cohort:** {valid_count}/{total_docs} high-priority defect documents selected from Dual-Corpus benchmark
 **Active Improvements:** P1 (Heading Classifier), P2 (Two-Tier Table Escalation), P4 (Margin Filtering), P5 (Table Unicode/Wrap)
 *(P3 Author-Year reference extraction excluded per user direction)*
@@ -470,12 +554,12 @@ def main() -> None:
 
 | Metric Surface | Pre-Fix Score (%) | Post-Fix Score (%) | Delta (pp) | Target Met |
 |---|---|---|---|---|
-| **Structure (P1 + P4)** | {orig_metric_avgs['structure']}% | **{post_metric_avgs['structure']}%** | **+{deltas['structure']} pp** | ✓ YES |
-| **Tables (P2 + P5)** | {orig_metric_avgs['tables']}% | **{post_metric_avgs['tables']}%** | **+{deltas['tables']} pp** | ✓ YES |
-| **Fidelity / Integrity** | {orig_metric_avgs['fidelity']}% | **{post_metric_avgs['fidelity']}%** | **+{deltas['fidelity']} pp** | ✓ YES |
-| **Completeness** | {orig_metric_avgs['completeness']}% | **{post_metric_avgs['completeness']}%** | **+{deltas['completeness']} pp** | ✓ YES |
-| **References** | {orig_metric_avgs['references']}% | **{post_metric_avgs['references']}%** | **+{deltas['references']} pp** | (P3 Excluded) |
-| **Scans / OCR** | {orig_metric_avgs['scans_ocr']}% | **{post_metric_avgs['scans_ocr']}%** | **+{deltas['scans_ocr']} pp** | ✓ YES |
+| **Structure (P1 + P4)** | {orig_metric_avgs["structure"]}% | **{post_metric_avgs["structure"]}%** | **+{deltas["structure"]} pp** | ✓ YES |
+| **Tables (P2 + P5)** | {orig_metric_avgs["tables"]}% | **{post_metric_avgs["tables"]}%** | **+{deltas["tables"]} pp** | ✓ YES |
+| **Fidelity / Integrity** | {orig_metric_avgs["fidelity"]}% | **{post_metric_avgs["fidelity"]}%** | **+{deltas["fidelity"]} pp** | ✓ YES |
+| **Completeness** | {orig_metric_avgs["completeness"]}% | **{post_metric_avgs["completeness"]}%** | **+{deltas["completeness"]} pp** | ✓ YES |
+| **References** | {orig_metric_avgs["references"]}% | **{post_metric_avgs["references"]}%** | **+{deltas["references"]} pp** | (P3 Excluded) |
+| **Scans / OCR** | {orig_metric_avgs["scans_ocr"]}% | **{post_metric_avgs["scans_ocr"]}%** | **+{deltas["scans_ocr"]} pp** | ✓ YES |
 
 ---
 
@@ -483,16 +567,16 @@ def main() -> None:
 
 ```
 Pre-Fix Cohort ({total_docs} docs):
-  PASS:             {orig_verdict_counts.get('PASS', 0)} ({orig_verdict_counts.get('PASS', 0)/max(1, len(all_j))*100:.1f}%)
-  PASS_WITH_ISSUES: {orig_verdict_counts.get('PASS_WITH_ISSUES', 0)} ({orig_verdict_counts.get('PASS_WITH_ISSUES', 0)/max(1, len(all_j))*100:.1f}%)
-  FAIL:             {orig_verdict_counts.get('FAIL', 0)} ({orig_verdict_counts.get('FAIL', 0)/max(1, len(all_j))*100:.1f}%)
-  --> Pass Rate:    {summary['pass_rate_before']}%
+  PASS:             {orig_verdict_counts.get("PASS", 0)} ({orig_verdict_counts.get("PASS", 0) / max(1, len(all_j)) * 100:.1f}%)
+  PASS_WITH_ISSUES: {orig_verdict_counts.get("PASS_WITH_ISSUES", 0)} ({orig_verdict_counts.get("PASS_WITH_ISSUES", 0) / max(1, len(all_j)) * 100:.1f}%)
+  FAIL:             {orig_verdict_counts.get("FAIL", 0)} ({orig_verdict_counts.get("FAIL", 0) / max(1, len(all_j)) * 100:.1f}%)
+  --> Pass Rate:    {summary["pass_rate_before"]}%
 
 Post-Fix Cohort ({total_docs} docs):
-  PASS:             {post_verdict_counts.get('PASS', 0)} ({post_verdict_counts.get('PASS', 0)/max(1, len(all_j))*100:.1f}%)
-  PASS_WITH_ISSUES: {post_verdict_counts.get('PASS_WITH_ISSUES', 0)} ({post_verdict_counts.get('PASS_WITH_ISSUES', 0)/max(1, len(all_j))*100:.1f}%)
-  FAIL:             {post_verdict_counts.get('FAIL', 0)} ({post_verdict_counts.get('FAIL', 0)/max(1, len(all_j))*100:.1f}%)
-  --> Pass Rate:    {summary['pass_rate_after']}%
+  PASS:             {post_verdict_counts.get("PASS", 0)} ({post_verdict_counts.get("PASS", 0) / max(1, len(all_j)) * 100:.1f}%)
+  PASS_WITH_ISSUES: {post_verdict_counts.get("PASS_WITH_ISSUES", 0)} ({post_verdict_counts.get("PASS_WITH_ISSUES", 0) / max(1, len(all_j)) * 100:.1f}%)
+  FAIL:             {post_verdict_counts.get("FAIL", 0)} ({post_verdict_counts.get("FAIL", 0) / max(1, len(all_j)) * 100:.1f}%)
+  --> Pass Rate:    {summary["pass_rate_after"]}%
 ```
 
 ---

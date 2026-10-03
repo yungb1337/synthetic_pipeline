@@ -3,6 +3,7 @@
 Both `detection` (type sniffing) and the format `loaders` (metadata shim)
 look up MIME types here, so the mapping lives in exactly one place.
 """
+
 MIME = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -5,6 +5,7 @@ tier toward the more capable pipeline (native→enrichment, enrichment→docling
 docling bounded to docling) and NEVER downgrade — an uncertain simple doc is
 over-sent (safe, just wasteful) rather than an uncertain complex doc sent to a
 weaker pipeline (loses fidelity)."""
+
 from __future__ import annotations
 
 from .config import RoutingConfig
@@ -26,7 +27,7 @@ class RoutingPolicy:
     def _escalate(self, band: str) -> str:
         order = [b for _lo, _hi, b in self.config.bands]
         idx = order.index(band) if band in order else 0
-        return order[min(idx + 1, len(order) - 1)]   # bounded: never past docling
+        return order[min(idx + 1, len(order) - 1)]  # bounded: never past docling
 
     def route(self, complexity: float, confidence: float) -> str:
         band = self.bounded_band(complexity)

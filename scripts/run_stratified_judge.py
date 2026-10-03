@@ -24,12 +24,11 @@ Usage:
         --model gemini-3.5-flash-lite \
         --pacing 3.5
 """
+
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import os
 import subprocess
 import sys
 import time
@@ -108,15 +107,17 @@ def _select_stratified_sample(
         if sha not in dom_mapping:
             continue
         doc_id, dom_path = dom_mapping[sha]
-        by_stratum[stratum].append({
-            "id": pdf_id,
-            "stratum": stratum,
-            "sha256": sha,
-            "title": entry.get("title", ""),
-            "pdf_path": pdf_path,
-            "doc_id": doc_id,
-            "dom_path": dom_path,
-        })
+        by_stratum[stratum].append(
+            {
+                "id": pdf_id,
+                "stratum": stratum,
+                "sha256": sha,
+                "title": entry.get("title", ""),
+                "pdf_path": pdf_path,
+                "doc_id": doc_id,
+                "dom_path": dom_path,
+            }
+        )
 
     selected: list[dict] = []
     for stratum in sorted(STRATUM_NAMES.keys()):
@@ -138,11 +139,19 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--manifest", required=True, help="path to manifest.json")
     ap.add_argument("--pdf-dir", required=True, help="dir of source PDFs")
-    ap.add_argument("--run-dir", required=True, help="run dir containing parsed-b* stores")
-    ap.add_argument("--judgments", required=True, help="dir to write <doc_id>.json verdicts")
+    ap.add_argument(
+        "--run-dir", required=True, help="run dir containing parsed-b* stores"
+    )
+    ap.add_argument(
+        "--judgments", required=True, help="dir to write <doc_id>.json verdicts"
+    )
     ap.add_argument("--out", required=True, help="output markdown summary report path")
-    ap.add_argument("--sample-per-stratum", type=int, default=24, help="target docs per stratum")
-    ap.add_argument("--model", default="gemini-3.5-flash-lite", help="light Gemini model")
+    ap.add_argument(
+        "--sample-per-stratum", type=int, default=24, help="target docs per stratum"
+    )
+    ap.add_argument(
+        "--model", default="gemini-3.5-flash-lite", help="light Gemini model"
+    )
     ap.add_argument("--pacing", type=float, default=3.5, help="seconds between calls")
     ap.add_argument("--force", action="store_true", help="re-judge existing verdicts")
     ap.add_argument("--max-chars", type=int, default=6000, help="char budget per doc")
@@ -160,8 +169,12 @@ def main() -> int:
     dom_mapping = _index_all_doms(run_dir)
     print(f"[stratified-judge] Indexed {len(dom_mapping)} DOMs across all wave stores.")
 
-    sample = _select_stratified_sample(manifest_entries, dom_mapping, pdf_dir, args.sample_per_stratum)
-    print(f"[stratified-judge] Selected {len(sample)} documents across {len(STRATUM_NAMES)} strata.")
+    sample = _select_stratified_sample(
+        manifest_entries, dom_mapping, pdf_dir, args.sample_per_stratum
+    )
+    print(
+        f"[stratified-judge] Selected {len(sample)} documents across {len(STRATUM_NAMES)} strata."
+    )
 
     counts_by_s = Counter(item["stratum"] for item in sample)
     for s, c in sorted(counts_by_s.items()):
@@ -188,33 +201,55 @@ def main() -> int:
                     rec["_pdf_id"] = item["id"]
                     results.append(rec)
                     skipped += 1
-                    print(f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> cached {rec['verdict']['verdict']}")
+                    print(
+                        f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> cached {rec['verdict']['verdict']}"
+                    )
                     continue
             except Exception:
                 pass
 
         cmd = [
-            py_exe, str(JUDGE_SCRIPT),
-            "--pdf", str(pdf_p),
-            "--dom", str(dom_p),
-            "--out", str(vpath),
-            "--model", args.model,
-            "--max-chars", str(args.max_chars),
+            py_exe,
+            str(JUDGE_SCRIPT),
+            "--pdf",
+            str(pdf_p),
+            "--dom",
+            str(dom_p),
+            "--out",
+            str(vpath),
+            "--model",
+            args.model,
+            "--max-chars",
+            str(args.max_chars),
         ]
 
         t0 = time.monotonic()
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              text=True, encoding="utf-8", errors="replace", timeout=300)
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=300,
+        )
         dt = time.monotonic() - t0
 
         if proc.returncode == 3:
-            print(f"ERROR: judge API key auth fatal at {doc_id}; aborting.", file=sys.stderr)
+            print(
+                f"ERROR: judge API key auth fatal at {doc_id}; aborting.",
+                file=sys.stderr,
+            )
             break
         elif proc.returncode == 4:
-            print(f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> rate limited (skipped)")
+            print(
+                f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> rate limited (skipped)"
+            )
             continue
         elif proc.returncode != 0:
-            print(f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> exit {proc.returncode}: {proc.stderr.strip()[:160]}")
+            print(
+                f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> exit {proc.returncode}: {proc.stderr.strip()[:160]}"
+            )
             continue
 
         try:
@@ -226,49 +261,57 @@ def main() -> int:
             vd = rec.get("verdict", {})
             vlabel = vd.get("verdict", "UNKNOWN")
             m = vd.get("metrics", {})
-            print(f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) in {dt:.1f}s -> {vlabel} "
-                  f"(comp={m.get('completeness', 0):.2f} fid={m.get('fidelity', 0):.2f} struct={m.get('structure', 0):.2f} "
-                  f"tbl={m.get('tables', 0):.2f} ref={m.get('references', 0):.2f} ocr={m.get('scans_ocr', 0):.2f})")
+            print(
+                f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) in {dt:.1f}s -> {vlabel} "
+                f"(comp={m.get('completeness', 0):.2f} fid={m.get('fidelity', 0):.2f} struct={m.get('structure', 0):.2f} "
+                f"tbl={m.get('tables', 0):.2f} ref={m.get('references', 0):.2f} ocr={m.get('scans_ocr', 0):.2f})"
+            )
         except Exception as e:
-            print(f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> corrupt verdict ({e})")
+            print(
+                f"[{idx}/{len(sample)}] [{stratum}] {item['id']} ({doc_id}) -> corrupt verdict ({e})"
+            )
 
         if args.pacing > 0:
             time.sleep(args.pacing)
 
     # --- Generate Comprehensive Markdown Report ---
     report_lines = [
-        f"# Stratified LLM Judge Audit — 120-Document Benchmark",
-        f"",
+        "# Stratified LLM Judge Audit — 120-Document Benchmark",
+        "",
         f"- Generated: `{_now()}`",
-        f"- Target sample: `120` documents (`24` per stratum across `S1..S5`)",
+        "- Target sample: `120` documents (`24` per stratum across `S1..S5`)",
         f"- Evaluated: `{len(results)}` documents (newly judged: `{new_judged}`, cached: `{skipped}`)",
         f"- Judge Model: `{args.model}`",
-        f"- Evaluation Harness: Multi-metric source-vs-DOM correspondence (`scripts/llm_judge.py`)",
-        f"",
-        f"## 1. Executive Summary & Verdict Distribution",
-        f"",
+        "- Evaluation Harness: Multi-metric source-vs-DOM correspondence (`scripts/llm_judge.py`)",
+        "",
+        "## 1. Executive Summary & Verdict Distribution",
+        "",
     ]
 
-    verdict_counts = Counter(r.get("verdict", {}).get("verdict", "UNKNOWN") for r in results)
+    verdict_counts = Counter(
+        r.get("verdict", {}).get("verdict", "UNKNOWN") for r in results
+    )
     pass_cnt = verdict_counts.get("PASS", 0)
     pwi_cnt = verdict_counts.get("PASS_WITH_ISSUES", 0)
     fail_cnt = verdict_counts.get("FAIL", 0)
     total_judged = len(results)
     pass_rate = (pass_cnt + pwi_cnt) / max(total_judged, 1) * 100.0
 
-    report_lines.extend([
-        f"| Verdict | Count | Share | Description |",
-        f"|---|---|---|---|",
-        f"| **PASS** | `{pass_cnt}` | {pass_cnt/max(total_judged, 1)*100.0:.1f}% | Complete, high-fidelity DOM extraction with zero critical/major defects |",
-        f"| **PASS_WITH_ISSUES** | `{pwi_cnt}` | {pwi_cnt/max(total_judged, 1)*100.0:.1f}% | High-fidelity extraction with minor structural / formatting nuances |",
-        f"| **FAIL** | `{fail_cnt}` | {fail_cnt/max(total_judged, 1)*100.0:.1f}% | Major extraction defect / substantial content loss |",
-        f"| **Total** | `{total_judged}` | 100.0% | **Acceptance Rate (PASS + PASS_WITH_ISSUES): {pass_rate:.1f}%** |",
-        f"",
-        f"## 2. Multi-Metric Accuracy by Risk Stratum",
-        f"",
-        f"| Stratum | Description | Docs | Completeness | Fidelity | Structure | Tables | References | Scans/OCR | Verdict (P / PWI / F) |",
-        f"|---|---|---|---|---|---|---|---|---|---|",
-    ])
+    report_lines.extend(
+        [
+            "| Verdict | Count | Share | Description |",
+            "|---|---|---|---|",
+            f"| **PASS** | `{pass_cnt}` | {pass_cnt / max(total_judged, 1) * 100.0:.1f}% | Complete, high-fidelity DOM extraction with zero critical/major defects |",
+            f"| **PASS_WITH_ISSUES** | `{pwi_cnt}` | {pwi_cnt / max(total_judged, 1) * 100.0:.1f}% | High-fidelity extraction with minor structural / formatting nuances |",
+            f"| **FAIL** | `{fail_cnt}` | {fail_cnt / max(total_judged, 1) * 100.0:.1f}% | Major extraction defect / substantial content loss |",
+            f"| **Total** | `{total_judged}` | 100.0% | **Acceptance Rate (PASS + PASS_WITH_ISSUES): {pass_rate:.1f}%** |",
+            "",
+            "## 2. Multi-Metric Accuracy by Risk Stratum",
+            "",
+            "| Stratum | Description | Docs | Completeness | Fidelity | Structure | Tables | References | Scans/OCR | Verdict (P / PWI / F) |",
+            "|---|---|---|---|---|---|---|---|---|---|",
+        ]
+    )
 
     by_s_results: dict[str, list[dict]] = defaultdict(list)
     for r in results:
@@ -278,7 +321,9 @@ def main() -> int:
         s_docs = by_s_results.get(stratum, [])
         s_name = STRATUM_NAMES.get(stratum, stratum)
         if not s_docs:
-            report_lines.append(f"| `{stratum}` | {s_name} | `0` | - | - | - | - | - | - | 0 / 0 / 0 |")
+            report_lines.append(
+                f"| `{stratum}` | {s_name} | `0` | - | - | - | - | - | - | 0 / 0 / 0 |"
+            )
             continue
 
         m_avgs = {}
@@ -302,15 +347,17 @@ def main() -> int:
         valid_vals = [v for v in vals if v is not None]
         all_avgs[m] = sum(valid_vals) / len(valid_vals) if valid_vals else 0.0
 
-    report_lines.extend([
-        f"| **Overall** | **Full Stratified Corpus** | `{total_judged}` | "
-        f"**`{all_avgs['completeness']:.3f}`** | **`{all_avgs['fidelity']:.3f}`** | **`{all_avgs['structure']:.3f}`** | "
-        f"**`{all_avgs['tables']:.3f}`** | **`{all_avgs['references']:.3f}`** | **`{all_avgs['scans_ocr']:.3f}`** | "
-        f"**{pass_cnt} / {pwi_cnt} / {fail_cnt}** |",
-        f"",
-        f"## 3. Issues & Nuances Tally",
-        f"",
-    ])
+    report_lines.extend(
+        [
+            f"| **Overall** | **Full Stratified Corpus** | `{total_judged}` | "
+            f"**`{all_avgs['completeness']:.3f}`** | **`{all_avgs['fidelity']:.3f}`** | **`{all_avgs['structure']:.3f}`** | "
+            f"**`{all_avgs['tables']:.3f}`** | **`{all_avgs['references']:.3f}`** | **`{all_avgs['scans_ocr']:.3f}`** | "
+            f"**{pass_cnt} / {pwi_cnt} / {fail_cnt}** |",
+            "",
+            "## 3. Issues & Nuances Tally",
+            "",
+        ]
+    )
 
     issue_counts: Counter = Counter()
     issues_by_surface: dict[str, list[dict]] = defaultdict(list)
@@ -322,41 +369,49 @@ def main() -> int:
             sev = iss.get("severity", "minor")
             surf = iss.get("surface", "other")
             issue_counts[sev] += 1
-            issues_by_surface[surf].append({
-                "doc_id": doc_id,
-                "pdf_id": pdf_id,
-                "stratum": stratum,
-                "severity": sev,
-                "detail": iss.get("detail", ""),
-                "suggestion": iss.get("suggestion", ""),
-            })
+            issues_by_surface[surf].append(
+                {
+                    "doc_id": doc_id,
+                    "pdf_id": pdf_id,
+                    "stratum": stratum,
+                    "severity": sev,
+                    "detail": iss.get("detail", ""),
+                    "suggestion": iss.get("suggestion", ""),
+                }
+            )
 
-    report_lines.extend([
-        f"- **Total Issues Identified:** `{sum(issue_counts.values())}`",
-        f"  - Critical: `{issue_counts.get('critical', 0)}`",
-        f"  - Major: `{issue_counts.get('major', 0)}`",
-        f"  - Minor: `{issue_counts.get('minor', 0)}`",
-        f"",
-        f"### Issues by Surface",
-        f"",
-        f"| Surface | Total Issues | Critical | Major | Minor | Sample Feedback / Suggestion |",
-        f"|---|---|---|---|---|---|",
-    ])
+    report_lines.extend(
+        [
+            f"- **Total Issues Identified:** `{sum(issue_counts.values())}`",
+            f"  - Critical: `{issue_counts.get('critical', 0)}`",
+            f"  - Major: `{issue_counts.get('major', 0)}`",
+            f"  - Minor: `{issue_counts.get('minor', 0)}`",
+            "",
+            "### Issues by Surface",
+            "",
+            "| Surface | Total Issues | Critical | Major | Minor | Sample Feedback / Suggestion |",
+            "|---|---|---|---|---|---|",
+        ]
+    )
 
     for surf, items in sorted(issues_by_surface.items()):
         c_sev = Counter(it["severity"] for it in items)
-        sample_sug = items[0]["suggestion"] if items and items[0].get("suggestion") else "—"
+        sample_sug = (
+            items[0]["suggestion"] if items and items[0].get("suggestion") else "—"
+        )
         report_lines.append(
             f"| `{surf}` | `{len(items)}` | `{c_sev.get('critical', 0)}` | `{c_sev.get('major', 0)}` | `{c_sev.get('minor', 0)}` | {sample_sug[:80]}... |"
         )
 
-    report_lines.extend([
-        f"",
-        f"## 4. Per-Document Audit Log (Stratified Sample)",
-        f"",
-        f"| # | Doc ID | PMC ID | Stratum | Verdict | Completeness | Fidelity | Structure | Tables | Refs | Notes |",
-        f"|---|---|---|---|---|---|---|---|---|---|---|",
-    ])
+    report_lines.extend(
+        [
+            "",
+            "## 4. Per-Document Audit Log (Stratified Sample)",
+            "",
+            "| # | Doc ID | PMC ID | Stratum | Verdict | Completeness | Fidelity | Structure | Tables | Refs | Notes |",
+            "|---|---|---|---|---|---|---|---|---|---|---|",
+        ]
+    )
 
     for idx, r in enumerate(results, start=1):
         doc_id = r.get("doc_id", "")
@@ -375,7 +430,9 @@ def main() -> int:
         )
 
     out_path.write_text("\n".join(report_lines), encoding="utf-8")
-    print(f"\n[stratified-judge] Audit complete: {len(results)} judged -> {verdict_counts}")
+    print(
+        f"\n[stratified-judge] Audit complete: {len(results)} judged -> {verdict_counts}"
+    )
     print(f"[stratified-judge] Report written: {out_path}")
     return 0
 

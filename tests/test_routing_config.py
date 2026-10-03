@@ -1,4 +1,5 @@
 """Wave A2: immutable config snapshot tests (spec §6, §17)."""
+
 from __future__ import annotations
 
 from app.routing.config import RoutingConfig
@@ -20,8 +21,12 @@ def test_all_weights_non_negative_and_cover_signals():
     rc = RoutingConfig()
     assert all(w >= 0 for w in rc.weights.values())
     # every complexity-driving signal we expect is present
-    for k in ("metric_scanned_page_probability", "metric_ocr_required",
-              "metric_low_text_ratio", "metric_multi_column_probability"):
+    for k in (
+        "metric_scanned_page_probability",
+        "metric_ocr_required",
+        "metric_low_text_ratio",
+        "metric_multi_column_probability",
+    ):
         assert k in rc.weights
     assert len(rc.weights) >= 10
 

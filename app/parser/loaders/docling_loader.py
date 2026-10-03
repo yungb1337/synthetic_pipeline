@@ -16,6 +16,7 @@ Design (mirrors `ocr.py`'s lazy-engine pattern):
   * We run the compute-light subset: layout + table-structure, no OCR, no
     code/formula, by default.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -25,7 +26,6 @@ import re
 import tempfile
 import threading
 import unicodedata
-from typing import Optional
 
 # Docling's layout model runs through torch.compile, which needs Triton — not
 # available on Windows (and some other environments). Disabling dynamo makes the
@@ -36,7 +36,7 @@ os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
 from ..parts import RecoveredBlock, RecoveredDocument, RecoveredImage, RecoveredTable
 
 _engine = None
-_engine_cache: dict[tuple, object] = {}   # I-05: (ocr, table_mode, gpi) -> converter
+_engine_cache: dict[tuple, object] = {}  # I-05: (ocr, table_mode, gpi) -> converter
 _lock = threading.Lock()
 
 # ItemLabel -> our Block kind. Keyed by the enum's `.value` string, which is
@@ -92,8 +92,11 @@ def engine_name() -> str | None:
 
 
 # --- converter construction -------------------------------------------------
-def _build_converter(ocr: bool | None = None, table_mode: str = "",
-                     generate_picture_images: bool | None = None):
+def _build_converter(
+    ocr: bool | None = None,
+    table_mode: str = "",
+    generate_picture_images: bool | None = None,
+):
     """Build a DocumentConverter with the compute-light pipeline, defensively.
 
     Docling's API has drifted across versions (PipelineOptions vs
@@ -122,7 +125,7 @@ def _build_converter(ocr: bool | None = None, table_mode: str = "",
         # Belt-and-braces: if TORCHDYNAMO_DISABLE is set too late (torch already
         # imported), suppress tracing errors so the layout model still runs eagerly.
         try:
-            import torch._dynamo as _dynamo
+            from torch import _dynamo
 
             _dynamo.config.suppress_errors = True
         except Exception:
@@ -134,9 +137,13 @@ def _build_converter(ocr: bool | None = None, table_mode: str = "",
         # export a legacy `PipelineOptions` alias that lacks those newer fields —
         # never use it, or option application silently no-ops.
         try:
-            from docling.datamodel.pipeline_options import PdfPipelineOptions as PipelineOptions
+            from docling.datamodel.pipeline_options import (
+                PdfPipelineOptions as PipelineOptions,
+            )
         except Exception:
-            from docling.datamodel.pipeline_options import PipelineOptions as PipelineOptions
+            from docling.datamodel.pipeline_options import (
+                PipelineOptions as PipelineOptions,
+            )
 
         # I-05: resolve the effective construction options. Explicit arguments
         # WIN; only when omitted do we fall back to the shipped defaults.
@@ -154,13 +161,19 @@ def _build_converter(ocr: bool | None = None, table_mode: str = "",
             return getattr(_cfg, attr, default) if _cfg is not None else default
 
         eff_ocr = bool(_cfg_attr("docling_ocr", True) if ocr is None else ocr)
-        eff_gpi = bool(_cfg_attr("docling_generate_picture_images", True)
-                       if generate_picture_images is None else generate_picture_images)
-        eff_mode = (table_mode or "").strip().upper() or \
-            str(_cfg_attr("docling_table_mode", "FAST")).upper()
+        eff_gpi = bool(
+            _cfg_attr("docling_generate_picture_images", True)
+            if generate_picture_images is None
+            else generate_picture_images
+        )
+        eff_mode = (table_mode or "").strip().upper() or str(
+            _cfg_attr("docling_table_mode", "FAST")
+        ).upper()
 
         opts = _make_pipeline_options(
-            PipelineOptions, ocr=eff_ocr, table_mode=eff_mode,
+            PipelineOptions,
+            ocr=eff_ocr,
+            table_mode=eff_mode,
             generate_picture_images=eff_gpi,
         )
         kwargs = {}
@@ -170,7 +183,9 @@ def _build_converter(ocr: bool | None = None, table_mode: str = "",
             from docling.datamodel.base_models import InputFormat
             from docling.document_converter import PdfFormatOption
 
-            kwargs["format_options"] = {InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
+            kwargs["format_options"] = {
+                InputFormat.PDF: PdfFormatOption(pipeline_options=opts)
+            }
         except Exception:
             # Fallback: global pipeline_options.
             try:
@@ -187,7 +202,10 @@ def _build_converter(ocr: bool | None = None, table_mode: str = "",
         try:
             import inspect as _inspect
 
-            if "artifacts_path" in _inspect.signature(DocumentConverter.__init__).parameters:
+            if (
+                "artifacts_path"
+                in _inspect.signature(DocumentConverter.__init__).parameters
+            ):
                 kwargs["artifacts_path"] = models_dir
         except Exception:
             pass
@@ -201,8 +219,9 @@ def _build_converter(ocr: bool | None = None, table_mode: str = "",
         return False
 
 
-def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = "",
-                           generate_picture_images: bool = True):
+def _make_pipeline_options(
+    cls, ocr: bool = True, table_mode: str = "", generate_picture_images: bool = True
+):
     """Build Docling pipeline options; `ocr` enables Docling's OCR stage (its
     built-in RapidOCR/onnxruntime backend — the same engine family as
     `app/parser/ocr.py`). `generate_picture_images` asks Docling to crop every
@@ -215,8 +234,11 @@ def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = "",
     # Never silently drop a picture because bytes were not generated — the
     # flag is config-driven (ParserConfig.docling_generate_picture_images).
     try:
-        opts = cls(do_ocr=ocr, do_code_formula=False,
-                   generate_picture_images=generate_picture_images)
+        opts = cls(
+            do_ocr=ocr,
+            do_code_formula=False,
+            generate_picture_images=generate_picture_images,
+        )
     except Exception:
         try:
             opts = cls(do_ocr=ocr, do_code_formula=False)
@@ -225,8 +247,11 @@ def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = "",
                 opts = cls()
                 for attr in ("do_ocr", "do_code_formula", "generate_picture_images"):
                     try:
-                        setattr(opts, attr,
-                                ocr if attr == "do_ocr" else generate_picture_images)
+                        setattr(
+                            opts,
+                            attr,
+                            ocr if attr == "do_ocr" else generate_picture_images,
+                        )
                     except Exception:
                         pass
             except Exception:
@@ -256,8 +281,11 @@ def _make_pipeline_options(cls, ocr: bool = True, table_mode: str = "",
     # (§5). These bound Docling's C++ layout/segmentation heap to one page at a
     # time (the root-cause mitigation for `std::bad_alloc`), trading a little
     # speed for RAM safety. Guarded so API drift never breaks engine construction.
-    for attr in ("release_native_memory_every_n_pages", "doc_batch_concurrency",
-                 "page_batch_concurrency"):
+    for attr in (
+        "release_native_memory_every_n_pages",
+        "doc_batch_concurrency",
+        "page_batch_concurrency",
+    ):
         try:
             setattr(opts, attr, 1)
         except Exception:
@@ -338,7 +366,9 @@ def _models_dir() -> str:
 
 
 # --- mapping ----------------------------------------------------------------
-def parse(data: bytes, filename: str = "", models_dir: str | None = None) -> RecoveredDocument | None:
+def parse(
+    data: bytes, filename: str = "", models_dir: str | None = None
+) -> RecoveredDocument | None:
     """Run Docling on `data` and map to a RecoveredDocument.
 
     Returns None (never raises) when Docling is unavailable, conversion fails,
@@ -352,6 +382,7 @@ def parse(data: bytes, filename: str = "", models_dir: str | None = None) -> Rec
     converter = _engine  # type: ignore[assignment]
 
     import time as _time
+
     t_conv = _time.time()
     doc = _convert(converter, data, filename)
     if doc is None:
@@ -379,6 +410,7 @@ def parse(data: bytes, filename: str = "", models_dir: str | None = None) -> Rec
     # PDF loader uses): Docling's own Document.metadata is empty for plain PDFs.
     try:
         import fitz as _fitz
+
         from ._pdfmeta import fitz_metadata
 
         with _fitz.open(stream=data, filetype="pdf") as mdoc:
@@ -438,10 +470,18 @@ def _map_item(item, rec: RecoveredDocument, doc=None) -> None:
     bbox = _bbox(prov, page_h)
 
     label = _label_name(item)
-    if label in ("table", "document_index") or type(item).__name__ == "TableItem" or hasattr(item, "table"):
+    if (
+        label in ("table", "document_index")
+        or type(item).__name__ == "TableItem"
+        or hasattr(item, "table")
+    ):
         _map_table(item, rec, doc, page, bbox, page_h)
         return
-    if label == "picture" or type(item).__name__ == "PictureItem" or hasattr(item, "image"):
+    if (
+        label == "picture"
+        or type(item).__name__ == "PictureItem"
+        or hasattr(item, "image")
+    ):
         _map_image(item, rec, doc, page, bbox)
         return
 
@@ -476,7 +516,11 @@ def _recover_formula_text(data: bytes, rec: RecoveredDocument) -> None:
     fitz uses). Faithful & fallible: only `kind == "formula"` blocks are
     touched, only when empty, and only when the page geometry yields words.
     """
-    todo = [b for b in rec.blocks if b.kind == "formula" and not (b.text or "").strip() and b.bbox]
+    todo = [
+        b
+        for b in rec.blocks
+        if b.kind == "formula" and not (b.text or "").strip() and b.bbox
+    ]
     if not todo:
         return
     try:
@@ -536,7 +580,7 @@ class _GridHole:
     """Stand-in for a grid position with no upstream cell (spanned over). Keeps
     the dense-grid logic uniform: every position carries .text/.bbox/span/flags."""
 
-    __slots__ = ("text", "column_header", "col_span", "row_span", "bbox")
+    __slots__ = ("bbox", "col_span", "column_header", "row_span", "text")
 
     def __init__(self):
         self.text = ""
@@ -600,8 +644,14 @@ def _item_caption(item, doc=None) -> str:
         return ""
 
 
-def _map_table(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None,
-               page_h: float = 0.0) -> None:
+def _map_table(
+    item,
+    rec: RecoveredDocument,
+    doc=None,
+    page: int = 0,
+    bbox=None,
+    page_h: float = 0.0,
+) -> None:
     table = getattr(item, "table", None) or getattr(item, "data", None)
     if table is None:
         return
@@ -648,17 +698,23 @@ def _map_table(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None,
         body_rows = range(1, nrows)
 
     rows = []
-    cell_bboxes: list[list[Optional[tuple[float, float, float, float]]]] = []
+    cell_bboxes: list[list[tuple[float, float, float, float] | None]] = []
     for r in body_rows:
         row = grid[r]
         # A merged body cell may occupy fewer grid positions than ncols (its
         # span covers the rest) — pad with empty cells to keep the rectangular
         # shape the DOM expects, without inventing text.
-        cells = [_clean_cell(getattr(row[c], "text", "")) for c in range(min(len(row), ncols))]
+        cells = [
+            _clean_cell(getattr(row[c], "text", ""))
+            for c in range(min(len(row), ncols))
+        ]
         # Cell/row geometry (D5). Docling's TableCell.bbox is already TOPLEFT
         # (no origin flip needed); positions absent upstream stay None — we
         # never fabricate coordinates.
-        cb = [_cell_bbox(getattr(row[c], "bbox", None)) for c in range(min(len(row), ncols))]
+        cb = [
+            _cell_bbox(getattr(row[c], "bbox", None))
+            for c in range(min(len(row), ncols))
+        ]
         rows.append(cells + [""] * (ncols - len(cells)))
         cell_bboxes.append(cb + [None] * (ncols - len(cb)))
 
@@ -667,7 +723,7 @@ def _map_table(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None,
     col_starts: list[float] = []
     header_bottom = 0.0
     body_bottom = 0.0
-    row_bboxes: list[Optional[tuple[float, float, float, float]]] = []
+    row_bboxes: list[tuple[float, float, float, float] | None] = []
     hr = header_rows[-1] if header_rows else 0
     for c in grid[hr]:
         bb = getattr(c, "bbox", None)
@@ -678,11 +734,14 @@ def _map_table(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None,
                 pass
     try:
         header_bottom = max(
-            (float(c.bbox.b) for c in grid[hr] if getattr(c, "bbox", None)), default=0.0)
+            (float(c.bbox.b) for c in grid[hr] if getattr(c, "bbox", None)), default=0.0
+        )
         if rows:
             last = body_rows[-1]
             body_bottom = max(
-                (float(c.bbox.b) for c in grid[last] if getattr(c, "bbox", None)), default=0.0)
+                (float(c.bbox.b) for c in grid[last] if getattr(c, "bbox", None)),
+                default=0.0,
+            )
     except Exception:
         pass
     # Row-level bbox = union of the row's cells (TOPLEFT, docling space).
@@ -703,16 +762,25 @@ def _map_table(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None,
         except Exception:
             row_bboxes.append(None)
 
-    rec.tables.append(RecoveredTable(
-        page=page, bbox=bbox, header=header, rows=rows, source="docling",
-        confidence=_table_structural_confidence(header, rows),
-        caption=caption,
-        column_starts=col_starts,
-        header_bottom=header_bottom, body_bottom=body_bottom,
-        cell_bboxes=cell_bboxes, row_bboxes=row_bboxes))
+    rec.tables.append(
+        RecoveredTable(
+            page=page,
+            bbox=bbox,
+            header=header,
+            rows=rows,
+            source="docling",
+            confidence=_table_structural_confidence(header, rows),
+            caption=caption,
+            column_starts=col_starts,
+            header_bottom=header_bottom,
+            body_bottom=body_bottom,
+            cell_bboxes=cell_bboxes,
+            row_bboxes=row_bboxes,
+        )
+    )
 
 
-def _cell_bbox(bbox) -> Optional[tuple[float, float, float, float]]:
+def _cell_bbox(bbox) -> tuple[float, float, float, float] | None:
     """Return a TOPLEFT bbox tuple from a Docling TableCell bbox (already TOPLEFT).
 
     Docling's cell bboxes are in the same PDF-point top-left space as our DOM, so
@@ -732,8 +800,9 @@ def _cell_bbox(bbox) -> Optional[tuple[float, float, float, float]]:
         return None
 
 
-def _map_table_via_dataframe(item, rec: RecoveredDocument, page: int, bbox,
-                             caption: str) -> None:
+def _map_table_via_dataframe(
+    item, rec: RecoveredDocument, page: int, bbox, caption: str
+) -> None:
     """Last-resort table mapping: Docling's structured dataframe (handles merged
     cells by repetition). Only used when no raw grid/cells are available."""
     try:
@@ -748,15 +817,26 @@ def _map_table_via_dataframe(item, rec: RecoveredDocument, page: int, bbox,
     # as a joined header level rather than being lost).
     cols = df.columns
     if getattr(cols, "nlevels", 1) > 1:
-        header = [".".join(str(x) for x in c if x is not None and str(x).strip())
-                  for c in cols]
+        header = [
+            ".".join(str(x) for x in c if x is not None and str(x).strip())
+            for c in cols
+        ]
     else:
         header = ["" if c is None else str(c) for c in cols]
-    rows = [["" if v is None else str(v) for v in row] for row in df.itertuples(index=False)]
-    rec.tables.append(RecoveredTable(page=page, bbox=bbox, header=header, rows=rows,
-                                     source="docling",
-                                     confidence=_table_structural_confidence(header, rows),
-                                     caption=caption))
+    rows = [
+        ["" if v is None else str(v) for v in row] for row in df.itertuples(index=False)
+    ]
+    rec.tables.append(
+        RecoveredTable(
+            page=page,
+            bbox=bbox,
+            header=header,
+            rows=rows,
+            source="docling",
+            confidence=_table_structural_confidence(header, rows),
+            caption=caption,
+        )
+    )
 
 
 # --- general structural table transformation ---------------------------------
@@ -765,6 +845,7 @@ def _map_table_via_dataframe(item, rec: RecoveredDocument, page: int, bbox,
 # table and drops caption/marker rows — derived purely from structure (column
 # count, adjacent fragments, repeated/degenerate headers), never from table
 # ids, page numbers, or document-specific text.
+
 
 def _clean_cell(value) -> str:
     if value is None:
@@ -795,7 +876,9 @@ def _is_continuation(later: RecoveredTable, earlier: RecoveredTable) -> bool:
     if later.page < earlier.page:
         return False
     earlier_h = [_clean_cell(h) for h in earlier.header]
-    if all(eh and _clean_cell(lh).endswith(eh) for lh, eh in zip(later.header, earlier_h)):
+    if all(
+        eh and _clean_cell(lh).endswith(eh) for lh, eh in zip(later.header, earlier_h)
+    ):
         return True
     if len({_clean_cell(h) for h in later.header if _clean_cell(h)}) == 1:
         return True
@@ -807,8 +890,9 @@ def _row_equals_header(row: list[str], header: list[str]) -> bool:
     the canonical header) rather than a data row."""
     if not row or not header or len(row) != len(header):
         return False
-    return all(_clean_cell(c) and _clean_cell(c) == _clean_cell(h)
-               for c, h in zip(row, header))
+    return all(
+        _clean_cell(c) and _clean_cell(c) == _clean_cell(h) for c, h in zip(row, header)
+    )
 
 
 def _merge_continuation(parent: RecoveredTable, frag: RecoveredTable) -> None:
@@ -865,15 +949,17 @@ def _strip_trailing_marker_cell(value) -> str:
     m = list(_SENT_BOUND.finditer(cell))
     if not m:
         return cell
-    frag = cell[m[-1].end():].strip()
+    frag = cell[m[-1].end() :].strip()
     if not frag or len(frag.split()) > _TABLE_MARKER_MAX_WORDS:
         return cell
-    if re.search(r"[.!?]\s*$", frag):      # sentence-final => real text, keep it
+    if re.search(r"[.!?]\s*$", frag):  # sentence-final => real text, keep it
         return cell
     return cell[: m[-1].start()].rstrip()
 
 
-def reconstruct_tables(rec: RecoveredDocument, data: bytes | None = None) -> RecoveredDocument:
+def reconstruct_tables(
+    rec: RecoveredDocument, data: bytes | None = None
+) -> RecoveredDocument:
     """Run the full table-reconstruction safety net on a FOLDED RecoveredDocument.
 
     This is the single call site for the structural recovery that makes the
@@ -936,10 +1022,16 @@ def normalize_tables(tables: list[RecoveredTable]) -> list[RecoveredTable]:
 # distinguish wrapped text from rows — the faithful collapsed table then
 # stands). Deterministic; faithful & fallible: if the evidence does not
 # establish >= 2 rows, the collapsed table stays unchanged.
-_TABLE_EV_TOL = 6.0           # px: word start must be within this of a column start
-_TABLE_EV_Y_EPS = 2.0         # px: baseline jitter — words this close vertically share one visual line
-_TABLE_EV_ROW_GAP = 16.0      # px: a wrapped-cell (continuation) line is within this of its row start
-_TABLE_EV_MAX_WORDS_PER_COL = 12  # roomy: wordy cells are fine; paragraphs are already excluded by y-bounding
+_TABLE_EV_TOL = 6.0  # px: word start must be within this of a column start
+_TABLE_EV_Y_EPS = (
+    2.0  # px: baseline jitter — words this close vertically share one visual line
+)
+_TABLE_EV_ROW_GAP = (
+    16.0  # px: a wrapped-cell (continuation) line is within this of its row start
+)
+_TABLE_EV_MAX_WORDS_PER_COL = (
+    12  # roomy: wordy cells are fine; paragraphs are already excluded by y-bounding
+)
 
 
 def _evidence_reconstruct(data: bytes, table: RecoveredTable) -> None:
@@ -960,8 +1052,9 @@ def _evidence_reconstruct(data: bytes, table: RecoveredTable) -> None:
         return
     try:
         import fitz
+
         pdf = fitz.open(stream=data, filetype="pdf")
-        page = pdf[int(table.page) - 1]   # Docling page_no is 1-based; fitz is 0-based
+        page = pdf[int(table.page) - 1]  # Docling page_no is 1-based; fitz is 0-based
         words = page.get_text("words")
         if not words:
             return
@@ -1055,7 +1148,11 @@ def _evidence_reconstruct(data: bytes, table: RecoveredTable) -> None:
         best_j, best_key = None, None
         for j, ay in enumerate(anchors):
             d = abs(y - ay)
-            key = (0, d) if (ay <= y + _TABLE_EV_Y_EPS and d <= _TABLE_EV_ROW_GAP) else (1, d)
+            key = (
+                (0, d)
+                if (ay <= y + _TABLE_EV_Y_EPS and d <= _TABLE_EV_ROW_GAP)
+                else (1, d)
+            )
             if best_key is None or key < best_key:
                 best_key, best_j = key, j
         assigned[i] = best_j
@@ -1083,7 +1180,9 @@ def _evidence_reconstruct(data: bytes, table: RecoveredTable) -> None:
     table.source = "docling+evidence"
 
 
-def _map_image(item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None) -> None:
+def _map_image(
+    item, rec: RecoveredDocument, doc=None, page: int = 0, bbox=None
+) -> None:
     img = getattr(item, "image", None)
     blob = b""
     if img is not None:
@@ -1206,14 +1305,20 @@ class DoclingConvertError(Exception):
     `convert_path` returning None). Carries the 0-based page and the wrapped
     cause so callers can label the failure honestly and decide retry policy.
     """
-    def __init__(self, message: str, page: int | None = None, caused: BaseException | None = None):
+
+    def __init__(
+        self, message: str, page: int | None = None, caused: BaseException | None = None
+    ):
         super().__init__(message)
         self.page = page
         self.caused = caused
 
 
-def get_engine(ocr: bool | None = None, table_mode: str = "",
-               generate_picture_images: bool | None = None):
+def get_engine(
+    ocr: bool | None = None,
+    table_mode: str = "",
+    generate_picture_images: bool | None = None,
+):
     """Per-process Docling converter, cached per construction-option key (I-05).
 
     Returns the converter or None when Docling is unavailable. Engines are
@@ -1231,27 +1336,39 @@ def get_engine(ocr: bool | None = None, table_mode: str = "",
     except Exception:
         _cfg = None
     eff_ocr = bool(getattr(_cfg, "docling_ocr", True) if ocr is None else ocr)
-    eff_gpi = bool(getattr(_cfg, "docling_generate_picture_images", True)
-                   if generate_picture_images is None else generate_picture_images)
+    eff_gpi = bool(
+        getattr(_cfg, "docling_generate_picture_images", True)
+        if generate_picture_images is None
+        else generate_picture_images
+    )
     # Key mode must match what the build will actually use (empty -> shipped
     # default mode), or the default engine and an explicit-FAST engine would
     # be two identical converters under different keys.
-    eff_mode = ((table_mode or "").strip().upper()
-                or str(getattr(_cfg, "docling_table_mode", "FAST") or "FAST").strip().upper())
+    eff_mode = (table_mode or "").strip().upper() or str(
+        getattr(_cfg, "docling_table_mode", "FAST") or "FAST"
+    ).strip().upper()
     key = (eff_ocr, eff_mode, eff_gpi)
     with _lock:
         eng = _engine_cache.get(key)
         if eng is None:
-            eng = _build_converter(ocr=ocr, table_mode=table_mode,
-                                   generate_picture_images=generate_picture_images)
+            eng = _build_converter(
+                ocr=ocr,
+                table_mode=table_mode,
+                generate_picture_images=generate_picture_images,
+            )
             if eng is False or eng is None:
                 return None
             _engine_cache[key] = eng
         return eng if eng is not False else None
 
 
-def convert_path(path: str, page: int, models_dir: str | None = None,
-                 table_mode: str = "", ocr: bool | None = None) -> object | None:
+def convert_path(
+    path: str,
+    page: int,
+    models_dir: str | None = None,
+    table_mode: str = "",
+    ocr: bool | None = None,
+) -> object | None:
     """Convert ONE page (0-based `page`) of `path` via `page_range=(page+1, page+1)`.
 
     Returns the full `ConversionResult` (so status/errors/page_count are
@@ -1277,10 +1394,11 @@ def convert_path(path: str, page: int, models_dir: str | None = None,
         return None
     try:
         return engine.convert(path, page_range=(page + 1, page + 1))
-    except Exception as exc:  # noqa: BLE001 — surface, don't swallow (B4)
+    except Exception as exc:
         raise DoclingConvertError(
             f"docling convert failed page {page + 1}: {type(exc).__name__}: {exc}",
-            page=page, caused=exc,
+            page=page,
+            caused=exc,
         ) from exc
 
 
@@ -1297,9 +1415,10 @@ def docling_guard() -> bool:
         return _GUARD_OK
     _GUARD_OK = False
     try:
+        import inspect
+
         from docling.datamodel.base_models import ErrorItem
         from docling.document_converter import ConversionResult, DocumentConverter
-        import inspect
 
         # Docling 2.x uses pydantic v2 models, so fields live in `model_fields`
         # (NOT class-level attributes readable via `hasattr`). The page-centric
@@ -1370,7 +1489,8 @@ def docling_guard_status(result) -> tuple[str, list[dict], int, int]:
                     "page_no": getattr(e, "page_no", None),
                     "category": getattr(getattr(e, "category", None), "name", None)
                     or getattr(e, "category", ""),
-                    "message": getattr(e, "error_message", "") or getattr(e, "message", ""),
+                    "message": getattr(e, "error_message", "")
+                    or getattr(e, "message", ""),
                 }
             )
 

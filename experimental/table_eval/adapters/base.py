@@ -1,14 +1,15 @@
-"""Base interfaces and shared data classes for Table and Layout adapters.
-"""
+"""Base interfaces and shared data classes for Table and Layout adapters."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
 class BoundingBox:
     """Standard bounding box (x0, y0, x1, y1) in points or pixels."""
+
     x0: float
     y0: float
     x1: float
@@ -24,8 +25,10 @@ class BoundingBox:
 
     def intersects(self, other: BoundingBox) -> bool:
         return not (
-            self.x1 <= other.x0 or self.x0 >= other.x1 or
-            self.y1 <= other.y0 or self.y0 >= other.y1
+            self.x1 <= other.x0
+            or self.x0 >= other.x1
+            or self.y1 <= other.y0
+            or self.y0 >= other.y1
         )
 
     def intersection_area(self, other: BoundingBox) -> float:
@@ -44,11 +47,12 @@ class BoundingBox:
 @dataclass
 class RawCell:
     """A single cell inside a detected table grid."""
+
     row_idx: int
     col_idx: int
     row_span: int = 1
     col_span: int = 1
-    bbox: Optional[BoundingBox] = None
+    bbox: BoundingBox | None = None
     text: str = ""
     confidence: float = 1.0
 
@@ -56,6 +60,7 @@ class RawCell:
 @dataclass
 class RawTable:
     """A detected table with bounding box, cells, and reconstructed rows/columns."""
+
     table_id: str
     page_index: int
     bbox: BoundingBox
@@ -71,6 +76,7 @@ class RawTable:
 @dataclass
 class LayoutRegion:
     """A region detected on a page by a layout model."""
+
     region_id: str
     page_index: int
     kind: str  # "table", "text", "heading", "figure", "header", "footer"
@@ -89,7 +95,7 @@ class BaseTableExtractor:
         self,
         fitz_page: Any,
         page_index: int,
-        page_image: Optional[Any] = None,
-        layout_regions: Optional[list[LayoutRegion]] = None,
+        page_image: Any | None = None,
+        layout_regions: list[LayoutRegion] | None = None,
     ) -> list[RawTable]:
         raise NotImplementedError

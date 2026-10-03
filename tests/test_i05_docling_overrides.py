@@ -5,6 +5,7 @@ converter was always built from `default_config()`. These tests pin the new
 contract: overrides are honored, engines are cached per option key, and the
 default path is unchanged.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -84,8 +85,13 @@ def test_i05_convert_path_forwards_overrides(fresh_cache, monkeypatch, tmp_path)
     keys = set()
     # Re-derive the key the module would use (ocr=True, ACCURATE, gpi default)
     from app.parser.config import default_config
+
     cfg = default_config()
-    key = (True, "ACCURATE", bool(getattr(cfg, "docling_generate_picture_images", True)))
+    key = (
+        True,
+        "ACCURATE",
+        bool(getattr(cfg, "docling_generate_picture_images", True)),
+    )
     assert key in fresh_cache._engine_cache
 
 

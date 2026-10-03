@@ -46,7 +46,7 @@ Trade-off analysis:
 **Decision:** keep `Document.reading_order: list[str]` UNCHANGED (block ids, consumed by `chunker`; persisted v0.1.0 DOMs still validate; existing tests pass) and ADD a parallel typed field:
 
 ```python
-ReadingOrderEntry = { "type": "block" | "table" | "image", "id": str }
+ReadingOrderEntry = {"type": "block" | "table" | "image", "id": str}
 
 Document.reading_order_full: list[ReadingOrderEntry]  # NEW, additive
 ```

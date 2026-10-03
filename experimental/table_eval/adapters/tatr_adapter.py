@@ -1,11 +1,11 @@
-"""Microsoft Table Transformer (TATR) adapter for Detection and Structure Recognition.
-"""
+"""Microsoft Table Transformer (TATR) adapter for Detection and Structure Recognition."""
+
 from __future__ import annotations
 
-import io
-from typing import Any, Optional
-from PIL import Image
+from typing import Any
+
 import torch
+from PIL import Image
 from transformers import AutoImageProcessor, TableTransformerForObjectDetection
 
 from .base import BaseTableExtractor, BoundingBox, RawCell, RawTable
@@ -21,7 +21,9 @@ class TATRTableExtractor(BaseTableExtractor):
         det_threshold: float = 0.6,
         struct_threshold: float = 0.5,
     ):
-        self.device = device if (torch.cuda.is_available() and device == "cuda") else "cpu"
+        self.device = (
+            device if (torch.cuda.is_available() and device == "cuda") else "cpu"
+        )
         self.crop_only = crop_only
         self.det_threshold = det_threshold
         self.struct_threshold = struct_threshold
@@ -36,13 +38,21 @@ class TATRTableExtractor(BaseTableExtractor):
 
     def _load_models(self) -> None:
         if self._tsr_model is None:
-            self._tsr_processor = AutoImageProcessor.from_pretrained(self._tsr_model_name)
-            self._tsr_model = TableTransformerForObjectDetection.from_pretrained(self._tsr_model_name).to(self.device)
+            self._tsr_processor = AutoImageProcessor.from_pretrained(
+                self._tsr_model_name
+            )
+            self._tsr_model = TableTransformerForObjectDetection.from_pretrained(
+                self._tsr_model_name
+            ).to(self.device)
             self._tsr_model.eval()
 
         if not self.crop_only and self._det_model is None:
-            self._det_processor = AutoImageProcessor.from_pretrained(self._det_model_name)
-            self._det_model = TableTransformerForObjectDetection.from_pretrained(self._det_model_name).to(self.device)
+            self._det_processor = AutoImageProcessor.from_pretrained(
+                self._det_model_name
+            )
+            self._det_model = TableTransformerForObjectDetection.from_pretrained(
+                self._det_model_name
+            ).to(self.device)
             self._det_model.eval()
 
     def detect_table_bboxes(self, page_image: Image.Image) -> list[BoundingBox]:
@@ -51,7 +61,9 @@ class TATRTableExtractor(BaseTableExtractor):
         if self._det_model is None:
             return []
 
-        inputs = self._det_processor(images=page_image, return_tensors="pt").to(self.device)
+        inputs = self._det_processor(images=page_image, return_tensors="pt").to(
+            self.device
+        )
         with torch.no_grad():
             outputs = self._det_model(**inputs)
 
@@ -61,7 +73,9 @@ class TATRTableExtractor(BaseTableExtractor):
         )[0]
 
         bboxes: list[BoundingBox] = []
-        for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+        for score, label, box in zip(
+            results["scores"], results["labels"], results["boxes"]
+        ):
             lbl_name = self._det_model.config.id2label[label.item()]
             if lbl_name in ("table", "table rotated"):
                 b = box.tolist()
@@ -77,7 +91,9 @@ class TATRTableExtractor(BaseTableExtractor):
     ) -> RawTable:
         """Runs TSR on a cropped table image to extract rows, columns, and spanning cells."""
         self._load_models()
-        inputs = self._tsr_processor(images=table_crop, return_tensors="pt").to(self.device)
+        inputs = self._tsr_processor(images=table_crop, return_tensors="pt").to(
+            self.device
+        )
         with torch.no_grad():
             outputs = self._tsr_model(**inputs)
 
@@ -94,7 +110,9 @@ class TATRTableExtractor(BaseTableExtractor):
         headers_boxes = []
         spanning_boxes = []
 
-        for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+        for score, label, box in zip(
+            results["scores"], results["labels"], results["boxes"]
+        ):
             lbl = self._tsr_model.config.id2label[label.item()]
             b = box.tolist()
             cbox = BoundingBox(x0=b[0], y0=b[1], x1=b[2], y1=b[3])
@@ -163,9 +181,9 @@ class TATRTableExtractor(BaseTableExtractor):
         self,
         fitz_page: Any,
         page_index: int,
-        page_image: Optional[Image.Image] = None,
-        layout_regions: Optional[list[Any]] = None,
-        candidate_bboxes: Optional[list[BoundingBox]] = None,
+        page_image: Image.Image | None = None,
+        layout_regions: list[Any] | None = None,
+        candidate_bboxes: list[BoundingBox] | None = None,
     ) -> list[RawTable]:
         if page_image is None:
             return []

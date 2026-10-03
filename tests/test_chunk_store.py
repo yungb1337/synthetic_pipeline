@@ -1,4 +1,5 @@
 """Tests for the chunk store (versioned keys, round-trips, traversal, sanitize)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -7,19 +8,32 @@ from app.chunking.schema import Chunk, ChunkProvenance, ChunksArtifact
 from app.chunking.store import FilesystemChunkStore, _sanitize_embedder_id
 
 
-def _artifact(doc_id: str = "d1", chunker_version: str = "chunker-v0.1.0", n: int = 2) -> ChunksArtifact:
+def _artifact(
+    doc_id: str = "d1", chunker_version: str = "chunker-v0.1.0", n: int = 2
+) -> ChunksArtifact:
     chunks = []
     for i in range(n):
         prov = ChunkProvenance(
-            chunker_version=chunker_version, chunker_params={},
-            dom_schema_version="s", tokenizer="char4",
-        )
-        chunks.append(Chunk(
-            chunk_id=f"id-{doc_id}-{i}", doc_id=doc_id, seq=i, kind="paragraph",
-            text=f"chunk text {i}", source_block_ids=[f"b{i}"], provenance=prov,
+            chunker_version=chunker_version,
+            chunker_params={},
+            dom_schema_version="s",
             tokenizer="char4",
-        ))
-    return ChunksArtifact(doc_id=doc_id, chunker_version=chunker_version, chunks=chunks, report={})
+        )
+        chunks.append(
+            Chunk(
+                chunk_id=f"id-{doc_id}-{i}",
+                doc_id=doc_id,
+                seq=i,
+                kind="paragraph",
+                text=f"chunk text {i}",
+                source_block_ids=[f"b{i}"],
+                provenance=prov,
+                tokenizer="char4",
+            )
+        )
+    return ChunksArtifact(
+        doc_id=doc_id, chunker_version=chunker_version, chunks=chunks, report={}
+    )
 
 
 def test_chunks_roundtrip(tmp_path):
@@ -35,8 +49,11 @@ def test_versioned_keys(tmp_path):
     store = FilesystemChunkStore(str(tmp_path / "store"))
     store.put_chunks("d1", _artifact())
     store.put_embeddings(
-        "d1", "chunker-v0.1.0", "dummy-feature-hash",
-        ["a", "b"], np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype="float32"),
+        "d1",
+        "chunker-v0.1.0",
+        "dummy-feature-hash",
+        ["a", "b"],
+        np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype="float32"),
         meta={"dim": 2, "dtype": "float32"},
     )
     root = tmp_path / "store"
@@ -75,7 +92,7 @@ def test_deterministic_overwrite(tmp_path):
     store.put_chunks("d1", art)
     p = tmp_path / "store" / "chunks" / "d1" / "chunks-v0.1.0.json"
     first = p.read_bytes()
-    store.put_chunks("d1", art)                       # same artifact -> identical bytes
+    store.put_chunks("d1", art)  # same artifact -> identical bytes
     assert p.read_bytes() == first
     assert store.get_chunks("d1", "chunker-v0.1.0") == art
 
@@ -96,7 +113,11 @@ def test_embeddings_roundtrip(tmp_path):
     chunk_ids = ["id-0", "id-1"]
     matrix = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype="float32")
     key = store.put_embeddings(
-        "d1", "chunker-v0.1.0", "dummy-feature-hash", chunk_ids, matrix,
+        "d1",
+        "chunker-v0.1.0",
+        "dummy-feature-hash",
+        chunk_ids,
+        matrix,
         meta={"dim": 2, "dtype": "float32"},
     )
     assert key.endswith("emb-v0.1.0-dummy-feature-hash.json")
@@ -108,7 +129,10 @@ def test_embeddings_roundtrip(tmp_path):
     assert meta["dim"] == 2
     row = store.get_embedding("d1", "id-1", "chunker-v0.1.0", "dummy-feature-hash")
     assert row == [0.0, 1.0]
-    assert store.get_embedding("d1", "missing", "chunker-v0.1.0", "dummy-feature-hash") is None
+    assert (
+        store.get_embedding("d1", "missing", "chunker-v0.1.0", "dummy-feature-hash")
+        is None
+    )
 
 
 def test_iter_traversal(tmp_path):
@@ -118,12 +142,20 @@ def test_iter_traversal(tmp_path):
     docs = [a.doc_id for a in store.iter_all_chunks()]
     assert docs == ["d1", "d2"]
     store.put_embeddings(
-        "d2", "chunker-v0.1.0", "dummy-feature-hash",
-        ["x"], np.asarray([[1.0]], dtype="float32"), meta={"dim": 1},
+        "d2",
+        "chunker-v0.1.0",
+        "dummy-feature-hash",
+        ["x"],
+        np.asarray([[1.0]], dtype="float32"),
+        meta={"dim": 1},
     )
     store.put_embeddings(
-        "d1", "chunker-v0.1.0", "dummy-feature-hash",
-        ["x"], np.asarray([[2.0]], dtype="float32"), meta={"dim": 1},
+        "d1",
+        "chunker-v0.1.0",
+        "dummy-feature-hash",
+        ["x"],
+        np.asarray([[2.0]], dtype="float32"),
+        meta={"dim": 1},
     )
     emb_docs = [d for d, *_ in store.iter_embeddings()]
     assert emb_docs == ["d1", "d2"]

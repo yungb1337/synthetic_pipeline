@@ -1,9 +1,8 @@
 """Tests for the parser module (Extraction -> DOM)."""
+
 from __future__ import annotations
 
 import json
-
-import pytest
 
 
 def _env(tmp_path):
@@ -147,16 +146,20 @@ def _make_bytes() -> bytes:
 
 def _make_pdf_bytes():
     import fitz
+
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     page.insert_text((72, 100), "Clinical Report", fontsize=20)
-    page.insert_text((72, 130), "The patient has stable diabetes on metformin.", fontsize=11)
+    page.insert_text(
+        (72, 130), "The patient has stable diabetes on metformin.", fontsize=11
+    )
     page.insert_text((72, 150), "Monitoring of renal function is advised.", fontsize=11)
     return doc.tobytes()
 
 
 def _make_pdf_with_image():
     import fitz
+
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     page.insert_text((72, 100), "Image report", fontsize=14)
@@ -175,9 +178,9 @@ def test_ocr_pil_image_converted_to_ndarray(monkeypatch):
     the rapidocr v6 `RapidOCROutput` (.txts/.boxes/.scores) parsed into
     (text, bbox, conf) — regression for the 2026-08-05 PIL-rejection bug and the
     2026-08-11 v6 engine unification."""
-    from app.parser import ocr
-
     import numpy as np
+
+    from app.parser import ocr
 
     seen = {}
 
@@ -198,7 +201,9 @@ def test_ocr_pil_image_converted_to_ndarray(monkeypatch):
 
     img = Image.new("RGB", (20, 20), "white")
     result = ocr.ocr_image(img)
-    assert seen["type"] == "numpy.ndarray", f"engine received {seen['type']}, expected ndarray"
+    assert seen["type"] == "numpy.ndarray", (
+        f"engine received {seen['type']}, expected ndarray"
+    )
     assert [t for t, _, _ in result] == ["hello"]
     assert result[0][1] == (0.0, 0.0, 10.0, 5.0)  # quad -> bbox
     assert round(result[0][2], 2) == 0.91

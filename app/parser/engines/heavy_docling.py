@@ -13,6 +13,7 @@ The mapping reuses the exact existing helpers from `docling_loader`
 (`_map_item`, `_map_table`, `_map_image`, `_recover_formula_text`,
 `_layout_model_name`) — no duplicated layout/OCR mapping.
 """
+
 from __future__ import annotations
 
 import threading
@@ -20,7 +21,7 @@ import threading
 from ..config import ParserConfig
 from ..loaders import docling_loader
 from ..page_result import PageResult, PageStatus
-from ..parts import RecoveredBlock, RecoveredDocument, RecoveredImage, RecoveredTable
+from ..parts import RecoveredDocument
 from .base import DOCLING, PageWorkItem
 
 
@@ -54,8 +55,11 @@ class HeavyDoclingEngine:
     def process(self, item: PageWorkItem) -> PageResult:
         try:
             result = docling_loader.convert_path(
-                item.src_path, item.page_index, item.models_dir,
-                table_mode=item.docling_table_mode, ocr=item.docling_ocr
+                item.src_path,
+                item.page_index,
+                item.models_dir,
+                table_mode=item.docling_table_mode,
+                ocr=item.docling_ocr,
             )
         except docling_loader.DoclingConvertError as e:
             # B4: this page's convert() call failed though the engine itself is
@@ -64,38 +68,70 @@ class HeavyDoclingEngine:
             # so this page gets retried on the next pass instead of being
             # dead-lettered as a dead engine.
             return PageResult(
-                doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
+                doc_id=item.doc_id,
+                page_index=item.page_index,
+                route=DOCLING,
                 status=PageStatus.FAILED,
-                errors=[{"page_no": item.page_index + 1, "category": "docling_convert",
-                         "message": str(e)}],
+                errors=[
+                    {
+                        "page_no": item.page_index + 1,
+                        "category": "docling_convert",
+                        "message": str(e),
+                    }
+                ],
                 source_hash=item.source_hash,
             )
         if result is None:
             # None now means ONLY "engine unavailable" (convert_path's contract).
             return PageResult(
-                doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
+                doc_id=item.doc_id,
+                page_index=item.page_index,
+                route=DOCLING,
                 status=PageStatus.FAILED,
-                errors=[{"page_no": item.page_index + 1, "category": "engine_unavailable",
-                         "message": "docling engine unavailable"}],
+                errors=[
+                    {
+                        "page_no": item.page_index + 1,
+                        "category": "engine_unavailable",
+                        "message": "docling engine unavailable",
+                    }
+                ],
                 source_hash=item.source_hash,
             )
 
         # --- silent-loss detection (the FIX) ---------------------------------
-        status_name, errors, expected, produced = docling_loader.docling_guard_status(result)
+        status_name, errors, expected, produced = docling_loader.docling_guard_status(
+            result
+        )
         if status_name in ("FAILURE", "SKIPPED"):
             return PageResult(
-                doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
-                status=PageStatus.FAILED, errors=errors or [
-                    {"page_no": item.page_index + 1, "category": "docling_failure",
-                     "message": f"conversion status={status_name}"}],
+                doc_id=item.doc_id,
+                page_index=item.page_index,
+                route=DOCLING,
+                status=PageStatus.FAILED,
+                errors=errors
+                or [
+                    {
+                        "page_no": item.page_index + 1,
+                        "category": "docling_failure",
+                        "message": f"conversion status={status_name}",
+                    }
+                ],
                 source_hash=item.source_hash,
             )
         if status_name == "PARTIAL_SUCCESS" and produced == 0:
             return PageResult(
-                doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
-                status=PageStatus.FAILED, errors=errors or [
-                    {"page_no": item.page_index + 1, "category": "docling_empty",
-                     "message": "partial success with no produced page content"}],
+                doc_id=item.doc_id,
+                page_index=item.page_index,
+                route=DOCLING,
+                status=PageStatus.FAILED,
+                errors=errors
+                or [
+                    {
+                        "page_no": item.page_index + 1,
+                        "category": "docling_empty",
+                        "message": "partial success with no produced page content",
+                    }
+                ],
                 source_hash=item.source_hash,
             )
 
@@ -106,7 +142,9 @@ class HeavyDoclingEngine:
             rec.reading_order_authoritative = True
             rec.docling_version = docling_loader.engine_name()
             converter = docling_loader.get_engine()
-            rec.layout_model = docling_loader._layout_model_name(converter) if converter else None
+            rec.layout_model = (
+                docling_loader._layout_model_name(converter) if converter else None
+            )
 
             target = item.page_index + 1
             # A1: index the document's items BY PAGE ONCE, then look up this
@@ -140,8 +178,13 @@ class HeavyDoclingEngine:
             content = bool(rec.blocks) or any(t.rows for t in rec.tables)
             status = PageStatus.OK if content else PageStatus.PARTIAL
             if status == PageStatus.PARTIAL and not errors:
-                errors = [{"page_no": target, "category": "docling_empty_page",
-                           "message": "docling returned no content for this page"}]
+                errors = [
+                    {
+                        "page_no": target,
+                        "category": "docling_empty_page",
+                        "message": "docling returned no content for this page",
+                    }
+                ]
 
             # Page geometry (D6): Docling's `page_no` is 1-based and matches the
             # `page` field on every block/table/image this engine emits, so key
@@ -157,17 +200,31 @@ class HeavyDoclingEngine:
                 pass
 
             return PageResult(
-                doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
-                status=status, blocks=rec.blocks, tables=rec.tables, images=rec.images,
+                doc_id=item.doc_id,
+                page_index=item.page_index,
+                route=DOCLING,
+                status=status,
+                blocks=rec.blocks,
+                tables=rec.tables,
+                images=rec.images,
                 page_sizes=page_sizes,
-                docling_version=rec.docling_version, engine_version=rec.docling_version,
-                errors=errors, source_hash=item.source_hash,
+                docling_version=rec.docling_version,
+                engine_version=rec.docling_version,
+                errors=errors,
+                source_hash=item.source_hash,
             )
         except Exception as e:
             return PageResult(
-                doc_id=item.doc_id, page_index=item.page_index, route=DOCLING,
+                doc_id=item.doc_id,
+                page_index=item.page_index,
+                route=DOCLING,
                 status=PageStatus.FAILED,
-                errors=[{"page_no": item.page_index + 1, "category": "docling_map",
-                         "message": str(e)}],
+                errors=[
+                    {
+                        "page_no": item.page_index + 1,
+                        "category": "docling_map",
+                        "message": str(e),
+                    }
+                ],
                 source_hash=item.source_hash,
             )

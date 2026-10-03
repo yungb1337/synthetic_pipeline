@@ -10,6 +10,7 @@ The pipeline never depends on it being present — `factory.default_embedder`
 falls back to `DummyEmbedder` if torch/this model isn't installed (CI, cramped
 machines). See README §"embedding seam".
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -28,6 +29,7 @@ def cuda_available() -> bool:
     """True only if torch is present AND reports a usable CUDA device."""
     try:
         import torch  # type: ignore
+
         return bool(torch.cuda.is_available())
     except Exception:
         return False
@@ -91,8 +93,9 @@ class SentenceTransformerEmbedder:
     def _load(self) -> None:
         try:
             from sentence_transformers import SentenceTransformer  # type: ignore
+
             self._st = SentenceTransformer(self._model_ref, device=self.device)
-            if self.fp16:                      # cast to half to fit 4GB VRAM
+            if self.fp16:  # cast to half to fit 4GB VRAM
                 try:
                     self._st = self._st.half()
                 except Exception:
@@ -109,13 +112,15 @@ class SentenceTransformerEmbedder:
     def ok(self) -> bool:
         return self._st is not None
 
-    def embed(self, texts: list[str], batch_size: int | None = None) -> list[list[float]]:
+    def embed(
+        self, texts: list[str], batch_size: int | None = None
+    ) -> list[list[float]]:
         if not self._st:
             raise RuntimeError(f"embedder unavailable: {self._load_error}")
         bs = batch_size or self.batch_size
         out: list[list[float]] = []
         for i in range(0, len(texts), bs):
-            slice_texts = texts[i:i + bs]
+            slice_texts = texts[i : i + bs]
             if not slice_texts:
                 continue
             vecs = self._st.encode(

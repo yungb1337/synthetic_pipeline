@@ -89,6 +89,7 @@ The code has **no explicit Stage 1 / Stage 2 boundary**. Instead:
 ```python
 # app/parser/dom/builder.py — proposed structure
 
+
 class DocumentBuilder:
     def build(self, page_results, document_id):
         # STAGE 1: Physical/layout pass (existing, unchanged)
@@ -103,10 +104,12 @@ class DocumentBuilder:
             pages=pages,
             reading_order=reading_order,
         )
-        self._extract_references(semantic_context)       # D3 → Document.references
-        self._build_reading_order_full(semantic_context)  # D4 → Document.reading_order_full
-        self._extract_entities(semantic_context)          # Future: Stage 3 entities
-        self._resolve_footnotes(semantic_context)         # Future: footnote归属
+        self._extract_references(semantic_context)  # D3 → Document.references
+        self._build_reading_order_full(
+            semantic_context
+        )  # D4 → Document.reading_order_full
+        self._extract_entities(semantic_context)  # Future: Stage 3 entities
+        self._resolve_footnotes(semantic_context)  # Future: footnote归属
 
         return Document(...)
 ```
@@ -208,6 +211,7 @@ class Block(BaseModel):
 # app/chunking/chunker.py — validate DOM version before processing
 from app.parser.dom.models import Document
 
+
 class SemanticChunker:
     SUPPORTED_DOM_VERSIONS = {"v0.1.0", "v0.2.0"}  # pin what we accept
 
@@ -226,6 +230,7 @@ class SemanticChunker:
 DOM_MIGRATIONS = {
     "v0.1.0": migrate_v010_to_v020,  # add missing fields with safe defaults
 }
+
 
 def migrate(doc: Document, target_version: str) -> Document:
     while doc.version != target_version:
@@ -291,13 +296,16 @@ Model regions as first-class nodes in the reading order graph. Linearize for ret
 ```python
 # app/parser/dom/models.py — add Region model
 
+
 class Region(BaseModel):
     """A semantic region of a page (column, sidebar, footnote area, figure region)."""
+
     id: str
     page: int
     bbox: BBox
     kind: str = "column"  # "column" | "sidebar" | "footnote" | "figure" | "table"
     block_ids: list[str] = Field(default_factory=list)
+
 
 class Document(BaseModel):
     # ... existing fields ...
@@ -306,6 +314,7 @@ class Document(BaseModel):
 
 ```python
 # app/parser/dom/reading_order.py — build regions from column partition
+
 
 def build_regions(page) -> list[Region]:
     """Partition page blocks into regions using geometric analysis."""
@@ -373,10 +382,13 @@ Cross-node chunking that joins semantic units across DOM nodes.
 ```python
 # app/chunking/chunker.py — semantic unit joiner
 
+
 class SemanticUnitJoiner:
     """Joins blocks that form a single semantic unit across node boundaries."""
 
-    def join(self, blocks: list[Block], footnotes: list[Footnote]) -> list[SemanticUnit]:
+    def join(
+        self, blocks: list[Block], footnotes: list[Footnote]
+    ) -> list[SemanticUnit]:
         """
         For each block, check if it has an attached footnote.
         If so, merge the block text + footnote into one SemanticUnit.

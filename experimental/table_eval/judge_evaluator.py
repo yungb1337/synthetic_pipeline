@@ -1,5 +1,5 @@
-"""Bridge to run the official scripts/llm_judge.py against benchmark canonical DOMs.
-"""
+"""Bridge to run the official scripts/llm_judge.py against benchmark canonical DOMs."""
+
 from __future__ import annotations
 
 import json
@@ -37,15 +37,22 @@ class TableBenchmarkJudgeEvaluator:
         cmd = [
             PYTHON_EXE,
             str(JUDGE_SCRIPT),
-            "--pdf", str(pdf_path),
-            "--dom", str(dom_json_path),
-            "--out", str(output_verdict_path),
-            "--model", self.model,
-            "--max-chars", str(self.max_chars),
+            "--pdf",
+            str(pdf_path),
+            "--dom",
+            str(dom_json_path),
+            "--out",
+            str(output_verdict_path),
+            "--model",
+            self.model,
+            "--max-chars",
+            str(self.max_chars),
         ]
 
         try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
+            res = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=180, check=False
+            )
             time.sleep(self.pacing_seconds)
 
             if output_verdict_path.exists():

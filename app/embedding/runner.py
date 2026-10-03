@@ -5,15 +5,14 @@
 * `embed_document_blocks` embeds a normalized DOM's block texts in batched
   calls, returning `{block_id: vector}`.
 """
-from __future__ import annotations
 
-from typing import Callable
+from __future__ import annotations
 
 from ..parser.dom import Document
 
 
 def batch_embed(
-    embed_fn,                # Callable[[list[str]], list[list[float]]]  (may batch internally)
+    embed_fn,  # Callable[[list[str]], list[list[float]]]  (may batch internally)
     texts: list[str],
     batch_size: int = 64,
 ) -> list[list[float]]:
@@ -21,14 +20,14 @@ def batch_embed(
     out: list[list[float]] = []
     dim: int | None = None
     for i in range(0, len(texts), batch_size):
-        slice_texts = texts[i:i + batch_size]
+        slice_texts = texts[i : i + batch_size]
         rows = embed_fn(slice_texts)
         if not rows:
             continue
         if dim is None:
             dim = len(rows[0])
         for row in rows:
-            if dim is not None and len(row) != dim:   # shape guard
+            if dim is not None and len(row) != dim:  # shape guard
                 raise ValueError(f"embedding dim mismatch: {len(row)} != {dim}")
             out.append(row)
     return out

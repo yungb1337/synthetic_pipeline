@@ -5,6 +5,7 @@ low-confidence fallback thresholds are config, so tuning them is a config
 change, not a code change (ADR-011 challenge: values below are INITIAL GUESSES
 to be calibrated against the `_cli_out` verification corpus).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -72,7 +73,7 @@ class RoutingConfig:
     # conservative escalation thresholds (one tier toward complex; §14)
     native_low_conf: float = 0.50
     enrichment_low_conf: float = 0.35
-    docling_low_conf: float = 0.0      # top tier never escalates (bounded)
+    docling_low_conf: float = 0.0  # top tier never escalates (bounded)
 
     inspection_engine: str = "pymupdf"
     max_signals: int = 512

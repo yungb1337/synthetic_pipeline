@@ -5,6 +5,7 @@ token-budget batching caps) lives here so chunking is reproducible given
 (DOM, config, tokenizer) — the same trust property the parser and normalizer
 configs carry.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

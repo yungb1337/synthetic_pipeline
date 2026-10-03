@@ -12,6 +12,7 @@ sentences).
 Only stdlib. ``split_ambiguous`` counts suppressed boundary candidates so the
 chunk report can surface how conservative the guard was.
 """
+
 from __future__ import annotations
 
 from .tokenize import TokenCounter
@@ -20,8 +21,20 @@ _FINAL_PUNCT = ".!?。！？…"
 
 # abbreviation tokens, WITHOUT the trailing period ("e.g." -> "e.g").
 _ABBREV_TOKENS = {
-    "dr", "mr", "mrs", "ms", "st", "vs", "etc", "inc", "jr", "sr",
-    "e.g", "i.e", "u.s", "u.k",
+    "dr",
+    "mr",
+    "mrs",
+    "ms",
+    "st",
+    "vs",
+    "etc",
+    "inc",
+    "jr",
+    "sr",
+    "e.g",
+    "i.e",
+    "u.s",
+    "u.k",
 }
 
 
@@ -88,10 +101,10 @@ def split_sentences(text: str) -> tuple[list[str], int]:
             i += 1
             continue
         j = i
-        while j < n and text[j] in _FINAL_PUNCT:      # consume the punct run
+        while j < n and text[j] in _FINAL_PUNCT:  # consume the punct run
             j += 1
         k = j
-        while k < n and text[k] in " \t\n\r\f\v":     # skip whitespace
+        while k < n and text[k] in " \t\n\r\f\v":  # skip whitespace
             k += 1
         if k >= n:
             # end of text: final sentence (no trailing empty sentence)

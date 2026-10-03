@@ -14,6 +14,7 @@ the only OCR dependency.
 
 Output: per text line [quad(4 pts), text, confidence].
 """
+
 from __future__ import annotations
 
 import threading
@@ -57,6 +58,7 @@ def engine_available() -> bool:
                 # Docling uses). Fully on-prem; models bundled in the venv.
                 try:
                     from rapidocr import RapidOCR  # type: ignore
+
                     _engine = RapidOCR()
                 except Exception:
                     _engine = False
@@ -84,6 +86,7 @@ def downscale_for_ocr(data: bytes, max_edge: int = OCR_MAX_EDGE) -> bytes:
     still applies downstream)."""
     try:
         from io import BytesIO
+
         from PIL import Image
 
         img = Image.open(BytesIO(data))
@@ -137,8 +140,10 @@ def ocr_image(image) -> list[tuple[str, tuple[float, float, float, float], float
         return []
     if not isinstance(image, (str, bytes, Path)):
         from PIL import Image as _PIL
+
         if isinstance(image, _PIL.Image):
             import numpy as _np
+
             image = _np.asarray(image)
     try:
         # I-10: one engine call at a time (see _call_lock note above).
@@ -149,11 +154,14 @@ def ocr_image(image) -> list[tuple[str, tuple[float, float, float, float], float
     return _extract_results(res)
 
 
-def ocr_bytes(data: bytes) -> list[tuple[str, tuple[float, float, float, float], float]]:
+def ocr_bytes(
+    data: bytes,
+) -> list[tuple[str, tuple[float, float, float, float], float]]:
     """OCR raw image bytes (loads via Pillow). Returns [] if unavailable."""
     if not engine_available():
         return []
     from io import BytesIO
+
     from PIL import Image
 
     img = Image.open(BytesIO(data)).convert("RGB")

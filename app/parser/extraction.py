@@ -13,6 +13,7 @@ constraint #2) and persisted through `Store.put_image/put_dom/put_raw`
 validated against `expected_page_set` so a document is never reported `parsed`
 when `actual < expected` (constraint #8 — ZERO silent page loss).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -20,29 +21,28 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from . import detection
+
+# Page-centric seams (additive; never break the legacy contract).
+from .assembler import Assembler
 from .config import ParserConfig
 from .dom import DocumentBuilder
 from .events import EventPublisher
 from .loaders import Loaders
 from .loaders.loaders import UnsupportedFormat
-from .storage import Store
-
-# Page-centric seams (additive; never break the legacy contract).
-from .assembler import Assembler
+from .page_result import PageStatus
 from .planner import Planner
 from .scheduler import Scheduler
 from .source import SourceScan, SourceScanError
+from .storage import Store
 from .storage_pages import Ledger, PageStore
-from .page_result import PageResult, PageStatus
 
 
 @dataclass
 class ParseOutcome:
     document_id: str
-    status: str                # "parsed" | "unsupported" | "unresolved" | "failed"
+    status: str  # "parsed" | "unsupported" | "unresolved" | "failed"
     document: object | None = None
     detected: object | None = None
     report: dict = field(default_factory=dict)
@@ -56,14 +56,14 @@ class ParseOutcome:
 class _SharedScheduler:
     """Process-wide shared scheduler (set by the executor / CLI)."""
 
-    scheduler: Optional[Scheduler] = None
+    scheduler: Scheduler | None = None
 
 
-def get_shared_scheduler() -> Optional[Scheduler]:
+def get_shared_scheduler() -> Scheduler | None:
     return _SharedScheduler.scheduler
 
 
-def set_shared_scheduler(s: Optional[Scheduler]) -> None:
+def set_shared_scheduler(s: Scheduler | None) -> None:
     _SharedScheduler.scheduler = s
 
 
@@ -100,7 +100,9 @@ class Extractor:
         self._own_scheduler = self.scheduler is None
         if self.scheduler is None:
             self.scheduler = Scheduler(
-                config, page_store=self.page_store, ledger=self.ledger,
+                config,
+                page_store=self.page_store,
+                ledger=self.ledger,
                 prefer_in_process_heavy=True,
             )
 
@@ -113,8 +115,13 @@ class Extractor:
         # pages it folds (the scheduler releases in-RAM blobs after persist).
         self.assembler.page_store = self.page_store
 
-    def extract(self, data: bytes, filename: str = "", sha256: str | None = None,
-                 resume: bool = False) -> ParseOutcome:
+    def extract(
+        self,
+        data: bytes,
+        filename: str = "",
+        sha256: str | None = None,
+        resume: bool = False,
+    ) -> ParseOutcome:
         t0 = time.time()
         sha = sha256 or hashlib.sha256(data).hexdigest()
         doc_id = f"d-{sha[:16]}"
@@ -130,11 +137,16 @@ class Extractor:
             ledger_plan = self.ledger.load_plan(doc_id)
             if ledger_plan and ledger_plan.get("assembly", {}).get("status") == "ok":
                 dom_dir = self.root / "dom" / doc_id
-                dom_files = sorted(dom_dir.glob("dom-*.docJSON")) if dom_dir.exists() else []
+                dom_files = (
+                    sorted(dom_dir.glob("dom-*.docJSON")) if dom_dir.exists() else []
+                )
                 if dom_files:
                     try:
                         from .dom import Document
-                        doc = Document.model_validate_json(dom_files[-1].read_text(encoding="utf-8"))
+
+                        doc = Document.model_validate_json(
+                            dom_files[-1].read_text(encoding="utf-8")
+                        )
                         elapsed = (time.time() - t0) * 1000
                         rep = ledger_plan.get("assembly", {}).get("report") or {}
                         doc_report = {
@@ -145,7 +157,9 @@ class Extractor:
                             "images": doc.num_images(),
                             "pages": len(doc.pages),
                             "expected_pages": rep.get("expected_pages", len(doc.pages)),
-                            "ocr": doc.provenance.ocr_engine if doc.provenance else None,
+                            "ocr": doc.provenance.ocr_engine
+                            if doc.provenance
+                            else None,
                             "route": ledger_plan.get("route"),
                             "dom_key": f"dom/{doc_id}/{dom_files[-1].name}",
                             "raw_key": None,
@@ -156,12 +170,22 @@ class Extractor:
 
         t_detect = time.time()
         if detected.unresolved:
-            self._emit("document.parse_failed", None, {"reason": "unresolved", "slug": detected.slug})
+            self._emit(
+                "document.parse_failed",
+                None,
+                {"reason": "unresolved", "slug": detected.slug},
+            )
             return ParseOutcome(None, "unresolved", None, detected)
 
         if len(data) > self.config.max_file_bytes:
-            self._emit("document.parse_failed", None, {"reason": "too_large", "bytes": len(data)})
-            return ParseOutcome(None, "failed", None, detected, {"error": "file exceeds max_file_bytes"})
+            self._emit(
+                "document.parse_failed",
+                None,
+                {"reason": "too_large", "bytes": len(data)},
+            )
+            return ParseOutcome(
+                None, "failed", None, detected, {"error": "file exceeds max_file_bytes"}
+            )
 
         # --- route (legacy router kept; only informs the Planner band) --------
         t_route0 = time.time()
@@ -175,8 +199,9 @@ class Extractor:
         # --- source scan (expected page set) ---------------------------------
         t_scan0 = time.time()
         try:
-            manifest = SourceScan.scan(data, filename, self._fs_store(),
-                                       detected=detected, source_hash=sha)
+            manifest = SourceScan.scan(
+                data, filename, self._fs_store(), detected=detected, source_hash=sha
+            )
         except UnsupportedFormat as e:
             self._emit("document.parse_failed", None, {"reason": f"unsupported:{e}"})
             return ParseOutcome(None, "unsupported", None, detected, {"error": str(e)})
@@ -215,8 +240,13 @@ class Extractor:
 
             # --- assemble + validate (hard gate) ----------------------------
             t_assemble0 = time.time()
-            report = self.assembler.assemble(plan, results, manifest.src_path, sha,
-                                            max_retries=self.config.page_retries)
+            report = self.assembler.assemble(
+                plan,
+                results,
+                manifest.src_path,
+                sha,
+                max_retries=self.config.page_retries,
+            )
             t_assemble1 = time.time()
 
             document = report.document
@@ -238,7 +268,9 @@ class Extractor:
                 "images": document.num_images() if document else 0,
                 "pages": report.actual_pages,
                 "expected_pages": report.expected_pages,
-                "ocr": document.provenance.ocr_engine if document and document.provenance else None,
+                "ocr": document.provenance.ocr_engine
+                if document and document.provenance
+                else None,
                 "route": route,
                 "dom_key": report.dom_key,
                 "raw_key": report.raw_key,
@@ -271,12 +303,18 @@ class Extractor:
                 },
             )
             if status != "parsed":
-                self._emit("document.parse_failed", doc_id,
-                           {"reason": "incomplete", "expected": report.expected_pages,
-                            "actual": report.actual_pages,
-                            "missing": report.missing_pages,
-                            "failed": report.failed_pages,
-                            "dead": report.dead_pages})
+                self._emit(
+                    "document.parse_failed",
+                    doc_id,
+                    {
+                        "reason": "incomplete",
+                        "expected": report.expected_pages,
+                        "actual": report.actual_pages,
+                        "missing": report.missing_pages,
+                        "failed": report.failed_pages,
+                        "dead": report.dead_pages,
+                    },
+                )
             return ParseOutcome(doc_id, status, document, detected, doc_report)
 
         except Exception as exc:  # SAFETY NET (zero-silent-loss invariant)
@@ -290,15 +328,23 @@ class Extractor:
             # and the run can still prove zero loss by inspecting the ledger.
             self._fail_document(doc_id, plan, sha, detected, exc)
             return ParseOutcome(
-                doc_id, "failed", None, detected,
-                {"error": f"{type(exc).__name__}: {exc}",
-                 "expected_pages": len(plan.expected_page_set)},
+                doc_id,
+                "failed",
+                None,
+                detected,
+                {
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "expected_pages": len(plan.expected_page_set),
+                },
             )
 
     # --- small helpers -------------------------------------------------------
     def _fs_store(self):
         # SourceScan needs a FilesystemStore (it uses `.root`); wrap if needed.
-        if isinstance(self.store, Store) and getattr(self.store, "root", None) is not None:
+        if (
+            isinstance(self.store, Store)
+            and getattr(self.store, "root", None) is not None
+        ):
             return self.store
         from .storage import FilesystemStore
 
@@ -309,35 +355,56 @@ class Extractor:
         frozen in the `pending` ledger. Mark any page that was not already
         persisted as FAILED (so a doc with some OK pages keeps them), record the
         assembly as failed, and emit `document.parse_failed`."""
-        err = {"page_no": 0, "category": "extract_failed",
-               "message": f"{type(exc).__name__}: {exc}",
-               "traceback": traceback.format_exc()}
+        err = {
+            "page_no": 0,
+            "category": "extract_failed",
+            "message": f"{type(exc).__name__}: {exc}",
+            "traceback": traceback.format_exc(),
+        }
         # Mark unpersisted or failed pages FAILED — check actual status (F-07 fix)
         for p in plan.expected_page_set:
             prior = self.page_store.get_page(doc_id, p)
-            if prior is None or prior.status in (PageStatus.FAILED, PageStatus.DEAD, PageStatus.PENDING):
+            if prior is None or prior.status in (
+                PageStatus.FAILED,
+                PageStatus.DEAD,
+                PageStatus.PENDING,
+            ):
                 try:
-                    self.ledger.update_page(doc_id, p, PageStatus.FAILED, "",
-                                            plan.route, 1, [err])
+                    self.ledger.update_page(
+                        doc_id, p, PageStatus.FAILED, "", plan.route, 1, [err]
+                    )
                 except Exception:
                     pass
         # Record the assembly outcome so the ledger proves the doc did not
         # silently vanish; assembled_page_set stays empty because nothing is OK.
         try:
             self.ledger.update_assembly(
-                doc_id, PageStatus.FAILED, [],
-                {"expected_pages": len(plan.expected_page_set), "actual_pages": 0,
-                 "missing_pages": list(plan.expected_page_set),
-                 "failed_pages": list(plan.expected_page_set), "dead_pages": []},
+                doc_id,
+                PageStatus.FAILED,
+                [],
+                {
+                    "expected_pages": len(plan.expected_page_set),
+                    "actual_pages": 0,
+                    "missing_pages": list(plan.expected_page_set),
+                    "failed_pages": list(plan.expected_page_set),
+                    "dead_pages": [],
+                },
             )
         except Exception:
             pass
-        self._emit("document.parse_failed", doc_id,
-                   {"reason": "extract_exception",
-                    "expected": len(plan.expected_page_set), "actual": 0,
-                    "missing": list(plan.expected_page_set),
-                    "failed": list(plan.expected_page_set), "dead": [],
-                    "error": f"{type(exc).__name__}: {exc}"})
+        self._emit(
+            "document.parse_failed",
+            doc_id,
+            {
+                "reason": "extract_exception",
+                "expected": len(plan.expected_page_set),
+                "actual": 0,
+                "missing": list(plan.expected_page_set),
+                "failed": list(plan.expected_page_set),
+                "dead": [],
+                "error": f"{type(exc).__name__}: {exc}",
+            },
+        )
 
     def _compute_route(self, data: bytes, detected) -> tuple[str | None, object | None]:
         lb = self.config.layout_backend

@@ -1,10 +1,9 @@
-"""Isolated adapter for Baidu Unlimited-OCR (PP-OCRv6 local on-prem inference).
-"""
+"""Isolated adapter for Baidu Unlimited-OCR (PP-OCRv6 local on-prem inference)."""
+
 from __future__ import annotations
 
 import contextlib
 import io
-import sys
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -112,6 +111,7 @@ class UnlimitedOCRAdapter:
 
             if self.config.use_gpu:
                 from rapidocr.utils.typings import EngineType
+
                 params = {
                     "Det.engine_type": EngineType.TORCH,
                     "Cls.engine_type": EngineType.TORCH,
@@ -125,7 +125,9 @@ class UnlimitedOCRAdapter:
         except Exception as exc:
             self._engine = None
             self._init_duration_ms = (time.perf_counter() - t0) * 1000.0
-            raise RuntimeError(f"Failed to initialize Unlimited-OCR / RapidOCR engine: {exc}") from exc
+            raise RuntimeError(
+                f"Failed to initialize Unlimited-OCR / RapidOCR engine: {exc}"
+            ) from exc
 
     def _get_process_rss_mb(self) -> float:
         if psutil is None:
@@ -144,7 +146,9 @@ class UnlimitedOCRAdapter:
                 return 0.0
         return 0.0
 
-    def process_pdf(self, pdf_path: str | Path, document_id: str | None = None) -> DocumentRawOCR:
+    def process_pdf(
+        self, pdf_path: str | Path, document_id: str | None = None
+    ) -> DocumentRawOCR:
         pdf_path = Path(pdf_path).resolve()
         if not pdf_path.is_file():
             raise FileNotFoundError(f"Source PDF not found: {pdf_path}")
@@ -176,7 +180,12 @@ class UnlimitedOCRAdapter:
                 total_expected_pages = doc.page_count
                 total_pages = doc.page_count
                 if total_pages == 0:
-                    doc_errors.append({"category": "empty_document", "message": "PDF contains 0 pages"})
+                    doc_errors.append(
+                        {
+                            "category": "empty_document",
+                            "message": "PDF contains 0 pages",
+                        }
+                    )
                     overall_status = "failed"
 
                 for p_idx in range(total_pages):
@@ -209,9 +218,15 @@ class UnlimitedOCRAdapter:
                         preprocess_ms += (time.perf_counter() - prep_t0) * 1000.0
                     except Exception as exc:
                         preprocess_ms += (time.perf_counter() - prep_t0) * 1000.0
-                        err_msg = f"Page {p_idx+1} rendering failed: {exc}"
+                        err_msg = f"Page {p_idx + 1} rendering failed: {exc}"
                         stderr_buf.write(err_msg + "\n")
-                        doc_errors.append({"page_no": p_idx + 1, "category": "render_error", "message": str(exc)})
+                        doc_errors.append(
+                            {
+                                "page_no": p_idx + 1,
+                                "category": "render_error",
+                                "message": str(exc),
+                            }
+                        )
                         raw_pages.append(
                             PageRawOCR(
                                 page_index=p_idx,
@@ -227,16 +242,25 @@ class UnlimitedOCRAdapter:
                     # 2. OCR Inference
                     inf_t0 = time.perf_counter()
                     try:
-                        with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
+                        with (
+                            contextlib.redirect_stdout(stdout_buf),
+                            contextlib.redirect_stderr(stderr_buf),
+                        ):
                             res = self._engine(img_array)
                         page_inf_ms = (time.perf_counter() - inf_t0) * 1000.0
                         inference_ms += page_inf_ms
                     except Exception as exc:
                         page_inf_ms = (time.perf_counter() - inf_t0) * 1000.0
                         inference_ms += page_inf_ms
-                        err_msg = f"Page {p_idx+1} OCR inference failed: {exc}"
+                        err_msg = f"Page {p_idx + 1} OCR inference failed: {exc}"
                         stderr_buf.write(err_msg + "\n" + traceback.format_exc() + "\n")
-                        doc_errors.append({"page_no": p_idx + 1, "category": "ocr_inference_error", "message": str(exc)})
+                        doc_errors.append(
+                            {
+                                "page_no": p_idx + 1,
+                                "category": "ocr_inference_error",
+                                "message": str(exc),
+                            }
+                        )
                         raw_pages.append(
                             PageRawOCR(
                                 page_index=p_idx,
@@ -265,8 +289,18 @@ class UnlimitedOCRAdapter:
                         if raw_txts is not None and len(raw_txts) > 0:
                             for idx_line in range(len(raw_txts)):
                                 t = str(raw_txts[idx_line] or "").strip()
-                                s = float(raw_scores[idx_line]) if raw_scores is not None and idx_line < len(raw_scores) else 1.0
-                                b = raw_boxes[idx_line].tolist() if raw_boxes is not None and idx_line < len(raw_boxes) else []
+                                s = (
+                                    float(raw_scores[idx_line])
+                                    if raw_scores is not None
+                                    and idx_line < len(raw_scores)
+                                    else 1.0
+                                )
+                                b = (
+                                    raw_boxes[idx_line].tolist()
+                                    if raw_boxes is not None
+                                    and idx_line < len(raw_boxes)
+                                    else []
+                                )
                                 if t:
                                     texts.append(t)
                                     scores.append(s)
@@ -291,12 +325,17 @@ class UnlimitedOCRAdapter:
                     postprocess_ms += (time.perf_counter() - post_t0) * 1000.0
 
                     current_rss = self._get_process_rss_mb()
-                    if current_rss > peak_rss:
-                        peak_rss = current_rss
+                    peak_rss = max(peak_rss, current_rss)
 
         except Exception as doc_exc:
             overall_status = "failed"
-            doc_errors.append({"category": "document_fatal", "message": str(doc_exc), "traceback": traceback.format_exc()})
+            doc_errors.append(
+                {
+                    "category": "document_fatal",
+                    "message": str(doc_exc),
+                    "traceback": traceback.format_exc(),
+                }
+            )
             stderr_buf.write(f"Fatal error processing document {doc_id}: {doc_exc}\n")
 
         end_wall = time.perf_counter()
@@ -307,28 +346,43 @@ class UnlimitedOCRAdapter:
             if p.texts:
                 full_texts.extend(p.texts)
         full_text_str = "\n".join(full_texts)
-        full_markdown_str = "\n\n".join(f"## Page {p.page_index + 1}\n\n{p.markdown}" for p in raw_pages if p.markdown)
+        full_markdown_str = "\n\n".join(
+            f"## Page {p.page_index + 1}\n\n{p.markdown}"
+            for p in raw_pages
+            if p.markdown
+        )
 
         # Repetition loop detection
-        rep_score, has_rep = calculate_repetition_score(full_text_str, n=self.config.repetition_ngram_size)
+        rep_score, has_rep = calculate_repetition_score(
+            full_text_str, n=self.config.repetition_ngram_size
+        )
         if has_rep:
-            doc_errors.append({
-                "category": "repetition_loop",
-                "message": f"Suspicious repetition loop detected (score={rep_score:.3f})",
-            })
+            doc_errors.append(
+                {
+                    "category": "repetition_loop",
+                    "message": f"Suspicious repetition loop detected (score={rep_score:.3f})",
+                }
+            )
             if overall_status == "success":
                 overall_status = "partial"
 
         # Incomplete / Empty check
         if not full_text_str.strip():
-            doc_errors.append({"category": "empty_output", "message": "No text extracted from document"})
+            doc_errors.append(
+                {
+                    "category": "empty_output",
+                    "message": "No text extracted from document",
+                }
+            )
             overall_status = "failed"
 
         if len(raw_pages) < max(1, total_expected_pages):
-            doc_errors.append({
-                "category": "missing_pages",
-                "message": f"Extracted {len(raw_pages)} pages, expected {total_expected_pages}",
-            })
+            doc_errors.append(
+                {
+                    "category": "missing_pages",
+                    "message": f"Extracted {len(raw_pages)} pages, expected {total_expected_pages}",
+                }
+            )
             if overall_status == "success":
                 overall_status = "partial"
 
@@ -337,7 +391,9 @@ class UnlimitedOCRAdapter:
         total_words = len(full_text_str.split())
         total_lines = len(full_texts)
         pages_with_content = sum(1 for p in raw_pages if p.texts)
-        avg_conf = sum(sum(p.scores) for p in raw_pages) / max(1, sum(len(p.scores) for p in raw_pages))
+        avg_conf = sum(sum(p.scores) for p in raw_pages) / max(
+            1, sum(len(p.scores) for p in raw_pages)
+        )
 
         pages_count = len(raw_pages)
         pages_per_sec = (pages_count / (wall_ms / 1000.0)) if wall_ms > 0 else 0.0
