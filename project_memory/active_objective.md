@@ -5,42 +5,32 @@ metadata:
   type: project
 ---
 
-# Active Run Brief: `firecrawl/pdf-inspector` Smart Routing Production Promotion
+# Active Run Brief: Production-Grade Knowledge Graph & Ontology Synthetic Data Generation Architecture
 
-**Run ID:** `run-2026-09-18-smart-routing-prod`  
-**Working Branch:** `smart_routing`  
-**Prior Runs:** `run-2026-09-17-pdf-inspector-eval` (experimental calibration on 2,017 documents), `run-2026-09-14-eval-1000` (1000-doc baseline), `run-2026-09-14-full-corpus` (945-doc calibrated routing baseline).  
-**ADR:** `docs/adr/001-pdf-inspector-smart-routing.md`  
-**Experimentation Doc:** `docs/pdf-inspector-experimentation-plan.md`  
+**Run ID:** `run-2026-10-21-synthetic-kg-architecture`  
+**Working Branch:** `feat/normalizer-production-overhaul`  
+**Phase:** Architecture & Research Exploration Gate (Pre-Implementation Review)  
+**Objective:**
+Perform deep, multi-source research across industry frontiers and academic research (Google Differentially Private LLM synthetic data, Microsoft SynthLLM, Nvidia synthetic data ecosystems, GRA GitHub repository, Atlan enterprise ontology vs. KG frameworks, and production-grade KG management systems). 
 
-## 1. Objective
-Promote the validated 3-tier per-page smart routing architecture from experimental evaluation (`experimental/pdf_inspector_eval/`) into the core production pipeline (`app/routing/`, `app/parser/`), delivering:
-1. Sub-30ms Rust stream inspection with CMap health check and structural layout detection in `FastInspector` (`app/routing/inspectors.py`).
-2. Per-page Docling TableFormer escalation for isolated table pages (`app/parser/planner.py`), unlocking +19.6pp table quality gain (68.1% → 87.7%) while preserving ~35–45 p/s native speed on digital text.
-3. ProcessPoolExecutor worker recycling (`heavy_pool_max_tasks_per_child = 10`) in `app/parser/scheduler.py` to prevent C++ memory accumulation over arbitrary corpus sizes.
-4. Formal ADR documentation in `docs/adr/001-pdf-inspector-smart-routing.md`.
+Formulate, compare, and stress-test **alternative production-grade architectures** across strict engineering metrics, trade-offs, scalability, and hardware limits (16.5 GB RAM / 4 GB VRAM local dev up to distributed production). Present the architectural options with detailed trade-off analysis for user review before implementation.
 
-## 2. Implementation Status: COMPLETE
+## User Brief & Directives:
+> "Look into the architecture details, compare various metrics and tradeoffs, Generate different architecture if required and show for review from my side.
+> Then we can talk about implementation details once the architecture is done.
+> Make sure to do a thorough research, Search over the (internet, github similar projects)[about ontology, KG management] all production grade.
+> Some sources im providing here:
+> - https://research.google/blog/generating-synthetic-data-with-differentially-private-llm-inference/
+> - https://www.microsoft.com/en-us/research/articles/synthllm-breaking-the-ai-data-wall-with-scalable-synthetic-data/
+> - https://eu.36kr.com/en/p/3340289916188416
+> - https://www.investors.com/news/technology/nvidia-stock-tech-giants-use-synthetic-data-train-ai-models/
+> - https://github.com/GX-XinGao/GRA
+> - https://atlan.com/know/ai-agent/knowledge-graph/ontology-vs-knowledge-graph/
+> - https://atlan.com/know/combining-knowledge-graphs-llms/
+> Do your own research as well, Deploy so many agents to cover up the whole scenario around this, so we have the best clear architecture with explanation of what and why it works, we dont want technical debt later, so we research right now as much we can to create the best architecture around this. Deploy a full agent swarm"
 
-### Phase 1: Core Inspection Upgrade
-- `app/routing/inspectors.py`: Integrated `pdf_inspector.process_pdf_bytes` for sub-30ms classification, exact table detection (`pages_with_tables`), multi-column geometry (`pages_with_columns`), and CMap integrity validation, with seamless PyMuPDF fallback.
-
-### Phase 2: Per-Page Routing Policy Calibration
-- `app/routing/config.py`: Un-zeroed `metric_table_present` weight from 0.0 to 8.0.
-- `app/parser/planner.py`: Added per-page band escalation (`_page_band`) so table-bearing pages route to `docling_heavy` single-page TableFormer while clean text pages remain on `rust_native`.
-
-### Phase 3: Single-Page Execution & Memory Bounding
-- Verified single-page PyMuPDF byte slicing in `docling_loader.convert_path` (`page_range=(page+1, page+1)`). Zero whole-document Docling calls.
-- Verified worker pool recycling with `heavy_pool_max_tasks_per_child = 10` in `app/parser/scheduler.py` (peak host RAM < 2.5 GB RSS).
-
-### Phase 4: Architecture Decision Record & Comparative Validation
-- Authored `docs/adr/001-pdf-inspector-smart-routing.md` and ADR-014 in `project_memory/architecture_decisions.md` documenting the 3-tier routing architecture, empirical evidence from 2,017 documents, and zero-silent-loss defensive invariants.
-- Executed production calibration on exact 40 documents (432 pages) with Gemini LLM Judge (`gemini-3.5-flash-lite`): 97.8% Fidelity (+1.4pp), 95.3% Structure (+1.4pp), 100% Pass Rate (0 FAILs), 2.04 p/s batch throughput, and 0 whole-doc Docling calls.
-- Executed 100-document mixed evaluation (1,302 pages): 355 tables extracted, 715 OCR blocks, 80.0% Rust native fast path, 0 silent drops.
-
-## 3. Definition of Done: ALL PASSED
-1. Production `FastInspector` leverages `pdf-inspector` with PyMuPDF fallback: **PASSED**
-2. Routing policy and planner execute per-page TableFormer slicing: **PASSED**
-3. Pytest suite across all routing, parser, and architecture modules: **PASSED**
-4. ADR-001 / ADR-014 authored and recorded: **PASSED**
-5. Full calibration and mixed evaluation benchmarks executed and verified: **PASSED**
+## Gate Pipeline Status:
+- [x] Gate 0: Run brief & checkpoint initialized
+- [ ] Gate 1: Research Lead (`research-lead` swarm) → `checkpoints/run/run-2026-10-21-synthetic-kg-architecture/research.md`
+- [ ] Gate 2: Chief Architect (`chief-architect`) → `checkpoints/run/run-2026-10-21-synthetic-kg-architecture/architecture.md` (Multiple architectural alternatives compared)
+- [ ] User Review & Approval
