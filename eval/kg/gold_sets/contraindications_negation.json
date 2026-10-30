@@ -1,0 +1,68 @@
+[
+  {
+    "test_id": "eval-neg-001",
+    "domain": "pharmacology",
+    "source_doc_id": "guideline-ckd-pain-2024",
+    "source_block_id": "blk-004-012",
+    "input_text": "Duloxetine is not recommended in patients with severe renal impairment (eGFR < 30 mL/min/1.73 m2) due to increased adverse effects and drug accumulation.",
+    "gold_entities": [
+      {
+        "id": "RXNORM:284637",
+        "name": "Duloxetine",
+        "category": "Drug"
+      },
+      {
+        "id": "MESH:D051436",
+        "name": "Renal Insufficiency, Chronic",
+        "category": "Condition"
+      }
+    ],
+    "gold_assertions": [
+      {
+        "subject_id": "RXNORM:284637",
+        "predicate": "CONTRAINDICATED_IN",
+        "object_id": "MESH:D051436",
+        "negation": true,
+        "hedging": "",
+        "population": "eGFR < 30 mL/min/1.73 m2",
+        "dosage": "",
+        "timing": "",
+        "route": "oral",
+        "evidence_level": "Guideline Standard"
+      }
+    ]
+  },
+  {
+    "test_id": "eval-neg-002",
+    "domain": "pharmacology",
+    "source_doc_id": "guideline-ada-diabetes-2024",
+    "source_block_id": "blk-010-005",
+    "input_text": "Metformin is contraindicated in patients with an eGFR < 30 mL/min/1.73 m2 due to the heightened risk of lactic acidosis.",
+    "gold_entities": [
+      {
+        "id": "RXNORM:6809",
+        "name": "Metformin",
+        "category": "Drug"
+      },
+      {
+        "id": "MESH:D051436",
+        "name": "Renal Insufficiency, Chronic",
+        "category": "Condition"
+      }
+    ],
+    "gold_assertions": [
+      {
+        "subject_id": "RXNORM:6809",
+        "predicate": "CONTRAINDICATED_IN",
+        "object_id": "MESH:D051436",
+        "negation": true,
+        "hedging": "",
+        "population": "eGFR < 30 mL/min/1.73 m2",
+        "dosage": "",
+        "timing": "",
+        "route": "oral",
+        "evidence_level": "Class I Recommendation"
+      }
+    ]
+  }
+]

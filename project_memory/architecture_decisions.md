@@ -485,3 +485,61 @@ largest edge in pixels we hand to the OCR engine.)
 - **Scans / OCR Score:** 61.8% → **99.2%** (+37.4 pp).
 - **Docling Heavy Escalation:** reduced from 20.79% to **7.55%** of pages (278 / 3,680 pages).
 
+---
+
+## ADR-015: Dual-Route Adaptive Architecture with GRA Quality Triad & Normalized DuckDB Knowledge Graph (2026-10-31, run-2026-10-21-synthetic-kg-architecture)
+
+*(Note: Numbered as ADR-015 in accordance with the run brief, reconciling and extending architectural scope to Modules #5 and #6).*
+
+**Context:**
+Transitioning from the Canonical DOM extraction pipeline to structured Knowledge Graph construction (Module #5) and Synthetic Data Generation (Module #6) requires deep factual grounding, strict physical provenance, and multi-stage verification. Production environments must operate within a local development envelope (16.5 GB RAM, 4 GB VRAM) while scaling cleanly to distributed production without architectural rewrites.
+
+Following comparative evaluation of Architecture Alpha ("Lean Graph"), Architecture Beta ("Full-Stack GraphRAG" with Neo4j), and Architecture Gamma ("Dual-Route Adaptive with GRA Quality Triad"), Architecture Gamma was approved and implemented.
+
+**Decisions:**
+
+1. **Option 2 Tripartite Normalized Relational Schema in Embedded DuckDB:**
+   - Evaluated embedded graph databases. Kùzu was archived on GitHub on October 10, 2025 (`kuzudb/kuzu`), rendering it an unmaintained dependency risk.
+   - Adopted DuckDB with a tripartite normalized relational schema (`entities`, `assertions`, `evidence` tables with composite foreign keys and indexes) defined in `app/kg/store/duckdb_schema.sql`.
+   - Multi-hop path extraction is executed via vectorized recursive Common Table Expressions (CTEs) in `DuckDBGraphStore.walk_paths()`, enforcing cycle prevention (`NOT list_contains(p.path_ids, a2.id)`) and population homogeneity propagation (`COALESCE(NULLIF(p.population, ''), a2.population)`).
+   - Replaced inner-loop N+1 lookups with vectorized batch queries (`WHERE id IN (...)`), achieving sub-1.5ms traversal.
+   - Graph storage operates as a **rebuildable projection** from content-addressed JSON artifacts (`kg-v{version}.json`, `kg-summary-v{version}.json`, `entity-index-v{version}.json`) via `GraphSerializer`.
+
+2. **Single-Model GPU Residency Rule (`_GPU_LOCK`) for 4 GB VRAM Envelope:**
+   - Local generative and reasoning inference standardizes on `microsoft/Phi-4-mini-instruct` (Q4_K_M GGUF, ~2.32 GB).
+   - Enforced class-level mutex `_GPU_LOCK = threading.Lock()` in `LlamaCppClient` (`app/synthetic/llm/llama_cpp.py`) ensuring only one model context occupies VRAM at any time, eliminating host-paging and CUDA allocation failures.
+   - Upstream zero-shot mention extraction (GLiNER `urchade/gliner_base`) and downstream entailment scoring (DeBERTa-v3 NLI) explicitly default to CPU execution (`device="cpu"`), preserving VRAM exclusively for LLM generation.
+
+3. **Model-Agnostic LLM Seam (`LLMClient` Protocol):**
+   - Decoupled LLM consumption via `@runtime_checkable class LLMClient(Protocol)` with methods `generate()` and `structured_predict()`.
+   - Unified structured JSON parsing and Pydantic validation via `structured_predict_helper()` with explicit `json.JSONDecodeError` handling.
+   - Implemented pluggable backends: `LlamaCppClient` (local GGUF), `APIClient` (Gemini via secure `x-goog-api-key` request headers and OpenAI with exponential backoff), and `MockLLMClient` for 100% offline, hermetic testing.
+
+4. **6-Gate Trust & Verification Engine (`TrustGate` Protocol -> `GateResult`):**
+   - Standardized all trust verification under `@runtime_checkable class TrustGate(Protocol)` returning typed `GateResult(passed, score, message, metadata)`:
+     - **Gate 1: Evidence Entailment** (`app/synthetic/trust/entailment.py`) — DeBERTa-v3 cross-encoder NLI scoring premise entailment ($\ge 0.85$).
+     - **Gate 2: Graph Consistency** (`app/synthetic/trust/consistency.py`) — Subgraph topological cycle validation and demographic/population conflict detection.
+     - **Gate 3: Physical DOM Provenance Audit** (`app/synthetic/trust/provenance.py`) — Verifies that synthetic statements trace to valid `doc_id`, `page_index`, `block_id`, `bbox`, and verbatim source text.
+     - **Gate 4: HIPAA PHI / PII Scrubbing** (`app/synthetic/trust/privacy.py`) — Microsoft Presidio `AnalyzerEngine` and `AnonymizerEngine` integration with safe `spacy.blank("en")` fallback, regex safety net, and medical false-positive suppression for dosage strengths and administration frequencies.
+     - **Gate 5: Sentence-Level Faithfulness Grounding** (`app/synthetic/trust/faithfulness.py`) — Verifies claim support ($\ge 0.95$) requiring $\ge 50\%$ sentence-source word overlap or clinical terminology containment ($\ge 35\%$ overlap) alongside an optional protected Ragas evaluation seam.
+     - **Gate 6: Bounded De-duplication** (`app/synthetic/trust/dedup.py`) — 64-bit SimHash Hamming distance ($\le 3$) using POPCNT `(h1 ^ h2).bit_count()` and batch Self-BLEU ($\le 0.35$), bounded by `collections.deque(maxlen=10000)` and fast-path $O(1)$ exact hash rejection.
+
+5. **Generator-Reviewer-Adjudicator (GRA) Multi-Agent Quality Triad:**
+   - Replaced fragile single LLM-as-judge evaluation with a 3-agent peer review loop (`GeneratorAgent`, `ReviewerAgent`, `AdjudicatorAgent`) in `app/synthetic/quality/`.
+   - Eliminates position, verbosity, and self-enhancement biases. If reviewer critique falls below threshold ($\ge 0.85$), candidate is iteratively refined up to `max_refinement_steps=2`. Disagreements are arbitrated by the Adjudicator.
+
+6. **Decoupled Upstream Extraction Protocol (`ExtractorLLMClient`):**
+   - Upstream Knowledge Graph extraction (`app/kg`) is strictly isolated from downstream synthesis (`app/synthetic`).
+   - Defined `@runtime_checkable class ExtractorLLMClient(Protocol)` in `app/kg/extractor/protocol.py`, eliminating layering inversion and circular package dependencies (verified 0 imports from `app.synthetic` inside `app/kg`).
+
+7. **Non-Circular Dual-Route Pre-Routing:**
+   - Implemented `DualRouteRouter` (`app/synthetic/router.py`) inspecting Canonical DOM `block.kind == "table"` and Stage 1 GLiNER mention counts prior to graph insertion.
+   - Blocks with tables or $\ge 3$ mentions route to Route A (KG Multi-Hop); narrative blocks with $\le 1$ mention route to Route B (DOM Direct), bypassing graph overhead and saving ~35% extraction compute.
+
+**Consequences:**
+- **Zero Daemon Overhead:** Embedded DuckDB and local GGUF run in-process without external database daemons or JVM heap footprint.
+- **Hardware Compliance:** Peak RAM stays under 2.5 GB RSS and VRAM stays strictly within 4 GB, preventing `std::bad_alloc`.
+- **Deterministic Lineage:** Every qualified assertion and synthetic record preserves physical DOM coordinates (`doc_id`, `page_index`, `block_id`, `bbox`).
+- **Verifiable Test Hermeticity:** 45 targeted tests execute in 1.48s offline with 0 network calls and 0 regressions across the 435-test full repository suite.
+
+

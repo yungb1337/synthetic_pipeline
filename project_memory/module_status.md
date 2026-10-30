@@ -7,17 +7,17 @@ metadata:
 
 # Module Status
 
-**Phase:** Module #1 — the Parser ("Document / Extraction Pipeline") — design in progress, not yet coded.
+**Phase:** Modules #5 (Knowledge Graph) and #6 (Synthetic Data Generation) COMPLETE & Verified. Ready for Scale Batch Generation.
 
 ## The intended build order (dependency-first, per brief)
-1. **Parser / Document Extraction Pipeline** ← **NOW**
-2. Text Normalization & Cleaning
-3. Semantic Chunking
-4. Embeddings
-5. Knowledge extraction (Entity/Rel) → Ontology mapping → KG
-6. Validation framework (multi-stage)
-7. Generation (Prompt builder + LLM + multi-generator)
-8. Dataset versioning / lineage / compiler
+1. **Parser / Document Extraction Pipeline** [x]
+2. **Text Normalization & Cleaning** [x]
+3. **Semantic Chunking** [x]
+4. **Embeddings (BGE-M3 1024-dim)** [x]
+5. **Knowledge extraction (Entity/Rel) → Ontology mapping → KG** [x] (Module #5)
+6. **Validation framework (multi-stage Trust Engine)** [x] (Module #6)
+7. **Generation (Prompt builder + LLM + GRA quality triad + Recipes)** [x] (Module #6)
+8. **Dataset versioning / lineage / compiler** ← **NEXT**
 9. Multi-tenancy, security, governance
 10. Delivery APIs / dashboard / observability
 
@@ -76,12 +76,16 @@ metadata:
     - Completeness surged: **54.3% → 95.1% (+40.8 pp)**.
     - Resilient judging: 250/250 evaluated with zero rate-limit dropouts via sequential multi-key rotation (`key`, `key1`, `key2`). Reports: `artifacts/targeted_eval_post_fix/summary.json` and `artifacts/targeted_eval_post_fix/targeted_evaluation_report.md`.
 
-- [ ] Archive the academic-PDF read (re-dispatch) → ground Ontology/KG/Ontology decisions
+- [x] **Archive the academic-PDF read (re-dispatch) → ground Ontology/KG/Ontology decisions** — Completed via deep research synthesis in `checkpoints/run/run-2026-10-21-synthetic-kg-architecture/research.md`.
 
-## Next module
-**Module #3 — Semantic Chunking** (own module, own spec), then wire the real embedder into the chunk→embed pipeline.
+- [x] **Knowledge Graph & Synthetic Generation Run `run-2026-10-21-synthetic-kg-architecture` COMPLETE (2026-10-31)** — Implemented Architecture Gamma ("Dual-Route Adaptive with GRA Quality Triad & Normalized DuckDB Knowledge Graph") delivering **Module #5 (`app/kg`)**, **Module #6 (`app/synthetic`)**, and Evaluation Suite (`eval/kg/`):
+  - **Module #5 Knowledge Graph (`app/kg/`):** Pydantic Qualified Assertion & Entity schemas (`models.py`); thread-safe `OntologyRegistry` with `PharmacologyOntologyProvider` (RxNorm/MeSH gazetteers with RapidFuzz and FlashText); Two-Stage Extractor with Stage 1 CPU GLiNER mention extraction (`mentions.py`) and Stage 2 Structured LLM relation extraction (`relations.py`) decoupled via `ExtractorLLMClient` protocol; table extraction (`tables.py`) and reading-order coreference resolution (`coreference.py`); embedded DuckDB normalized schema (`entities`, `assertions`, `evidence` with composite indexes) with recursive CTE 2–4 hop paths (`store.py`) enforcing cycle prevention and population homogeneity filtering; deterministic content-addressed JSON projections (`serializer.py`); contradiction validation engine (`validation.py`).
+  - **Module #6 Synthetic Data Generation (`app/synthetic/`):** Model-agnostic LLM seam (`protocol.py`) supporting local GGUF (`LlamaCppClient` with `_GPU_LOCK` single-model residency for 4 GB VRAM budget), remote API (`APIClient` with header-based auth, key rotation, and 429 jitter backoff), and hermetic mock (`MockLLMClient`); non-circular dual-route router (`router.py`) pre-routing via block kind and Stage 1 mentions; recursive CTE subgraph topology sampler (`sampler.py`); Generator-Reviewer-Adjudicator (GRA) multi-agent peer review loop (`quality/`) eliminating single-judge self-enhancement bias; 5 pluggable training recipes (`recipes/`: `MultiHopRecipe`, `DPOPerturbationRecipe`, `TableReasoningRecipe`, `DOMDirectRecipe`, `ContradictionRecipe`); 6-Gate Trust & Verification Engine (`trust/`: Evidence Entailment via DeBERTa-v3, Graph Consistency, Physical DOM Provenance Audit, HIPAA PHI/PII scrubbing via Presidio + blank spaCy fallback, Sentence-level Faithfulness grounding, and Bounded SimHash/Self-BLEU de-duplication); multi-format dataset exporters (`exporter/`: ChatML with `<think>` CoT, Stanford Alpaca, DPO Arrow pairs, HuggingFace Parquet).
+  - **Evaluation Suite (`eval/kg/`):** Clinical gold assertion test sets (contraindications, drug-drug interactions), precision/recall/negation metrics, Self-BLEU & entropy diversity metrics, and runner suite.
+  - **Verification & Review:** 45 targeted tests passed in 1.48s (100% pass rate); 435 full repo regression tests passed (0 failures, 2 skipped). Both Gate 5 (Architecture Review) and Gate 6 (Quality Review) verified **PASS** post-Fix Round 1 (13/13 findings resolved). Zero regressions across parser, normalizer, chunker, and embedding modules.
 
-**Module #4 — retrieval next** (updated 2026-08-05, run-2026-08-04-chunking COMPLETE): `ChunkStore.iter_*` (`app/chunking/store.py`) is the retrieval seam; a vector store (pgvector/Qdrant) + hybrid BM25+dense behind it is a future ADR. Documented next steps from this run: atomic table/figure-caption chunks, parent-child context injection (both schema-reserved).
+## Next module / capabilities
+**Module #8 — Dataset versioning, lineage compilation, and large-scale synthesis execution** across the 1,945-document dual corpus; Multi-tenancy, security, and governance; Delivery APIs & observability.
 
 ## Blocked by
-Nothing for the parser itself. Folder rename (22_07 → synthetic_pipeline) blocked until editor releases CWD.
+Nothing for KG or Synthetic Generation modules. Folder rename (22_07 → synthetic_pipeline) blocked until editor releases CWD.

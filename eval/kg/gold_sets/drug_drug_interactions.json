@@ -1,0 +1,68 @@
+[
+  {
+    "test_id": "eval-ddi-001",
+    "domain": "pharmacology",
+    "source_doc_id": "guideline-anticoagulation-2024",
+    "source_block_id": "blk-012-004",
+    "input_text": "Warfarin interacts significantly with CYP2C9 inhibitors such as Amiodarone, requiring preemptive 30-50% dose reduction to avoid supratherapeutic INR and hemorrhage.",
+    "gold_entities": [
+      {
+        "id": "RXNORM:11289",
+        "name": "Warfarin",
+        "category": "Drug"
+      },
+      {
+        "id": "RXNORM:703",
+        "name": "Amiodarone",
+        "category": "Drug"
+      }
+    ],
+    "gold_assertions": [
+      {
+        "subject_id": "RXNORM:11289",
+        "predicate": "INTERACTS_WITH",
+        "object_id": "RXNORM:703",
+        "negation": false,
+        "hedging": "",
+        "population": "Patients receiving concurrent anticoagulation",
+        "dosage": "preemptive 30-50% dose reduction",
+        "timing": "at initiation",
+        "route": "oral",
+        "evidence_level": "Level A"
+      }
+    ]
+  },
+  {
+    "test_id": "eval-ddi-002",
+    "domain": "pharmacology",
+    "source_doc_id": "guideline-pain-management-2024",
+    "source_block_id": "blk-018-009",
+    "input_text": "Concomitant use of Pregabalin and Opioids substantially increases the risk of severe central nervous system depression and fatal respiratory arrest.",
+    "gold_entities": [
+      {
+        "id": "RXNORM:187832",
+        "name": "Pregabalin",
+        "category": "Drug"
+      },
+      {
+        "id": "MESH:D009294",
+        "name": "Narcotics",
+        "category": "Drug"
+      }
+    ],
+    "gold_assertions": [
+      {
+        "subject_id": "RXNORM:187832",
+        "predicate": "INTERACTS_WITH",
+        "object_id": "MESH:D009294",
+        "negation": false,
+        "hedging": "",
+        "population": "Combined analgesic therapy",
+        "dosage": "minimize dose",
+        "timing": "",
+        "route": "oral",
+        "evidence_level": "FDA Black Box Warning"
+      }
+    ]
+  }
+]

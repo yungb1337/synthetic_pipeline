@@ -1,0 +1,68 @@
+[
+  {
+    "test_id": "eval-dose-001",
+    "domain": "pharmacology",
+    "source_doc_id": "guideline-ckd-pain-2024",
+    "source_block_id": "blk-004-015",
+    "input_text": "In patients with Stage 4 CKD (eGFR 15-29 mL/min), Pregabalin starting dose must not exceed 25 mg daily, titrated to a maximum of 75 mg daily.",
+    "gold_entities": [
+      {
+        "id": "RXNORM:187832",
+        "name": "Pregabalin",
+        "category": "Drug"
+      },
+      {
+        "id": "MESH:D051436",
+        "name": "Renal Insufficiency, Chronic",
+        "category": "Condition"
+      }
+    ],
+    "gold_assertions": [
+      {
+        "subject_id": "RXNORM:187832",
+        "predicate": "REQUIRES_DOSE_ADJUSTMENT",
+        "object_id": "MESH:D051436",
+        "negation": false,
+        "hedging": "",
+        "population": "Stage 4 CKD (eGFR 15-29 mL/min)",
+        "dosage": "starting <= 25 mg daily, max 75 mg daily",
+        "timing": "",
+        "route": "oral",
+        "evidence_level": "Level A"
+      }
+    ]
+  },
+  {
+    "test_id": "eval-dose-002",
+    "domain": "pharmacology",
+    "source_doc_id": "guideline-ckd-pain-2024",
+    "source_block_id": "blk-004-018",
+    "input_text": "For Gabapentin, patients with CrCl 15 to 29 mL/min should receive 200 to 700 mg once daily at bedtime.",
+    "gold_entities": [
+      {
+        "id": "RXNORM:25480",
+        "name": "Gabapentin",
+        "category": "Drug"
+      },
+      {
+        "id": "MESH:D051436",
+        "name": "Renal Insufficiency, Chronic",
+        "category": "Condition"
+      }
+    ],
+    "gold_assertions": [
+      {
+        "subject_id": "RXNORM:25480",
+        "predicate": "REQUIRES_DOSE_ADJUSTMENT",
+        "object_id": "MESH:D051436",
+        "negation": false,
+        "hedging": "",
+        "population": "CrCl 15 to 29 mL/min",
+        "dosage": "200 to 700 mg once daily",
+        "timing": "at bedtime",
+        "route": "oral",
+        "evidence_level": "Level B"
+      }
+    ]
+  }
+]

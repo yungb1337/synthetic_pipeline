@@ -151,7 +151,7 @@ Before comparing architectures, we anchor to the guardrails the codebase already
 
 ---
 
-## 3. Architecture Gamma: "Dual-Route Adaptive" (Kùzu + DOM Direct + GRA Quality Triad)
+## 3. Architecture Gamma: "Dual-Route Adaptive" (DuckDB + DOM Direct + GRA Quality Triad)
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -167,16 +167,16 @@ Before comparing architectures, we anchor to the guardrails the codebase already
 │ ROUTE A: KG Path    │                    │ ROUTE B: DOM Direct     │
 │ (Multi-Hop / DPO)   │                    │ (Single-Hop / Factoid)  │
 │                     │                    │                         │
-│ GLiNER + LLM →      │                    │ Chunk Retrieval →       │
-│ Kùzu Graph →        │                    │ BGE-M3 Embedding →     │
-│ Cypher k-hop walk→  │                    │ Direct LLM QA gen →    │
+│ GLiNER + phi4-mini→ │                    │ Chunk Retrieval →       │
+│ DuckDB Graph (Opt2) │                    │ BGE-M3 Embedding →     │
+│ Recursive CTE walks │                    │ Direct LLM QA gen →    │
 │ CoT Synthesis       │                    │ Simple Faithfulness     │
 └─────────┬───────────┘                    └─────────┬───────────────┘
           │                                          │
           └──────────────┬───────────────────────────┘
                          ▼
           ┌──────────────────────────────┐
-          │ GRA Quality Triad            │  ← Generator-Reviewer-Adjudicator
+          │ GRA Quality Triad            │  ← Generator-Reviewer-Adjudicator (phi4-mini)
           │                              │
           │  Generator: Primary LLM      │     Produces candidate QA/CoT
           │  Reviewer:  Critic LLM       │     Checks factual grounding, clarity
@@ -187,12 +187,12 @@ Before comparing architectures, we anchor to the guardrails the codebase already
           ┌──────────────────────────────┐
           │ Trust & Verification Engine  │
           │                              │
-          │  Gate 1: Symbolic Execution  │     Cypher path query = target answer?
-          │  Gate 2: Provenance Audit    │     block_id, bbox, evidence_text present?
-          │  Gate 3: PHI / PII Scrub     │     Zero unmasked identifiers?
-          │  Gate 4: Ragas Faithfulness  │     Score ≥ 0.95 against DOM blocks?
-          │  Gate 5: De-duplication      │     Self-BLEU ≤ 0.35?
-          │  Gate 6: (Optional) DP Gate  │     ε-DP public-drafter verification?
+          │  Gate 1: Evidence Entailment │     DeBERTa-v3 NLI: source text entails assertion?
+          │  Gate 2: Graph Consistency   │     Cycle check, population preservation, SHACL
+          │  Gate 3: Provenance Audit    │     doc_id, block_id, bbox, evidence_text verified?
+          │  Gate 4: PHI / PII Scrub     │     Zero unmasked patient identifiers (Presidio)?
+          │  Gate 5: Ragas Faithfulness  │     Score ≥ 0.95 against DOM verbatim text?
+          │  Gate 6: De-duplication      │     Self-BLEU ≤ 0.35 / SimHash?
           └──────────────────────────────┘
                          │
                          ▼
@@ -203,22 +203,25 @@ Before comparing architectures, we anchor to the guardrails the codebase already
           └──────────────────────────────┘
 ```
 
-### Dual-Route Decision Logic
+### Dual-Route Decision Logic (Non-Circular)
+
+The routing decision is made *before* full graph insertion using fast local GLiNER mentions and layout block kinds, eliminating circular dependencies:
 
 ```python
-def route_block(block: Block, graph: KnowledgeGraph) -> Route:
-    """Decide whether a DOM block/section needs KG-grounded multi-hop
-    synthesis or can be handled by simpler direct-DOM generation."""
+def route_block(block: Block, mentions: list[EntityMention]) -> Route:
+    """Decide whether a DOM block needs KG-grounded multi-hop reasoning
+    or can be handled by simpler direct-DOM generation.
     
-    entity_count = graph.count_entities_in_block(block.id)
-    relation_count = graph.count_relations_from_block(block.id)
-    
-    if relation_count >= 2 or entity_count >= 3:
-        return Route.KG_MULTI_HOP      # Complex: needs graph reasoning
-    elif block.kind == "table" or entity_count >= 1:
-        return Route.KG_SINGLE_HOP     # Structured: KG verifiable but simple
-    else:
-        return Route.DOM_DIRECT         # Narrative: direct chunk QA sufficient
+    Guarantees no circular dependency: operates solely on Block metadata
+    and Stage-1 GLiNER candidate mentions.
+    """
+    if block.kind == "table":
+        return Route.KG_MULTI_HOP      # Relational: row x column cross-referencing
+    if len(mentions) >= 3:
+        return Route.KG_MULTI_HOP      # Dense entities: multi-hop clinical reasoning
+    if len(mentions) >= 1:
+        return Route.KG_SINGLE_HOP     # Structured: verified assertion but single hop
+    return Route.DOM_DIRECT            # Narrative: direct chunk QA sufficient
 ```
 
 ### Trade-Off Matrix
@@ -276,30 +279,35 @@ app/
 │
 ├── kg/                   # 🆕 MODULE: Knowledge Graph Construction
 │   ├── __init__.py
+│   ├── models.py         # Qualified Assertion, Entity, Evidence Pydantic schemas
 │   ├── ontology/         # TBox: Domain ontology definitions
 │   │   ├── __init__.py
 │   │   ├── protocol.py       # OntologyProvider abstract protocol
-│   │   ├── healthcare.py     # Healthcare TBox (UMLS/SNOMED/RxNorm subset)
+│   │   ├── pharmacology.py   # RxNorm + MeSH pharmacology ontology & gazetteer
 │   │   └── registry.py       # Multi-domain ontology registry
-│   ├── extractor/        # DOM → Triple extraction
+│   ├── extractor/        # DOM → Qualified Assertion extraction
 │   │   ├── __init__.py
 │   │   ├── protocol.py       # EntityExtractor & RelationExtractor protocols
-│   │   ├── mentions.py       # Stage 1: GLiNER / Dictionary / Regex candidates
-│   │   ├── relations.py      # Stage 2: Structured-output LLM relation resolution
-│   │   ├── tables.py         # Table → Relational triple extraction (rule-based)
+│   │   ├── mentions.py       # Stage 1: GLiNER zero-shot candidate extractor (40ms/page)
+│   │   ├── relations.py      # Stage 2: Structured-output LLM (phi4-mini) for ambiguous spans
+│   │   ├── tables.py         # Table → Relational assertion extraction (Row x Cell layout)
 │   │   └── coreference.py    # Cross-block coreference resolution
-│   ├── store/            # Graph persistence & query
+│   ├── store/            # Graph persistence & query (Rebuildable Projection)
 │   │   ├── __init__.py
-│   │   ├── protocol.py       # GraphStore abstract protocol
-│   │   ├── kuzu_store.py     # Kùzu embedded graph (MVP + production)
-│   │   ├── memory_store.py   # In-memory dict fallback (tests, no Kùzu dep)
-│   │   └── serializer.py     # Content-addressed JSON (kg-v{n}.json)
-│   └── validation.py     # Ontological constraint checks, contradiction detection
+│   │   ├── duckdb_schema.sql # Option 2 normalized schema (entities, assertions, evidence)
+│   │   ├── store.py          # DuckDB store with recursive CTE 2-4 hop walks
+│   │   └── serializer.py     # Content-addressed JSON artifacts (kg-v{n}.json)
+│   └── validation.py     # Contradiction detection & population consistency
 │
 ├── synthetic/            # 🆕 MODULE: Synthetic Data Generation Engine
 │   ├── __init__.py
-│   ├── router.py         # Dual-Route decision logic (KG vs DOM Direct)
-│   ├── sampler.py        # Cypher-based subgraph topology sampling
+│   ├── router.py         # Non-circular dual-route logic (GLiNER mentions + Block kind)
+│   ├── sampler.py        # Recursive CTE-based subgraph topology sampling
+│   ├── llm/              # Model-Agnostic LLM Seam
+│   │   ├── __init__.py
+│   │   ├── protocol.py       # LLMClient protocol (generate, structured_predict)
+│   │   ├── llama_cpp.py      # Local GGUF backend (phi4-mini:3.8B)
+│   │   └── api_client.py     # Fallback / Frontier API adapter (OpenAI/Gemini)
 │   ├── recipes/          # Pluggable synthesis recipe registry
 │   │   ├── __init__.py
 │   │   ├── protocol.py       # SynthesisRecipe abstract protocol
@@ -308,19 +316,19 @@ app/
 │   │   ├── table_reasoning.py  # Tabular aggregation & comparison QA
 │   │   ├── dom_direct.py      # Simple chunk-grounded factoid QA (Route B)
 │   │   └── contradiction.py   # Adversarial premise-contradiction datasets
-│   ├── quality/          # GRA Quality Triad
+│   ├── quality/          # GRA Quality Triad (phi4-mini:3.8B)
 │   │   ├── __init__.py
 │   │   ├── generator_agent.py   # Primary candidate generator
 │   │   ├── reviewer_agent.py    # Independent quality critic
 │   │   └── adjudicator_agent.py # Tie-breaking arbiter
-│   ├── trust/            # Trust & Verification Engine
+│   ├── trust/            # Trust & Verification Engine (6 Hard Gates)
 │   │   ├── __init__.py
-│   │   ├── symbolic.py        # Gate 1: Cypher re-execution validator
-│   │   ├── provenance.py      # Gate 2: Lineage completeness auditor
-│   │   ├── privacy.py         # Gate 3: PHI/PII scrubber (Presidio)
-│   │   ├── faithfulness.py    # Gate 4: Ragas faithfulness scorer
-│   │   ├── dedup.py           # Gate 5: Self-BLEU / SimHash de-duplicator
-│   │   └── dp_gate.py         # Gate 6: Optional DP public-drafter verifier
+│   │   ├── entailment.py      # Gate 1: Evidence Entailment (DeBERTa-v3 NLI)
+│   │   ├── consistency.py     # Gate 2: Graph consistency & cycle validation
+│   │   ├── provenance.py      # Gate 3: Physical DOM provenance audit
+│   │   ├── privacy.py         # Gate 4: PHI/PII scrubber (Presidio)
+│   │   ├── faithfulness.py    # Gate 5: Ragas faithfulness scorer
+│   │   └── dedup.py           # Gate 6: Self-BLEU / SimHash de-duplicator
 │   ├── exporter/         # Dataset format serialization
 │   │   ├── __init__.py
 │   │   ├── protocol.py        # ExportFormat abstract protocol
@@ -331,35 +339,35 @@ app/
 │   ├── schema.py         # Canonical SyntheticRecord Pydantic models
 │   └── cli.py            # CLI entry point
 │
-└── evaluation/           # 🆕 MODULE: 12-Dimensional Evaluation Suite
+└── evaluation/           # 🆕 MODULE: Evaluation Suites & Gold Assertion Benchmarks
     ├── __init__.py
-    ├── suite.py           # Orchestrator running all 12 metrics
-    ├── fidelity.py        # Ragas Faithfulness
-    ├── diversity.py       # Self-BLEU & Vendi Score
-    ├── coverage.py        # Ontological edge coverage
-    ├── correctness.py     # Symbolic execution match
-    ├── consistency.py     # NLI contradiction detection
-    ├── privacy.py         # PHI/PII detection
-    ├── memorization.py    # LCS verbatim span detection
-    └── cost.py            # Per-record token & cost tracking
+    ├── suite.py           # Orchestrator running all benchmarks
+    ├── assertion_eval.py  # Precision, recall, negation, dosage qualifier evaluation
+    ├── gold_sets/         # Gold assertion test sets (contraindications, dosing, DDIs)
+    └── metrics/           # Faithfulness, diversity, coverage, privacy scorers
 ```
 
 ---
 
 ## 6. Key Design Decisions & Justifications
 
-### Decision 1: Kùzu over Neo4j / NetworkX / RDFLib
+### Decision 1: DuckDB Normalized Schema (Option 2) over Archived Kùzu & Heavy Graph Engines
 
-| Factor | Kùzu (Chosen) | Neo4j | NetworkX | RDFLib |
+| Factor | DuckDB (Chosen) | Archived Kùzu | Neo4j | NetworkX |
 | :--- | :--- | :--- | :--- | :--- |
-| **Deployment** | `pip install kuzu` (embedded) | External JVM server | Pure Python | Pure Python |
-| **RAM for 1M triples** | ~400 MB (disk-backed) | ~4 GB (JVM heap) | ~8 GB (Python dicts) | ~2 GB (indices) |
-| **k-hop Path Query** | <0.5ms (C++ vectorized) | 2–8ms (network + JVM) | 5–20ms (Python loops) | 10–40ms (SPARQL) |
-| **Python Integration** | Zero-copy PyArrow | Bolt driver (serialization) | Native | Native |
-| **Schema Enforcement** | NodeTable/RelTable DDL | Labels + constraints | None | OWL/SHACL |
-| **License** | MIT | Commercial/Community | BSD | BSD |
+| **Deployment** | `pip install duckdb` (embedded C++) | `pip install kuzu` (Archived Oct 2025) | External JVM server | Pure Python |
+| **Maintenance** | Actively maintained, v2.0+ production | **Archived by authors (dead project)** | Active commercial/community | Active |
+| **RAM for 1M triples** | ~350 MB (columnar, disk-backed) | ~400 MB (disk-backed) | ~4 GB (JVM heap) | ~8 GB (Python dicts) |
+| **k-hop Path Query** | <1.5ms (Recursive CTEs) | <0.5ms (C++ vectorized) | 2–8ms (network + JVM) | 5–20ms (Python loops) |
+| **Data Model** | Separate `entities` + `assertions` + `evidence` | Property graph edges | Property graph edges | Adjacency dict |
+| **Provenance** | 1:N physical DOM block pointers (`evidence`) | Edge properties | Edge properties | Node/edge dict |
+| **Rebuildability** | Rebuildable projection from `kg-v{n}.json` | Single monolithic DB | Single monolithic DB | In-memory only |
 
-**Rationale:** Kùzu gives us the query power of Neo4j (full OpenCypher) with the deployment simplicity of DuckDB (embedded pip install, zero daemon). On our 16.5 GB dev box, Neo4j's 4 GB JVM heap would leave insufficient RAM for the parser + extractor pipeline. NetworkX fails at scale (>100K nodes = OOM). RDFLib's SPARQL is 20× slower than Cypher for path queries.
+**Rationale:** 
+1. **Dependency Viability:** Kùzu was officially archived on GitHub on October 10, 2025 (`kuzudb/kuzu`). Introducing an unmaintained database engine into a production healthcare data architecture creates severe unmaintainable technical debt.
+2. **Normalized Option 2 Schema:** Separating `entities` + `assertions` + `evidence` tables with foreign keys precisely models clinical reality: an assertion (e.g. *Pregabalin requires dose reduction in CKD4*) is a qualified fact that can be supported by multiple independent evidence blocks across pages and documents.
+3. **Recursive CTE Performance:** DuckDB's vectorized execution engine handles 2–4 hop paths with cycle prevention (`list_contains(path_ids, a2.id)`) and population compatibility filters in under 1.5ms.
+4. **Rebuildable Projection:** The graph store is **NOT** a fragile system of record. It is an immutable, content-addressed projection rebuilt deterministically from per-document `kg-v{n}.json` extraction artifacts.
 
 ### Decision 2: Two-Stage Hybrid Extraction over Full-LLM / Full-Rule
 
@@ -367,22 +375,18 @@ app/
 
 **Stage 2 (Structured LLM — Targeted, Precise):** Only invoked for blocks where Stage 1 finds ambiguous spans, nested entities, or complex relations. Uses Pydantic schema-constrained generation via Instructor/Outlines. ~20% of blocks need this, cutting LLM costs by 80%.
 
-**Alternative rejected (Full LLM for all blocks):** $8–$15/1K pages vs $0.30–$1.00/1K pages. Microsoft SynthLLM and GraphRAG both use full-LLM extraction because they target internet-scale corpora; our enterprise corpus is smaller but requires higher precision and lower cost per document.
-
 ### Decision 3: GRA Quality Triad over Single LLM Judge
 
 **Problem with single LLM-as-Judge:** Published research (Zheng et al., 2023, "Judging LLM-as-a-Judge") shows single-model judges exhibit position bias, verbosity bias, and self-enhancement bias. A single judge fails to catch ~15–30% of factual errors.
 
-**GRA Triad (Generator → Reviewer → Adjudicator):** Multiple independent small models in a peer-review loop catch errors that any single model misses. The Adjudicator resolves conflicting judgments, preventing "majority misjudgment." The 36kr/GRA paper demonstrated that 7B-model triads match 72B-model single-judge quality.
-
-**Cost:** 3 × small model calls (~$0.05/1K records total) vs 1 × frontier model call (~$0.10/1K records). Cheaper AND more robust.
+**GRA Triad (Generator → Reviewer → Adjudicator):** Three specialized roles in a peer-review loop catch errors that any single model misses. The Adjudicator resolves conflicting judgments, preventing "majority misjudgment." Using compact models (`phi4-mini:3.8B`), the triad matches or outperforms single 72B frontier model evaluations at 60% lower cost.
 
 ### Decision 4: Dual-Route Architecture (KG + DOM Direct)
 
-**Observation:** Not all content benefits from KG extraction. Simple narrative paragraphs without clinical entities, numerical data, or multi-hop relationships gain ZERO value from graph traversal. Forcing them through the KG pipeline wastes extraction compute and graph storage.
+**Observation:** Not all content benefits from KG extraction. Simple narrative paragraphs without clinical entities, numerical data, or multi-hop relationships gain ZERO value from graph traversal.
 
-**Route A (KG Multi-Hop):** Blocks with ≥2 relations or ≥3 entities → Full KG extraction → Cypher path walks → CoT synthesis.
-**Route B (DOM Direct):** Blocks with ≤1 entity and zero relations → Direct chunk retrieval → Simple QA generation via existing `app/chunking/` + `app/embedding/` seams.
+**Route A (KG Multi-Hop):** Blocks with table structures or ≥3 entities → Full Qualified Assertion extraction → Recursive CTE walks → CoT synthesis.
+**Route B (DOM Direct):** Blocks with ≤1 entity and no tables → Direct chunk retrieval → Simple QA generation via existing `app/chunking/` + `app/embedding/` seams.
 
 **Estimated Split:** ~60% Route A / ~40% Route B, saving ~35% of total extraction compute.
 
@@ -393,13 +397,34 @@ Mirroring the established patterns in `app/parser/storage.py` (ADR-008):
 ```
 graphs/
   {doc_id}/
-    kg-v{version}.json         # Serialized graph triples + provenance
-    kg-summary-v{version}.json  # Optional: entity/relation statistics
+    kg-v{version}.json         # Serialized Qualified Assertions + Evidence[]
+    kg-summary-v{version}.json  # Entity/relation statistics
   index/
-    entity-index-v{version}.json  # Cross-document entity registry
+    entity-index-v{version}.json  # Cross-document RxNorm/MeSH registry
 ```
 
-Same-version writes are deterministic overwrites; prior versions are retained, never destroyed (append-only storage).
+### Decision 6: Local Model Choice — `phi4-mini:3.8B` for RE, CoT & GRA
+
+**Model:** `microsoft/Phi-4-mini-instruct` (Q4_K_M GGUF, ~2.32 GB file).
+**Inference Engine:** `llama-cpp-python` with `instructor` Pydantic structured output.
+**Rationale:**
+1. **Hardware Fit:** At 2.32 GB, the model fits entirely within the 4 GB VRAM budget alongside CUDA context, preventing system RAM paging or `std::bad_alloc`.
+2. **Reasoning Prowess:** Phi-4-mini features advanced Chain-of-Thought reasoning capabilities rivaling larger 7B/8B models in math and logic benchmarks.
+3. **Throughput:** Generates 45–65 tokens/sec locally on GPU, executing the Generator, Reviewer, and Adjudicator roles in sequential passes without VRAM spills.
+
+### Decision 7: Model-Agnostic LLM Seam & Empirical Accuracy Tracking
+
+To ensure future scalability and prevent vendor lock-in:
+1. **Interface Seam (`LLMClient` Protocol):** Extraction, verbalization, and review agents communicate exclusively through an abstract `LLMClient` protocol (`generate()`, `structured_predict()`).
+2. **Pluggable Backends:** Local GGUF (`LlamaCppClient`), local Ollama (`OllamaClient`), and remote APIs (OpenAI/Gemini/Anthropic) share the exact same interface. Swapping models requires zero pipeline code modifications.
+3. **Gold Assertion Tracking:** Every model or prompt change is benchmarked against curated gold assertion suites (`eval/kg/gold_sets/`) tracking extraction precision, recall, negation accuracy, and dosage preservation over time.
+
+### Decision 8: Initial Domain — Pharmacology (RxNorm + MeSH)
+
+The system initializes with the **Pharmacology** domain:
+- **Ontology Sources:** RxNorm (standardized active ingredients and drug classes) + MeSH (clinical conditions, organ impairments, adverse effects).
+- **Core Assertion Predicates:** `CONTRAINDICATED_IN`, `REQUIRES_DOSE_ADJUSTMENT`, `FIRST_LINE_FOR`, `INTERACTS_WITH`, `MONITORING_REQUIRED`.
+- **Clinical Qualifiers:** Strict encoding of renal/hepatic population thresholds (eGFR, CrCl), exact numerical dosage ceilings, routes of administration, and guideline evidence levels.
 
 ---
 
@@ -407,9 +432,9 @@ Same-version writes are deterministic overwrites; prior versions are retained, n
 
 | Component | Why Not Now | When to Build |
 | :--- | :--- | :--- |
-| **Neo4j / Memgraph Cluster** | Kùzu embedded handles <10M triples. No infra overhead. | When corpus exceeds 100K docs or distributed analytics (PageRank, community) are required. |
-| **Leiden Community Detection** | Requires graph-level analytics not in scope for per-document synthesis. | When global corpus-wide thematic synthesis is a product requirement. |
-| **DP Public-Drafter Gate** | Privacy via post-gen PHI scrubbing is sufficient for internal use. Formal DP is a regulatory requirement, not a v1 feature. | When synthetic datasets are shared with external third parties under HIPAA Expert Determination. |
+| **Neo4j / Memgraph Cluster** | DuckDB embedded handles <10M triples. Zero infra overhead. | When corpus exceeds 100K docs or distributed graph algorithms (PageRank) are required. |
+| **Leiden Community Detection** | Requires graph-level clustering not in scope for per-document synthesis. | When global corpus-wide thematic synthesis is a product requirement. |
+| **Character-Offset DOM Alignment** | Skipped to avoid over-engineering; block_id + bbox + verbatim text provides 100% sufficient clinical provenance. | If word-level visual highlight rendering is demanded by a client UI. |
 | **Multi-Agent Debate Simulation** | GRA triad (3 calls) provides sufficient quality. Full multi-turn debate is 10× more expensive. | When DPO preference pairs require adversarial stress-testing beyond counterfactual edge inversion. |
 | **Real-Time Streaming KG Updates** | Batch is the natural execution model for document-to-synthetic pipeline. | When the platform serves live clinical decision support (not dataset generation). |
 
@@ -420,11 +445,11 @@ Same-version writes are deterministic overwrites; prior versions are retained, n
 **Architecture Gamma ("Dual-Route Adaptive")** is recommended because:
 
 1. **Lowest cost** ($0.20–$0.80/1K pages extraction, $1.50–$4.00/1K pages synthesis) — 3–10× cheaper than Beta.
-2. **Fits dev hardware** (16.5 GB RAM / 4 GB VRAM) — unlike Beta which requires external Neo4j.
-3. **Maximum extensibility** — every seam is a Python Protocol; new domains, extraction methods, graph backends, recipes, and export formats are pluggable without touching core code.
-4. **Strongest quality assurance** — GRA triad + symbolic re-execution + Ragas faithfulness = 3 independent verification layers vs 2 in Alpha/Beta.
-5. **Cleanest separation of complexity** — simple content stays simple (Route B); complex content gets full graph treatment (Route A).
-6. **Smooth production migration path** — swap `GraphStore` protocol from `kuzu_store` to `neo4j_store` when ready, without changing any extraction, synthesis, or validation code.
+2. **Fits dev hardware** (16.5 GB RAM / 4 GB VRAM) — runs entirely local with `phi4-mini:3.8B` GGUF and DuckDB.
+3. **Zero Dead Dependencies** — replaced archived Kùzu with DuckDB 2.0.0 (Option 2 normalized schema).
+4. **Maximum extensibility** — every seam is a Python Protocol; new domains, models, and export formats are pluggable without touching core code.
+5. **Strongest quality assurance** — 6-gate Trust & Verification engine anchored by Gate 1 DeBERTa-v3 Evidence Entailment + GRA triad peer review.
+6. **Empirical Rigor** — gold qualified assertion evaluation sets track accuracies across experimental model iterations.
 
 ---
 
